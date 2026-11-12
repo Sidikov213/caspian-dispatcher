@@ -29,6 +29,25 @@ def _check(name: str, label: str, expected, actual, tol: float = 1e-6) -> dict:
     return {"name": name, "label": label, "expected": expected, "actual": actual, "ok": ok}
 
 
+def forecast_quiet(cp) -> dict:
+    """Создал ли наблюдатель алерт на текущей погоде до сценария. Не ошибка (шторм бывает и настоящий),
+    но проверка говорит об этом прямо: порт, волна, рейс. ok всегда True."""
+    found = []
+    for a in cp.alerts.values():
+        if a.get("source") != "forecast" or a["status"] != "new":
+            continue
+        th = cp.alert_threat[a["id"]]
+        port = cp.graph.nodes[th["affected_nodes"][0]]["name"].split(" (")[0]
+        s = cp.sailings[th["_sailing"]]
+        found.append(f"{port}: волна до {ru(th['_peak'])} м к отправлению "
+                     f"{cp.meta.get('sailing_labels', {}).get(s['id'], s['id'])} ({day_time(s['departure'])}), "
+                     f"грузов {len(a['items'])} — {a['id']}")
+    actual = "0 алертов по прогнозу" if not found else f"{len(found)} по прогнозу: " + "; ".join(found)
+    return {"name": "forecast_quiet",
+            "label": "До сценария наблюдатель не создаёт алертов по прогнозу (если создал — это настоящая угроза)",
+            "expected": "0 алертов по прогнозу", "actual": actual, "ok": True}
+
+
 def calm_start(cp) -> tuple[dict, list[str]]:
     """До сценария ни один груз не «Под риском» (на текущей погоде и активном предикторе).
     Возвращает (проверка, причины провала)."""
@@ -60,13 +79,14 @@ def run_check(st) -> dict:
     from .state import State  # здесь, чтобы не было циклического импорта
     cp = State(st.seed_path, clock=FixedClock(st.sim_now), predictor=st.predictor, forecast=st.forecast)
     calm, calm_problems = calm_start(cp)
+    quiet = forecast_quiet(cp)
     out = D.run_scenario(cp, "storm_north")
     alert, sc = out["alert"], out["scenario"]
     items = {i["shipment_id"]: i for i in alert["items"]}
     rec = next((o for o in alert["options"] if o["recommended"]), None)
     mkh = next((o for o in alert["options"] if o["id"] == "mkh"), None)
 
-    checks = [calm]
+    checks = [quiet, calm]
     pct = {sid: round(cp.shipments[sid]["risk"]["miss_probability"] * 100) for sid in EXPECTED_RISK}
     for sid, want in EXPECTED_RISK.items():
         checks.append(_check(f"risk_{sid}", f"Риск №{sid[3:]}, % (±{RISK_TOLERANCE_PP} п. п.)", want, pct[sid],
@@ -85,7 +105,8 @@ def run_check(st) -> dict:
         _check("recommended", "Рекомендованный вариант", EXPECTED["recommended"], rec["id"] if rec else None),
     ]
     ok = all(c["ok"] for c in checks)
-    problems = [] if ok else calm_problems + explain(cp, sc, [c for c in checks if c["name"] != "calm_start"], items)
+    problems = [] if ok else calm_problems + explain(
+        cp, sc, [c for c in checks if c["name"] not in ("calm_start", "forecast_quiet")], items)
     w = cp.weather_out()
     return {"ok": ok, "sim_now": cp.sim_now.isoformat().replace("+00:00", "Z"),
             "weather": {"source": w["source"], "stale": w["stale"], "updated_at": w["updated_at"]},
@@ -138,6 +159,9 @@ def log_check(st, when: str) -> dict:
         log.exception("Проверка демо (%s) упала", when)
         return {"ok": False}
     src = f"погода: {res['weather']['source']}{', устарела' if res['weather']['stale'] else ''}"
+    quiet = next(c["actual"] for c in res["checks"] if c["name"] == "forecast_quiet")
+    if not quiet.startswith("0 "):
+        log.warning("Проверка демо (%s): наблюдатель нашёл угрозу в настоящем прогнозе до сценария — %s", when, quiet)
     if res["ok"]:
         risk = "/".join(str(c["actual"]) for c in res["checks"] if c["name"].startswith("risk_sh"))
         calm = next(c["actual"] for c in res["checks"] if c["name"] == "calm_start")

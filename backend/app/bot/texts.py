@@ -60,7 +60,7 @@ def hint() -> str:
 def alert_message(st, alert: dict) -> str:
     """Заголовок отдельной строкой, текст — тот же шаблон движка, что и Alert.text, но с разметкой."""
     icon = "🔴" if alert["severity"] == "high" else "🟠"
-    sc = next((s for s in st.scenarios.values() if s["id"] == alert["scenario_id"]), None)
+    sc = st.alert_threat.get(alert["id"])   # угроза, по которой создан алерт: прогноз или сценарий
     internal = st.alert_internal.get(alert["id"])
     body = (D.alert_text(st, sc, alert, internal, html=True) if sc is not None and internal is not None
             else escape(alert["text"]))
@@ -74,6 +74,8 @@ def alert_suffix(alert: dict) -> str:
     if st_ == "rejected":
         return "✖️ Отклонено: груз ждёт следующий рейс"
     if st_ == "superseded":
+        if alert.get("status_note") == "угроза снята":
+            return "✅ Угроза снята — решение не нужно"
         return "⌛ Предложение устарело — актуальное ниже"
     return ""
 

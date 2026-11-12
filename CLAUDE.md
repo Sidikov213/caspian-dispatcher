@@ -57,8 +57,10 @@ web (React/Vue + Leaflet)   mobile (Flutter)   Telegram
 - Бот живёт в процессе бэкенда (polling как asyncio-задача) и вызывает функции напрямую.
 - Состояние в памяти, сид из `data/seed.json`, `POST /api/demo/reset` возвращает всё к началу демо.
 
-Конвейер диспетчера (`dispatcher.py`), запускается при появлении сценария:
-1. `affected` = грузы, чей рейс попадает в окно сценария
+Наблюдатель угроз (`dispatcher.watch`) запускается при старте и reset, после каждого обновления прогноза и после запуска сценария. Угроза — (вид, порт, рейс): у запланированного рейса в ближайшие 48 ч в момент отправления волна в порту не ниже предела (или порт под затором сценария). По каждой новой угрозе — алерт через конвейер ниже. Одна угроза — один активный алерт; прогноз изменился существенно (окно сдвинулось на 3 ч и больше или пик волны на 0,5 м) — старый алерт `superseded`, создаётся новый; угроза ушла до решения — алерт `superseded` с пометкой «угроза снята». Сценарий — не отдельная ветка: он только подменяет прогноз (шторм, затор) и зовёт наблюдателя. Источник угрозы в алерте: `source: forecast | scenario`.
+
+Конвейер диспетчера (`dispatcher.build_alert`), запускается наблюдателем по угрозе:
+1. `affected` = грузы, чья стыковка — рейс угрозы
 2. для каждого: `predictor.predict(...)` → вероятность срыва стыковки, самое раннее отправление, факторы
 3. «ничего не делать» = первый рейс из расписания после самого раннего отправления → задержка прибытия
 4. `graph.alternatives(...)` → до 3 маршрутов; для каждого проверки: волна в порту в момент отправления ниже предела, рейс есть, свободного места хватает, груз успевает к окончанию приёма, тип груза допустим
@@ -110,7 +112,9 @@ Alert     {id, scenario_id, created_at, starts_in_h, severity, title, text,
            port_load: {node_id, before, after},
            options: [{id, title, route: Route|null, delay_vs_plan_h, saved_hours,
                       saved_rub, co2_delta_kg, recommended}],
-           status: new|accepted|rejected|superseded, accepted_at, accepted_via}
+           status: new|accepted|rejected|superseded, accepted_at, accepted_via,
+           source?: forecast|scenario,   # откуда угроза: наблюдатель нашёл в прогнозе или сценарий
+           status_note?}                 # почему закрыт: «угроза снята», «прогноз изменился…»
            # все деньги и часы до наступления события — расчётные
            # options — до трёх вариантов решения, рекомендованный первый; числа — сумма по грузам
            # алерта. id: тег маршрута (mkh, west…), best — лучший обход для каждого груза,
@@ -159,7 +163,7 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | POST | `/auth/login` | `{email, password}` | `{token, user}`; 401 `invalid_credentials` |
 | GET | `/auth/me` | заголовок `Authorization: Bearer <token>` | `user`; 401 `invalid_token` |
 | POST | `/demo/reset` | — | `{ok: true}` |
-| GET | `/demo/check` (только демо) | — | `{ok, sim_now, weather: {source, stale, updated_at}, checks: [{name, label, expected, actual, ok}], problems: [string]}`: проверка «начальное состояние спокойное» (до сценария ни один груз не «Под риском», при провале — причина: груз, риск, волна в порту) и storm_north на копии исходного состояния, сверка с эталоном (риски 82/74/68% ±5 п. п. и порядок №01 > №02 > №03; точно: +18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, рекомендован `mkh`); `problems` — почему разошлось. Состояние не меняет |
+| GET | `/demo/check` (только демо) | — | `{ok, sim_now, weather: {source, stale, updated_at}, checks: [{name, label, expected, actual, ok}], problems: [string]}`: проверка `forecast_quiet` — создал ли наблюдатель алерт на текущей погоде до сценария (не ошибка, `ok: true`, но в `actual` прямо: порт, волна, рейс); проверка «начальное состояние спокойное» (до сценария ни один груз не «Под риском», при провале — причина: груз, риск, волна в порту) и storm_north на копии исходного состояния, сверка с эталоном (риски 82/74/68% ±5 п. п. и порядок №01 > №02 > №03; точно: +18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, рекомендован `mkh`); `problems` — почему разошлось. Состояние не меняет |
 | GET | `/model` | — | `{summary, active: "catboost" \| "formula", requested, fallback_reason, synthetic: true, note, used_at_runtime: {miss_probability, departure_shift_and_delays, shift_regressor}, trained_at, seed, classifier: {auc, brier, n_train, n_test} \| null, regressor: {mae_h, n_train, n_test} \| null, feature_importance: [{name, label, importance}]}`: только чтение, метрики из `data/model_report.json`. `summary` — строка «Активен предиктор: …» (при откате — причина; та же строка в логе при старте, при откате — warning). На сервере работает только классификатор; сдвиг и задержки — расчёт; регрессор — только проверка |
 | POST | `/demo/fail_next_pass` (только демо) | — | `{ok: true}`; следующий выпуск пропуска сорвётся → груз получает `pass_state: reissue_pending`, старый пропуск активен, повтор через `/shipments/{id}/pass/retry` |
 

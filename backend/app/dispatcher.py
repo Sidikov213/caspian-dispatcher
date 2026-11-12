@@ -27,6 +27,7 @@ from .graph import KIND_FERRY
 from .predictor import PredictContext, PredictorResult
 from .scenarios import make_scenario, public
 from .schedule import Ctx, build_legs, make_route, route_end
+from .weather import HORIZON_H
 from .util import (H, cargo_dative, cargo_dative_words, cargo_word, day_only, day_time, hours, iso,
                    k_rub, num, parse, ru, signed, time_only)
 
@@ -224,9 +225,123 @@ def mark_route(route: dict, blocked: set[str], from_index: int, delay_h: float) 
     return r
 
 
-# ---------------- сценарий → алерт ----------------
+# ---------------- наблюдатель угроз → алерт ----------------
+#
+# Алерт создаёт наблюдатель `watch`: после каждого обновления прогноза, при старте и reset, и после
+# запуска сценария. Сценарий не отдельная ветка: он только подменяет прогноз (накладывает шторм или
+# затор) и зовёт того же наблюдателя. Угроза — (вид, порт, рейс): у запланированного рейса в ближайшие
+# 48 ч в момент отправления волна в порту не ниже предела парома (или порт под затором сценария).
+# Одна угроза — один активный алерт. Прогноз изменился существенно → старый алерт superseded, новый.
+# Угроза ушла из прогноза до решения → алерт superseded с пометкой «угроза снята».
+
+WATCH_HORIZON_H = 48
+CHANGE_H = 3          # окно угрозы сдвинулось на столько часов — прогноз изменился существенно
+CHANGE_WAVE_M = 0.5   # или пик волны изменился на столько
+NOTE_GONE = "угроза снята"
+
+
+def storm_window(st, port: str, dep) -> tuple:
+    """Непрерывные часы волны не ниже предела вокруг момента отправления: [начало, конец)."""
+    lim, w = st.meta["wave_limit_m"], st.weather
+    start = parse(dep).replace(minute=0, second=0, microsecond=0)
+    while start > st.sim_now and w.wave(port, start - H(1)) >= lim:
+        start -= H(1)
+    end = w.first_calm(port, dep, lim) or st.sim_now + H(HORIZON_H)
+    return start, end
+
+
+def _scenario_threat(sc: dict, key: tuple, sailing: dict, window: tuple, peak: float) -> dict:
+    return {**sc, "_key": key, "_sailing": sailing["id"], "_source": "scenario",
+            "_window": (iso(window[0]), iso(window[1])), "_peak": peak}
+
+
+def threats(st) -> dict[tuple, dict]:
+    """Текущие угрозы по прогнозу (с наложенными сценариями). Ключ — (вид, порт, рейс)."""
+    lim = st.meta["wave_limit_m"]
+    scen = list(st.scenarios.values())
+    out: dict[tuple, dict] = {}
+    for s in st.sailings.values():
+        dep_h = hours(st.sim_now, s["departure"])
+        if s["status"] != "scheduled" or not 0 < dep_h <= WATCH_HORIZON_H:
+            continue
+        port, dep = s["from"], parse(s["departure"])
+        if port in st.weather.series and st.weather.wave(port, dep) >= lim:
+            start, end = storm_window(st, port, dep)
+            peak = round(st.weather.max_wave(port, start, end - H(1)), 2)
+            key = ("storm", port, s["id"])
+            sc = next((x for x in scen if x.get("_overlay") and port in x["_overlay"]["storm_nodes"]
+                       and parse(x["start"]) <= dep < parse(x["end"])), None)
+            if sc is not None:
+                out[key] = _scenario_threat(sc, key, s, (start, end), peak)
+            else:
+                name = st.graph.nodes[port]["name"].split(" (")[0].split(" /")[0]
+                out[key] = {
+                    "id": f"fc-{port}-{s['id']}", "type": "storm", "title": f"Шторм у порта {name}",
+                    "blocked_edges": [e for e in st.meta["ferry_edges"] if st.graph.edges[e]["from"] == port],
+                    "affected_nodes": [port], "start": iso(start), "end": iso(end),
+                    "starts_in_h": round(hours(st.sim_now, start)),
+                    "params": {"wave_height_m": round(peak, 1), "wind_ms": st.weather.wind(port, dep)},
+                    "_key": key, "_sailing": s["id"], "_source": "forecast",
+                    "_window": (iso(start), iso(end)), "_peak": peak}
+        for sc in scen:   # затор и таможня: прогноза у них нет, угрозу задаёт сценарий
+            if sc["type"] != "storm" and port in sc["affected_nodes"] \
+                    and parse(sc["start"]) <= dep <= parse(sc["end"]):
+                key = (sc["type"], port, s["id"])
+                out[key] = _scenario_threat(sc, key, s, (parse(sc["start"]), parse(sc["end"])), 0.0)
+    return out
+
+
+def _changed(old: dict, new: dict) -> bool:
+    if old["_source"] != new["_source"]:
+        return True
+    (a0, a1), (b0, b1) = old["_window"], new["_window"]
+    return (abs(hours(a0, b0)) >= CHANGE_H or abs(hours(a1, b1)) >= CHANGE_H
+            or abs(old["_peak"] - new["_peak"]) >= CHANGE_WAVE_M)
+
+
+def close_alert(st, alert: dict, note: str) -> None:
+    """Алерт больше не актуален: superseded с пометкой; грузы, оставшиеся на плане, — к обычному прогнозу."""
+    alert["status"], alert["status_note"] = "superseded", note
+    internal = st.alert_internal.get(alert["id"], {})
+    for it in alert["items"]:
+        sh = st.shipments.get(it["shipment_id"])
+        before = internal.get(it["shipment_id"], {}).get("route_before")
+        if sh and before and sh["route"]["id"] == before["id"] and not sh["rerouted"]:
+            sh["route"] = copy.deepcopy(before)
+            refresh_shipment(st, sh)
+            st.emit("shipment.updated", sh)
+    st.emit("alert.updated", alert)
+
+
+def watch(st) -> list[dict]:
+    """Сверить угрозы прогноза с алертами: новые — алерт, ушедшие — закрыть, изменившиеся — заменить."""
+    current = threats(st)
+    for key, aid in list(st.threat_alerts.items()):
+        a = st.alerts.get(aid) if aid else None
+        if key not in current:
+            if a and a["status"] == "new":
+                close_alert(st, a, NOTE_GONE)
+            del st.threat_alerts[key]
+        elif a and a["status"] == "new" and _changed(st.alert_threat[aid], current[key]):
+            close_alert(st, a, "прогноз изменился, актуальный алерт ниже")
+            del st.threat_alerts[key]
+        elif aid is None and current[key]["_source"] == "scenario":
+            del st.threat_alerts[key]   # грузов не было, но пришёл сценарий — посмотреть заново
+    created = []
+    for key, th in current.items():
+        if key in st.threat_alerts:
+            continue
+        alert = build_alert(st, th, quiet_if_empty=th["_source"] == "forecast")
+        st.threat_alerts[key] = alert["id"] if alert else None
+        if alert:
+            created.append(alert)
+    if created:
+        st.emit("stats.updated", st.stats())
+    return created
+
 
 def run_scenario(st, key: str) -> dict:
+    """Сценарий подменяет прогноз и зовёт наблюдателя. Повторный запуск — тот же ответ."""
     if key in st.scenarios:
         sc = st.scenarios[key]
         alert = next(a for a in reversed(list(st.alerts.values())) if a["scenario_id"] == sc["id"])
@@ -235,7 +350,10 @@ def run_scenario(st, key: str) -> dict:
     st.scenarios[key] = sc
     st.weather = st.make_weather()
     st.emit("weather.updated", None)
-    alert = build_alert(st, sc)
+    created = watch(st)
+    alert = next((a for a in created if a["scenario_id"] == sc["id"]), None)
+    if alert is None:   # угрозы с грузами нет (рейсов в окне нет) — алерт «грузов под риском нет»
+        alert = build_alert(st, {**sc, "_source": "scenario"})
     return {"scenario": public(sc), "alert": copy.deepcopy(alert)}
 
 
@@ -300,11 +418,13 @@ def _option(st, oid: str, title: str, items: list[dict], recommended: bool) -> d
             "co2_delta_kg": round(sum(i["co2_delta_kg"] for i in rer), 1), "recommended": recommended}
 
 
-def build_alert(st, sc: dict) -> dict:
+def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
+    """Алерт по угрозе sc (угроза наблюдателя или сценарий). Угроза наблюдателя задаёт рейс `_sailing`:
+    в алерт идут грузы, чья стыковка — этот рейс. quiet_if_empty — без грузов под угрозой алерт не нужен."""
     hour_cost = st.meta["hour_cost_rub_per_t"]
     ctx = st.ctx()
-    banned = banned_edges(st)
     blocked = set(sc["blocked_edges"])
+    banned = banned_edges(st) | blocked
     bases, internal, touched = [], {}, []
     for sh in st.shipments.values():
         if sh["stage"] == "delivered":
@@ -314,9 +434,12 @@ def build_alert(st, sc: dict) -> dict:
             continue
         leg = sh["route"]["legs"][fi]
         s = st.sailings[leg["sailing_id"]]
-        if leg["edge_id"] not in blocked and leg["from"] not in sc["affected_nodes"]:
+        if sc.get("_sailing"):
+            if s["id"] != sc["_sailing"]:
+                continue
+        elif leg["edge_id"] not in blocked and leg["from"] not in sc["affected_nodes"]:
             continue
-        if not parse(sc["start"]) <= parse(s["departure"]) <= parse(sc["end"]):
+        elif not parse(sc["start"]) <= parse(s["departure"]) <= parse(sc["end"]):
             continue
         res, _ = predict_route(st, sh, sh["route"])
         shift = hours(s["departure"], res.earliest_departure)
@@ -333,7 +456,8 @@ def build_alert(st, sc: dict) -> dict:
         internal[sh["id"]] = {"from_sailing": s["id"], "loss": dn_delay * sh["weight_t"] * hour_cost,
                               "dn_sailing": dn_sailing, "dn_delay": dn_delay, "shift": shift,
                               "p": res.miss_probability, "co2_plan": cur["total_co2_kg"],
-                              "weight": sh["weight_t"], "_risk": risk_of(res, s["departure"], dn_delay)}
+                              "weight": sh["weight_t"], "_risk": risk_of(res, s["departure"], dn_delay),
+                              "route_before": copy.deepcopy(cur)}
 
     # варианты: рекомендованный (лучший обход для каждого груза), другие обходы, «ждать»
     options: dict[str, dict] = {}
@@ -377,6 +501,10 @@ def build_alert(st, sc: dict) -> dict:
         wait_items = [_item(st, b, None, ctx)[0] for b in bases]
         options["wait"] = {"items": wait_items, "risks": {}, "title": option_title(st, wait_items)}
     rec_key = next(iter(options), None)
+    if quiet_if_empty and not bases:
+        for sid in touched:
+            st.emit("shipment.updated", st.shipments[sid])
+        return None
 
     st.seq["alert"] += 1
     aid = f"alert-{st.seq['alert']:03d}"
@@ -395,6 +523,7 @@ def build_alert(st, sc: dict) -> dict:
         "port_load": port_load(st, [i for i in items if i["action"] == "reroute"]),
         "options": [_option(st, k, o["title"], o["items"], k == rec_key) for k, o in options.items()],
         "status": "new", "accepted_at": None, "accepted_via": None,
+        "source": sc.get("_source", "scenario"), "status_note": None,
     }
     alert["text"] = alert_text(st, sc, alert, internal)
     for base in bases:
@@ -402,6 +531,7 @@ def build_alert(st, sc: dict) -> dict:
     st.alerts[aid] = alert
     st.alert_internal[aid] = internal
     st.alert_options[aid] = options
+    st.alert_threat[aid] = {k: v for k, v in sc.items()}
     st.emit("alert.created", alert)
     for sid in touched:
         st.emit("shipment.updated", st.shipments[sid])
@@ -519,10 +649,11 @@ def alert_text(st, sc: dict, alert: dict, internal: dict, html: bool = False) ->
 # ---------------- принятие, повтор, ручная смена маршрута ----------------
 
 def _supersede(st, alert: dict, why: str):
-    alert["status"] = "superseded"
-    st.emit("alert.updated", alert)
-    sc = next(s for s in st.scenarios.values() if s["id"] == alert["scenario_id"])
-    new = build_alert(st, sc)
+    close_alert(st, alert, f"предложение устарело: {why}")
+    th = st.alert_threat[alert["id"]]
+    new = build_alert(st, th)
+    if th.get("_key"):
+        st.threat_alerts[th["_key"]] = new["id"]
     raise ApiError(409, "superseded", f"Предложение устарело ({why}). Новый вариант — {new['id']}")
 
 
@@ -675,10 +806,12 @@ def reroute(st, sid: str, route_id: str) -> dict:
     fi_new, fi_old = first_ferry(st, new_route), first_ferry(st, sh["route"])
     new_s = new_route["legs"][fi_new]["sailing_id"] if fi_new is not None else None
     old_s = sh["route"]["legs"][fi_old]["sailing_id"] if fi_old is not None else None
-    if new_s and new_s != old_s:
-        if ctx.free_t(new_s) < sh["weight_t"]:
-            raise ApiError(409, "no_capacity", f"На рейсе {new_s} нет места")
-        st.sailings[new_s]["booked_t"] += sh["weight_t"]
+    if new_s != old_s:
+        if new_s:
+            if ctx.free_t(new_s) < sh["weight_t"]:
+                raise ApiError(409, "no_capacity", f"На рейсе {new_s} нет места")
+            st.sailings[new_s]["booked_t"] += sh["weight_t"]
+        # груз ушёл со старого рейса — бронь снимается всегда, в том числе при уходе на сушу
         if old_s and st.sailings[old_s]["status"] == "scheduled":
             st.sailings[old_s]["booked_t"] -= sh["weight_t"]
     set_route(st, sh, copy.deepcopy(new_route), copy.deepcopy(alt["risk"]),

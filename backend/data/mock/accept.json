@@ -894,6 +894,8 @@
       }
     ],
     "status": "accepted",
+    "source": "scenario",
+    "status_note": null,
     "accepted_at": "2026-11-12T11:32:00Z",
     "accepted_via": "web"
   },

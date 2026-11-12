@@ -108,6 +108,8 @@ class State:
         self.alerts: dict[str, dict] = {}
         self.alert_internal: dict[str, dict] = {}
         self.alert_options: dict[str, dict] = {}
+        self.alert_threat: dict[str, dict] = {}            # алерт → угроза, по которой он создан
+        self.threat_alerts: dict[tuple, str | None] = {}  # угроза (вид, порт, рейс) → алерт (None — грузов нет)
         self.accept_results: dict[str, dict] = {}
         self.decisions: list[dict] = []
         self.scenarios: dict[str, dict] = {}
@@ -120,6 +122,7 @@ class State:
         for sh in self.shipments.values():
             D.refresh_shipment(self, sh)
         self.events.clear()
+        D.watch(self)   # угроза уже в прогнозе — алерт сразу, без сценария
 
     # ---------------- служебное ----------------
 
@@ -127,11 +130,14 @@ class State:
         return Weather(self.sim_now, list(getattr(self, "scenarios", {}).values()), self.forecast)
 
     def on_forecast_updated(self) -> None:
-        """Пришёл свежий прогноз: пересобрать погоду; до сценария — и риски грузов."""
+        """Пришёл свежий прогноз: пересобрать погоду, риски грузов вне открытых алертов, наблюдатель."""
         self.weather = self.make_weather()
         if not self.scenarios:
+            in_alerts = {i["shipment_id"] for a in self.alerts.values() if a["status"] == "new" for i in a["items"]}
             for sh in self.shipments.values():
-                D.refresh_shipment(self, sh)
+                if sh["id"] not in in_alerts:
+                    D.refresh_shipment(self, sh)
+        D.watch(self)
         self.emit("weather.updated", None)
 
     def ctx(self) -> Ctx:

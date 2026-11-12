@@ -247,6 +247,9 @@ class Alert(Model):
     port_load: PortLoad | None = None
     options: list[AlertOption] = Field(default_factory=list, description="До трёх вариантов, рекомендованный первый")
     status: AlertStatus
+    source: Literal["forecast", "scenario"] | None = Field(
+        None, description="Откуда угроза: forecast — наблюдатель нашёл в прогнозе, scenario — сценарий демо")
+    status_note: str | None = Field(None, description="Почему алерт закрыт: «угроза снята», «прогноз изменился…»")
     accepted_at: datetime | None = None
     accepted_via: Via | None = None
 

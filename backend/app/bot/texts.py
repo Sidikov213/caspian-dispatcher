@@ -4,6 +4,8 @@
 """
 from html import escape
 
+from .. import dispatcher as D
+
 from ..util import cargo_dative, cargo_word, day_time, hours, k_rub, num, parse, signed, time_only
 
 STATUS = {"planned": ("⚪", "Запланирован"), "in_transit": ("🔵", "В пути"),
@@ -55,9 +57,14 @@ def hint() -> str:
 
 # ---------------- алерт ----------------
 
-def alert_message(alert: dict) -> str:
+def alert_message(st, alert: dict) -> str:
+    """Заголовок отдельной строкой, текст — тот же шаблон движка, что и Alert.text, но с разметкой."""
     icon = "🔴" if alert["severity"] == "high" else "🟠"
-    return f"<b>{icon} {escape(alert['title'])}</b>\n\n{escape(alert['text'])}"
+    sc = next((s for s in st.scenarios.values() if s["id"] == alert["scenario_id"]), None)
+    internal = st.alert_internal.get(alert["id"])
+    body = (D.alert_text(st, sc, alert, internal, html=True) if sc is not None and internal is not None
+            else escape(alert["text"]))
+    return f"<b>{icon} {escape(alert['title'])}</b>\n\n{body}"
 
 
 def alert_suffix(alert: dict) -> str:
@@ -102,25 +109,70 @@ def options_message(alert: dict) -> str:
     return "\n".join(lines)
 
 
+def _goes(n: int) -> str:
+    return "идёт" if n == 1 else "идут"
+
+
+def _records(n: int) -> str:
+    if n % 10 == 1 and n % 100 != 11:
+        return f"{n} запись"
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return f"{n} записи"
+    return f"{n} записей"
+
+
+def checkpoint_name(st, nid: str) -> str:
+    kind = {"port": "порт", "border": "пункт пропуска", "station": "станцию"}.get(st.graph.nodes[nid]["type"], "")
+    return f"{kind} {node_name(st, nid)}".strip()
+
+
+def route_line(st, sids: list[str], via: str, sailing_id: str | None, delay: float) -> str:
+    """«№01, №02, №03 идут через Махачкалу, паром М, 15 ноя, 06:00, прибытие +6 ч к плану»."""
+    parts = [f"{', '.join(ship_no(s) for s in sids)} {_goes(len(sids))} {via[:1].lower() + via[1:]}"]
+    if sailing_id:
+        parts.append(f"{D._label(st, sailing_id)}, {day_time(st.sailings[sailing_id]['departure'])}")
+    parts.append(f"прибытие {h(delay)} к плану")
+    return ", ".join(parts)
+
+
 def accept_summary(st, result: dict) -> str:
+    """Итог: строка на грузы с одинаковым маршрутом, строка про пропуска, про реестр, про расчётную
+    экономию. Технических id пропусков и хэшей нет."""
     alert, ships, blocks = result["alert"], result["shipments"], result["blocks"]
     t = alert["totals"]
-    lines = [f"<b>✅ Решение принято: маршрут перестроен, {cargo_word(len(ships))}</b>", ""]
+    sailing_of = {i["shipment_id"]: i["sailing_id"] for i in alert["items"]}
+    groups: dict[tuple, list[str]] = {}
     for sh in ships:
-        legs = sh["route"]["legs"]
-        chain = " → ".join([node_name(st, legs[0]["from"])] + [node_name(st, leg["to"]) for leg in legs])
-        delay = hours(sh["planned_eta"], sh["eta"])
-        lines.append(f"🟢 <b>{ship_no(sh['id'])} {escape(sh['title'])}</b>: {chain}")
-        lines.append(f"   Прибытие {day_time(sh['eta'])} · {h(delay)} к плану")
-        if sh["pass_state"] == "reissue_pending":
-            lines.append("   ⚠️ Пропуск ожидает переоформления — «Мои грузы» → «Повторить»")
-        elif sh["pass_id"]:
-            p = st.passes[sh["pass_id"]]
-            lines.append(f"   Пропуск {p['id']} на пункт {node_name(st, p['checkpoint_node'])}")
-    if blocks:
-        lines += ["", "Реестр: " + ", ".join(f"запись №{b['index']} ({b['hash'][:8]})" for b in blocks)]
-    lines += ["", f"Расчётная экономия по {cargo_dative(len(ships))}: {num(t['saved_hours'])} груз-часов, "
-                  f"{k_rub(t['saved_rub'])}, {co2_pct(t['co2_delta_pct'])}"]
+        key = (D.via_title(st, sh["route"]), sailing_of.get(sh["id"]), hours(sh["planned_eta"], sh["eta"]))
+        groups.setdefault(key, []).append(sh["id"])
+    lines = ["<b>✅ Решение принято</b>", ""]
+    lines += [escape(route_line(st, sids, *key)) for key, sids in groups.items()]
+
+    pending = [sh for sh in ships if sh["pass_state"] == "reissue_pending"]
+    done = [sh for sh in ships if sh["pass_state"] != "reissue_pending" and sh["pass_id"]]
+    cps: dict[str, list[str]] = {}
+    for sh in done:
+        cps.setdefault(st.passes[sh["pass_id"]]["checkpoint_node"], []).append(sh["id"])
+    parts = []
+    if len(cps) == 1:
+        word = "Пропуск переоформлен" if len(done) == 1 else "Пропуска переоформлены"
+        who = f" ({', '.join(ship_no(sh['id']) for sh in done)})" if pending else ""
+        parts.append(f"{word} на {checkpoint_name(st, next(iter(cps)))}{who}")
+    elif cps:
+        parts.append("Пропуска переоформлены: " + "; ".join(
+            f"{', '.join(ship_no(s) for s in sids)} — на {checkpoint_name(st, cp)}" for cp, sids in cps.items()))
+    if pending:
+        parts.append(f"⚠️ {', '.join(ship_no(sh['id']) for sh in pending)}: пропуск ожидает переоформления, "
+                     "старый действует — «Мои грузы» → «Повторить»")
+    if parts:
+        lines.append("; ".join(parts))
+
+    broken = st.ledger_verify()["broken_at"]
+    chain = "цепочка цела" if broken is None else f"цепочка нарушена на записи №{broken}"
+    lines.append(f"Реестр: {_records(len(blocks))} о переоформлении, {chain}" if blocks
+                 else "Реестр: записи появятся после переоформления пропусков")
+    lines.append(f"<b>Расчётная экономия по {cargo_dative(len(ships))}: {num(t['saved_hours'])} груз-часов, "
+                 f"{k_rub(t['saved_rub'])}, {co2_pct(t['co2_delta_pct'])}</b>")
     return "\n".join(lines)
 
 
@@ -159,8 +211,7 @@ def shipments_message(st, ships: list[dict]) -> str:
 
 def retry_done(st, result: dict) -> str:
     p, sh = result["pass"], result["shipment"]
-    return (f"✅ {ship_no(sh['id'])}: пропуск {p['id']} выпущен на пункт {node_name(st, p['checkpoint_node'])}, "
-            "старый отозван")
+    return f"✅ {ship_no(sh['id'])}: пропуск переоформлен на {checkpoint_name(st, p['checkpoint_node'])}, старый отозван"
 
 
 # ---------------- погода ----------------
@@ -168,7 +219,7 @@ def retry_done(st, result: dict) -> str:
 def weather_message(st) -> str:
     w = st.weather_out()
     limit = st.meta["wave_limit_m"]
-    age = round(hours(w["updated_at"], st.sim_now) * 60)
+    age = max(0, round(hours(w["updated_at"], st.clock.real_now()) * 60))
     lines = ["<b>🌊 Погода на Каспии</b>", f"Предел волны для парома — {signed(limit)} м", ""]
     for pt in w["points"]:
         nxt = pt["forecast"][:48]
@@ -176,7 +227,7 @@ def weather_message(st) -> str:
         flag = "🔴" if peak["wave_height_m"] >= limit else "🟢"
         lines.append(f"{flag} <b>{node_name(st, pt['node_id'])}</b>: сейчас {signed(pt['wave_height_m'])} м, "
                      f"за 48 ч до {signed(peak['wave_height_m'])} м ({day_time(peak['ts'])})")
-    stale = " ⚠️" if age > 60 else ""
+    stale = " ⚠️" if w["stale"] or age > 60 else ""
     lines += ["", f"Погода обновлена {age} мин назад{stale}", FOOTER]
     return "\n".join(lines)
 

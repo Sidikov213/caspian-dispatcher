@@ -75,11 +75,16 @@ def test_alert_is_sent_to_every_linked_user(bot_env):
     msgs = alert_msgs(fake)
     assert sorted(m["chat_id"] for m in msgs) == sorted(USERS)
     text = msgs[0]["text"]
-    for part in ("Риск срыва стыковки до 82%", "если рейс А отменят", "720 тыс ₽",
-                 "Через Махачкалу (паром М, 15 ноя, 06:00): прибытие +6 ч к плану",
-                 "Расчётная экономия по 3 грузам: 126 груз-часов, 597 тыс ₽",
+    assert text.startswith("<b>🔴 Шторм на Северном Каспии: 3 груза под риском</b>\n\n14 ноя 02:00–21:00, волна")
+    assert text.count("Шторм на Северном Каспии") == 1                 # заголовок не повторяется
+    for part in ("Риск срыва стыковки до <b>82%</b>", "если рейс А отменят", "прибытие <b>+48 ч</b>",
+                 "720 тыс ₽", "Через Махачкалу (паром М, 15 ноя, 06:00): прибытие <b>+6 ч</b> к плану",
+                 "<b>Расчётная экономия по 3 грузам: 126 груз-часов, 597 тыс ₽",
                  "Загрузка порта Махачкала после переноса: 55% → 61%"):
         assert part in text, part
+    assert text.count("\n\n") == 4                                    # заголовок + 4 блока
+    site = st.alerts["alert-001"]["text"]                              # сайту — без разметки
+    assert "<b>" not in site and "\x01" not in site and site.startswith("⚠️ Шторм на Северном Каспии: ")
     e = st.epoch
     assert buttons(msgs[0]["kb"]) == [f"a:{e}:alert-001", f"o:{e}:alert-001", f"r:{e}:alert-001"]
     assert [b.text for row in msgs[0]["kb"].inline_keyboard for b in row] == \
@@ -118,10 +123,13 @@ def test_bot_and_site_accept_at_once_one_decision_one_edit(bot_env):
     summaries = [m for m in fake.sent if m["text"].startswith("<b>✅ Решение принято")]
     assert sorted(m["chat_id"] for m in summaries) == sorted(USERS)
     s = summaries[0]["text"]
-    assert "Москва → Астрахань → Махачкала → Энзели" in s
-    assert "Пропуск pass-01-r1 на пункт Махачкала" in s
-    assert "Реестр: запись №4" in s
-    assert "Расчётная экономия по 3 грузам: 126 груз-часов, 597 тыс ₽, −6,9% CO₂" in s
+    assert s.split("\n") == [
+        "<b>✅ Решение принято</b>", "",
+        "№01, №02, №03 идут через Махачкалу, паром М, 15 ноя, 06:00, прибытие +6 ч к плану",
+        "Пропуска переоформлены на порт Махачкала",
+        "Реестр: 3 записи о переоформлении, цепочка цела",
+        "<b>Расчётная экономия по 3 грузам: 126 груз-часов, 597 тыс ₽, −6,9% CO₂</b>"]
+    assert "pass-" not in s
 
 
 def test_site_accept_edits_bot_message(bot_env):
@@ -207,9 +215,10 @@ def test_shipments_list_and_retry(bot_env):
     assert "⚠️ №01: маршрут изменён, пропуск ожидает переоформления" in text
     assert buttons(kb) == [f"p:{st.epoch}:sh-01"]
     summary = next(m["text"] for m in fake.sent if m["text"].startswith("<b>✅ Решение принято"))
-    assert "Пропуск ожидает переоформления" in summary
+    assert "Пропуска переоформлены на порт Махачкала (№02, №03); ⚠️ №01: пропуск ожидает переоформления" in summary
+    assert "Реестр: 2 записи о переоформлении" in summary and "pass-" not in summary
     out = asyncio.run(service.retry(st.epoch, "sh-01"))
-    assert "pass-01-r1" in out and "Махачкала" in out
+    assert out == "✅ №01: пропуск переоформлен на порт Махачкала, старый отозван"
     assert asyncio.run(service.retry(st.epoch, "sh-01")) == out  # повтор не выпускает новый
     assert service.shipments()[1] is None and len(st.decisions) == 1
 

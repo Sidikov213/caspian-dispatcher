@@ -4,6 +4,7 @@
 этим же движком, для тех, кто читает файлы напрямую.
 Запуск: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 """
+import asyncio
 import logging
 import secrets
 from contextlib import asynccontextmanager
@@ -20,7 +21,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import events
 from . import models as M
 from .bot import start_bot, stop_bot
-from .config import API_KEY
+from .config import API_KEY, WEATHER_MODE
+from .democheck import log_check, run_check
 from .state import ApiError, state
 
 log = logging.getLogger("caspian")
@@ -33,14 +35,48 @@ for _name in ("caspian", "aiogram"):  # uvicorn настраивает толь�
         _lg.setLevel(logging.INFO)
 
 
+async def refresh_weather() -> bool:
+    """Свежий прогноз Open-Meteo → погода и риски в состоянии, событие weather.updated."""
+    ok = await state.forecast.refresh()
+    async with state.lock:
+        state.on_forecast_updated()
+    await flush()
+    return ok
+
+
+async def weather_loop() -> None:
+    from .weather import REFRESH_S
+    while True:
+        await asyncio.sleep(REFRESH_S)
+        try:
+            await refresh_weather()
+        except Exception:
+            log.exception("обновление погоды упало")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Бот живёт в процессе бэкенда: polling как asyncio-задача. Без BOT_TOKEN сервер работает без бота."""
+    """Бот живёт в процессе бэкенда: polling как asyncio-задача. Без BOT_TOKEN сервер работает без бота.
+    Погода (WEATHER_MODE=live) обновляется раз в 30 мин; перед первой проверкой демо ждём первый прогноз."""
+    weather_task = None
+    if not state.forecast.synthetic:
+        try:
+            ok = await asyncio.wait_for(refresh_weather(), timeout=30)
+            log.info("Погода: %s", "Open-Meteo" if ok else "Open-Meteo недоступен, работаем по кэшу")
+        except asyncio.TimeoutError:
+            log.warning("Погода: Open-Meteo не ответил за 30 с, работаем по кэшу")
+        weather_task = asyncio.create_task(weather_loop(), name="weather-refresh")
+    else:
+        log.info("Погода: WEATHER_MODE=%s — синтетический прогноз, сеть не трогаем", WEATHER_MODE)
+    log.info("Сценарий: sim_now %s", state.sim_now.isoformat())
+    log_check(state, "старт")
     runtime = await start_bot(state)
     try:
         yield
     finally:
         await stop_bot(runtime)
+        if weather_task:
+            weather_task.cancel()
 
 
 app = FastAPI(
@@ -307,7 +343,16 @@ async def demo_reset():
     for s in state.shipments_list():
         await hub.send("shipment.updated", s)
     await hub.send("stats.updated", state.stats())
+    await hub.send("weather.updated", None)
+    log.info("Reset: sim_now %s", state.sim_now.isoformat())
+    log_check(state, "reset")
     return {"ok": True}
+
+
+@api.get("/demo/check", response_model=M.DemoCheckOut, tags=["демо"])
+async def demo_check():
+    """Только демо: storm_north на копии исходного состояния, сверка ключевых чисел с эталоном."""
+    return run_check(state)
 
 
 @api.post("/demo/fail_next_pass", response_model=M.OkOut, tags=["демо"])

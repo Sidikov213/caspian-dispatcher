@@ -19,6 +19,18 @@ JWT_SECRET = os.getenv("JWT_SECRET", "")
 MOCK_JWT_SECRET = "caspian-mock-only-not-a-secret"
 PASS_SECRET = JWT_SECRET or MOCK_JWT_SECRET
 
-# «Сейчас» сценария (sim_now): по нему идут все расчёты — прогноз, рейсы, задержки.
-# 12 ноя 14:00 МСК = 11:00 UTC. Метки событий (event_ts) = DEMO_NOW + время с последнего reset.
-DEMO_NOW = os.getenv("DEMO_NOW", "2026-11-12T11:00:00Z")
+# «Сейчас» сценария (sim_now). Пусто — при каждом reset текущее время, отброшенное до часа,
+# и сид сдвигается к нему. Задано (UTC, напр. 2026-11-12T11:00:00Z) — ручная фиксация.
+DEMO_NOW = os.getenv("DEMO_NOW", "").strip() or None
+
+# Якорь сценария: «сейчас» в docs/DEMO_SCENARIO.md, 12 ноя 14:00 МСК. На нём построены seed.json,
+# моки и тесты; живой сервер сдвигает все времена сида на sim_now − SCENARIO_ANCHOR.
+SCENARIO_ANCHOR = "2026-11-12T11:00:00Z"
+
+# Погода: live — Open-Meteo Marine (кэш в файл, при сбое — кэш); synthetic — синтетический прогноз,
+# сеть не трогаем (страховка на защиту: плохая погода или нет интернета).
+WEATHER_MODE = os.getenv("WEATHER_MODE", "live").strip().lower()
+WEATHER_CACHE_PATH = DATA_DIR / "weather_cache.json"
+
+# Привязки Telegram (/start) переживают перезапуск сервера.
+USERS_PATH = DATA_DIR / "users.json"

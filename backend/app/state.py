@@ -9,29 +9,56 @@
 import asyncio
 import copy
 import json
+import logging
 import re
+from datetime import timedelta
 from pathlib import Path
 
 import jwt
 
 from . import dispatcher as D
 from .clock import Clock
-from .config import DEMO_NOW, PASS_SECRET, SEED_PATH
+from .config import (DEMO_NOW, PASS_SECRET, SCENARIO_ANCHOR, SEED_PATH, USERS_PATH, WEATHER_CACHE_PATH,
+                     WEATHER_MODE)
 from .documents import doc_hash, normalize_fields
 from .errors import ApiError
 from .graph import Graph
-from .ledger import append_block, verify_chain
+from .ledger import append_block, block_hash, verify_chain
 from .predictor import Predictor, get_predictor
 from .scenarios import PRESET_LIST
 from .schedule import Ctx
 from .util import iso, parse
-from .weather import Weather
+from .weather import Weather, make_forecast
 
 __all__ = ["ApiError", "State", "state"]
 
 REQUIRED_FIELDS = ("goods", "hs_code", "weight_kg", "value", "origin_country")
 WEIGHT_TOLERANCE = 0.05
 HS_RE = re.compile(r"^\d{4}( ?\d{2})?( ?\d{2,4})?$")
+ISO_RE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+log = logging.getLogger("caspian")
+
+
+def shift_times(obj, delta: timedelta):
+    """Все метки времени ISO UTC в сиде сдвигаются на delta: сид хранит времена от якоря meta.now."""
+    if isinstance(obj, dict):
+        return {k: shift_times(v, delta) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [shift_times(v, delta) for v in obj]
+    if isinstance(obj, str) and delta and ISO_RE.match(obj):
+        return iso(parse(obj) + delta)
+    return obj
+
+
+def rehash_chain(chain: list[dict]) -> dict[str, str]:
+    """Пересчитать хэши после сдвига времени; {старый хэш: новый}."""
+    remap, prev = {}, "0" * 64
+    for b in chain:
+        b["prev_hash"] = prev
+        new = block_hash(b)
+        remap[b["hash"]], b["hash"] = new, new
+        prev = new
+    return remap
 
 
 class PassIssueError(Exception):
@@ -42,10 +69,13 @@ class State:
     PassIssueError = PassIssueError
 
     def __init__(self, seed_path: Path = SEED_PATH, clock: Clock | None = None,
-                 predictor: Predictor | None = None):
+                 predictor: Predictor | None = None, forecast=None, users_path: Path | None = None):
         self.seed_path = Path(seed_path)
         self.clock = clock or Clock(DEMO_NOW)
         self.predictor = predictor or get_predictor()
+        self.forecast = forecast or make_forecast(WEATHER_MODE, WEATHER_CACHE_PATH)
+        self.users_path = Path(users_path) if users_path else None
+        self.users: dict[int, str] = self._load_users()
         self.lock = asyncio.Lock()
         self.reset()
 
@@ -58,6 +88,11 @@ class State:
     def reset(self) -> None:
         seed = json.loads(self.seed_path.read_text(encoding="utf-8"))
         self.clock.reset()
+        anchor = parse(seed["meta"].get("now", SCENARIO_ANCHOR))
+        seed = shift_times(seed, self.sim_now - anchor)   # сценарий всегда от sim_now: шторм +36 ч, паром А +44 ч
+        remap = rehash_chain(seed["ledger"]) if self.sim_now != anchor else {}
+        for p in seed["passes"]:
+            p["block_hash"] = remap.get(p["block_hash"], p["block_hash"])
         self.meta = seed["meta"]
         self.graph = Graph(seed["nodes"], seed["edges"], self.meta["ferry_edges"])
         self.sailings = {s["id"]: s for s in seed["sailings"]}
@@ -76,19 +111,28 @@ class State:
         self.accept_results: dict[str, dict] = {}
         self.decisions: list[dict] = []
         self.scenarios: dict[str, dict] = {}
-        if not hasattr(self, "users"):  # привязки Telegram переживают reset
-            self.users: dict[int, str] = {}
         self.epoch = getattr(self, "epoch", 0) + 1   # номер прогона демо — для кнопок в Telegram
         self.fail_next_pass = 0
         self.seq = {"alert": 0, "decision": 0,
                     "shipment": max(int(s[3:]) for s in self.shipments if s[3:].isdigit())}
-        self.weather = Weather(self.sim_now)
+        self.weather = self.make_weather()
         self.events: list[tuple[str, object]] = []
         for sh in self.shipments.values():
             D.refresh_shipment(self, sh)
         self.events.clear()
 
     # ---------------- служебное ----------------
+
+    def make_weather(self) -> Weather:
+        return Weather(self.sim_now, list(getattr(self, "scenarios", {}).values()), self.forecast)
+
+    def on_forecast_updated(self) -> None:
+        """Пришёл свежий прогноз: пересобрать погоду; до сценария — и риски грузов."""
+        self.weather = self.make_weather()
+        if not self.scenarios:
+            for sh in self.shipments.values():
+                D.refresh_shipment(self, sh)
+        self.emit("weather.updated", None)
 
     def ctx(self) -> Ctx:
         return Ctx(self.graph, self.sailings, self.weather, self.meta, list(self.scenarios.values()),
@@ -123,7 +167,7 @@ class State:
         return D.alternatives(self, sid)
 
     def weather_out(self):
-        return self.weather.to_api()
+        return self.weather.to_api(self.clock.real_now())
 
     def presets(self):
         return copy.deepcopy(PRESET_LIST)
@@ -312,6 +356,30 @@ class State:
 
     def link_user(self, telegram_id: int, name: str) -> None:
         self.users[telegram_id] = name
+        self._save_users()
+
+    # ---------------- привязки Telegram: переживают reset и перезапуск ----------------
+
+    def _load_users(self) -> dict[int, str]:
+        if self.users_path is None:
+            return {}
+        try:
+            raw = json.loads(self.users_path.read_text(encoding="utf-8"))
+            return {int(k): v for k, v in raw.items()}
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError):
+            log.exception("не прочитал %s — привязки бота пустые", self.users_path)
+            return {}
+
+    def _save_users(self) -> None:
+        if self.users_path is None:
+            return
+        try:
+            self.users_path.write_text(json.dumps({str(k): v for k, v in self.users.items()},
+                                                  ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError:
+            log.exception("не записал %s", self.users_path)
 
 
-state = State()
+state = State(users_path=USERS_PATH)

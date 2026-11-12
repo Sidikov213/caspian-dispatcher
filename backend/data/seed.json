@@ -29,9 +29,9 @@
       "ocean_before_h": 12,
       "border_h": 24
     },
-    "rail_departures_msk": {
+    "rail_departures_h": {
       "e-astrakhan-makhachkala": [
-        "20:00"
+        6.0
       ]
     },
     "customs_h": 1,

@@ -31,7 +31,7 @@ class Notifier:
 
     async def on_created(self, alert: dict) -> None:
         key = (self.st.epoch, alert["id"])
-        text = T.alert_message(alert)
+        text = T.alert_message(self.st, alert)
         kb = alert_kb(self.st.epoch, alert)
         for uid in list(self.st.users):
             try:

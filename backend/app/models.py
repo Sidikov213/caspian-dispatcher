@@ -431,3 +431,28 @@ class ErrorBody(Model):
 
 class ErrorOut(Model):
     error: ErrorBody
+
+
+# ---------------- GET /api/demo/check (только демо) ----------------
+
+class DemoCheckItem(Model):
+    name: str
+    label: str
+    expected: float | str
+    actual: float | str | None
+    ok: bool
+
+
+class DemoCheckWeather(Model):
+    source: str
+    stale: bool
+    updated_at: str
+
+
+class DemoCheckOut(Model):
+    ok: bool
+    sim_now: str
+    weather: DemoCheckWeather
+    checks: list[DemoCheckItem]
+    problems: list[str]
+

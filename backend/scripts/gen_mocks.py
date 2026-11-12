@@ -371,7 +371,7 @@ SEED_META = {
                     and d["mode"] == "sea"],
     "handling_h": {"ferry_before_h": 8, "ferry_after_h": 12, "ocean_before_h": 12, "border_h": 24},
     # поезд Астрахань → Махачкала ходит раз в сутки (МСК); остальные плечи — по готовности
-    "rail_departures_msk": {"e-astrakhan-makhachkala": ["20:00"]},
+    "rail_departures_h": {"e-astrakhan-makhachkala": [hours(NOW, T(12, 20))]},  # 20:00 МСК = +6 ч
     "customs_h": 1,                     # обычная очередь на таможне в порту, ч
     "port_capacity_t_per_day": 2000,      # для строки «загрузка порта до → после»
     "ferry_forbidden_cargo": ["explosives"],
@@ -478,7 +478,8 @@ def run_engine() -> dict:
     from app import state as state_mod
     from app.clock import FixedClock
     state_mod.PASS_SECRET = MOCK_JWT_SECRET
-    st = state_mod.State(DATA_DIR / "seed.json", clock=FixedClock(iso(NOW)))
+    from app.weather import SyntheticForecast
+    st = state_mod.State(DATA_DIR / "seed.json", clock=FixedClock(iso(NOW)), forecast=SyntheticForecast())
 
     dump("graph", st.graph_out(), M.GraphOut)
     dump("scenario_presets", st.presets(), M.PresetOut, many=True)

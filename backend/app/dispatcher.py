@@ -19,6 +19,7 @@
 """
 import copy
 from collections import defaultdict
+from html import escape
 
 from . import models as M
 from .errors import ApiError
@@ -28,7 +29,7 @@ from .scenarios import make_scenario, public
 from .schedule import Ctx, build_legs, make_route, route_end
 from .util import (H, cargo_dative, cargo_dative_words, cargo_word, day_only, day_time, hours, iso,
                    k_rub, num, parse, ru, signed, time_only)
-from .weather import Weather
+
 
 ROUTE_TAGS = {"makhachkala": "mkh", "astrakhan": "ast", "olya": "olya", "aktau": "akt", "baku": "baku"}
 MAX_ALTERNATIVES = 3
@@ -229,7 +230,7 @@ def run_scenario(st, key: str) -> dict:
         return {"scenario": public(sc), "alert": copy.deepcopy(alert)}
     sc = make_scenario(key, st.sim_now)
     st.scenarios[key] = sc
-    st.weather = Weather(st.sim_now, list(st.scenarios.values()))
+    st.weather = st.make_weather()
     st.emit("weather.updated", None)
     alert = build_alert(st, sc)
     return {"scenario": public(sc), "alert": copy.deepcopy(alert)}
@@ -440,37 +441,53 @@ def via_title(st, route: dict) -> str:
     return "Через " + st.meta.get("via_names", {}).get(port, st.graph.nodes[port]["name"])
 
 
-def alert_text(st, sc: dict, alert: dict, internal: dict) -> str:
-    """Шаблон текста. Позже текст пишет LLM по тем же готовым числам, шаблон остаётся запасным."""
+B0, B1 = "\x01", "\x02"   # метки жирного: для сайта вырезаются, в Telegram — <b>…</b>
+
+
+def render(text: str, html: bool) -> str:
+    if not html:
+        return text.replace(B0, "").replace(B1, "")
+    return escape(text).replace(B0, "<b>").replace(B1, "</b>")
+
+
+def alert_text(st, sc: dict, alert: dict, internal: dict, html: bool = False) -> str:
+    """Шаблон текста. Позже текст пишет LLM по тем же готовым числам, шаблон остаётся запасным.
+
+    html=False — Alert.text для сайта: без разметки, первая строка с названием сценария.
+    html=True  — сообщение Telegram: заголовок там отдельной строкой, поэтому без повтора; блоки
+    через пустые строки, жирным — риск, «ничего не делать», обход и расчётная экономия.
+    """
     lim = st.meta["wave_limit_m"]
     s, e = parse(sc["start"]), parse(sc["end"])
     span = (f"{day_only(s)} {time_only(s)}–{time_only(e)}" if day_only(s) == day_only(e)
             else f"{day_only(s)} {time_only(s)} – {day_only(e)} {time_only(e)}")
+    lead = "" if html else f"⚠️ {sc['title']}: "
     if sc["type"] == "storm":
-        head = (f"⚠️ {sc['title']}: {span}, волна до {ru(sc['params']['wave_height_m'])} м "
-                f"(предел парома {ru(lim)} м).")
+        head = f"{lead}{span}, волна до {ru(sc['params']['wave_height_m'])} м (предел парома {ru(lim)} м)."
     else:
         node = sc["affected_nodes"][0]
-        head = (f"⚠️ {sc['title']}: {span}, загрузка порта {round(congestion(st, node) * 100)}%, "
+        head = (f"{lead}{span}, загрузка порта {round(congestion(st, node) * 100)}%, "
                 f"таможня до {num(customs_h(st, node))} ч.")
     items = alert["items"]
     if not items:
-        return head + "\nГрузов, у которых сорвётся стыковка, нет."
+        return render(head + "\nГрузов, у которых сорвётся стыковка, нет.", html)
     first = internal[items[0]["shipment_id"]]
     fs = st.sailings[first["from_sailing"]]
     n, w = len(items), sum(v["weight"] for v in internal.values())
     lines = [head,
              f"Под риском {_label(st, fs['id'])} {st.graph.nodes[fs['from']]['name']} → "
-             f"{st.graph.nodes[fs['to']]['name']} ({day_time(fs['departure'])}): {cargo_word(n)}, {num(w)} т.",
-             f"Риск срыва стыковки до {round(max(v['p'] for v in internal.values()) * 100)}%: "
-             f"отправление на {num(max(v['shift'] for v in internal.values()))} ч позже планового рейса.",
-             ""]
+             f"{st.graph.nodes[fs['to']]['name']} ({day_time(fs['departure'])}): {cargo_word(n)}, {num(w)} т."]
+    if html:
+        lines.append("")
+    lines += [f"Риск срыва стыковки до {B0}{round(max(v['p'] for v in internal.values()) * 100)}%{B1}: "
+              f"отправление на {num(max(v['shift'] for v in internal.values()))} ч позже планового рейса.",
+              ""]
     dn = alert["do_nothing"]
     wait = (f"если {_flight(st, fs['id'])} отменят, ждать {_flight(st, first['dn_sailing'])}"
             if first["dn_sailing"] else f"если {_flight(st, fs['id'])} отменят, ждать следующий рейс")
     rer = [i for i in items if i["action"] == "reroute"]
     if rer:
-        lines.append(f"Ничего не делать: {wait} — прибытие +{num(dn['delay_hours'])} ч, "
+        lines.append(f"Ничего не делать: {wait} — прибытие {B0}+{num(dn['delay_hours'])} ч{B1}, "
                      f"задержка обойдётся в {k_rub(dn['loss_rub'])} по {cargo_dative_words(n)}.")
         r = rer[0]["to_route"]
         sid = rer[0]["sailing_id"]
@@ -478,12 +495,12 @@ def alert_text(st, sc: dict, alert: dict, internal: dict) -> str:
         if sid:
             via += f" ({_label(st, sid)}, {day_time(st.sailings[sid]['departure'])})"
         alt_cost = sum(internal[i["shipment_id"]]["alt_cost"] for i in rer)
-        lines.append(f"{via}: прибытие +{num(max(i['delay_vs_plan_h'] for i in rer))} ч к плану, "
+        lines.append(f"{via}: прибытие {B0}+{num(max(i['delay_vs_plan_h'] for i in rer))} ч{B1} к плану, "
                      f"{k_rub(alt_cost)}.")
         t = alert["totals"]
-        lines += ["", f"Расчётная экономия по {cargo_dative(len(rer))}: {num(t['saved_hours'])} груз-часов, "
+        lines += ["", f"{B0}Расчётная экономия по {cargo_dative(len(rer))}: {num(t['saved_hours'])} груз-часов, "
                       f"{k_rub(t['saved_rub'])}, {signed(t['co2_delta_kg'] / 1000)} т CO₂ "
-                      f"({signed(t['co2_delta_pct'])}%)."]
+                      f"({signed(t['co2_delta_pct'])}%).{B1}"]
         pl = alert.get("port_load")
         if pl:
             lines.append(f"Загрузка порта {st.graph.nodes[pl['node_id']]['name']} после переноса: "
@@ -491,8 +508,8 @@ def alert_text(st, sc: dict, alert: dict, internal: dict) -> str:
     else:
         lines.append(f"Обхода нет: допустимого маршрута не нашлось, лучший вариант — "
                      f"{wait.split(', ')[-1]}, "
-                     f"прибытие +{num(dn['delay_hours'])} ч.")
-    return "\n".join(lines)
+                     f"прибытие {B0}+{num(dn['delay_hours'])} ч{B1}.")
+    return render("\n".join(lines), html)
 
 
 # ---------------- принятие, повтор, ручная смена маршрута ----------------

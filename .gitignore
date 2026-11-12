@@ -7,3 +7,5 @@ build/
 local_db.json
 *.cbm
 .pytest_cache/
+backend/data/users.json
+backend/data/weather_cache.json

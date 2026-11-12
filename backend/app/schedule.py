@@ -9,11 +9,12 @@
 ребро не закрыто сценарием в момент отправления, волна в порту отправления ниже предела,
 свободного места хватает (с учётом предварительных резервов внутри одного расчёта).
 """
+import math
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from .graph import KIND_FERRY, KIND_OCEAN, Graph
-from .util import MSK, H, hours, iso, parse
+from .util import H, hours, iso, parse
 from .weather import Weather
 
 
@@ -78,19 +79,23 @@ def first_sailing(ctx: Ctx, eid: str, ready, weight_t: float, not_before=None,
 
 
 def next_departure(ctx: Ctx, eid: str, t: datetime) -> datetime:
-    """Плечо с суточным расписанием (seed.meta.rail_departures_msk) — первое отправление ≥ t."""
-    slots = ctx.meta.get("rail_departures_msk", {}).get(eid)
+    """Плечо с суточным расписанием — первое отправление ≥ t.
+
+    seed.meta.rail_departures_h: {ребро: [часы от «сейчас» сценария]}, дальше каждые 24 ч. Задано
+    смещением, а не часами по Москве, чтобы при любом sim_now поезд шёл в том же месте сценария
+    (20:00 МСК при якоре 14:00 = +6 ч).
+    """
+    slots = ctx.meta.get("rail_departures_h", {}).get(eid)
     if not slots:
         return t
-    local = t.astimezone(MSK)
     best = None
-    for day in (0, 1):
-        for hhmm in slots:
-            hh, mm = map(int, hhmm.split(":"))
-            cand = (local + timedelta(days=day)).replace(hour=hh, minute=mm, second=0, microsecond=0)
-            if cand >= local and (best is None or cand < best):
-                best = cand
-    return best.astimezone(timezone.utc)
+    for off in slots:
+        first = ctx.sim_now + H(off)
+        k = max(0, math.ceil(hours(first, t) / 24))
+        cand = first + H(24 * k)
+        if best is None or cand < best:
+            best = cand
+    return best
 
 
 def leg_status(start, end, now) -> str:

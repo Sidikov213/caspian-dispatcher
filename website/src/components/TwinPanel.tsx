@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cargoLabel, checkpointLabel, co2ByMode, modeIcon, routeStops, type RouteStop } from "@/lib/derive";
 import {
   formatDateTime,
@@ -14,6 +15,7 @@ import {
 import type { Edge, GraphNode, Pass, RiskLevel, Shipment } from "@/lib/types";
 import { CloseIcon, FileIcon, LeafIcon, RouteIcon, TransportIcon } from "./icons";
 import { QrCode } from "./QrCode";
+import { PassModal } from "./PassModal";
 import { StatusChip } from "./StatusChip";
 
 interface Props {
@@ -48,6 +50,8 @@ function RiskCard({ shipment }: { shipment: Shipment }) {
   const tone = RISK_TONE[risk.level];
   const maxImpact = Math.max(...risk.factors.map((f) => f.impact_hours), 1);
   const shift = risk.departure_shift_h;
+  // паром на маршруте — этап с рейсом; без него груз идёт по суше и риск — на границе
+  const ferry = shipment.route.legs.some((l) => !!l.sailing_id);
 
   return (
     <section
@@ -62,15 +66,22 @@ function RiskCard({ shipment }: { shipment: Shipment }) {
           <div className="tnum mt-[3px] text-[40px] leading-[44px] font-bold" style={{ color: tone.text }}>
             {formatPercent(risk.miss_probability)}
           </div>
-          <div className="mt-[3.5px] text-[11.5px] leading-[16px] text-muted">Вероятность опоздать на паром</div>
+          <div className="mt-[3.5px] text-[11.5px] leading-[16px] text-muted">
+            {ferry ? "Вероятность опоздать на паром" : "Риск задержки на границе"}
+          </div>
         </div>
         <div className="pt-[11.5px]">
           <div className="tnum text-[24px] leading-[28px] font-bold">{formatHoursDelta(shift)}</div>
           <div className="mt-[-1px] text-[11.5px] leading-[14px] text-muted">
-            {shift > 0 ? "к плану" : "по расписанию"}
+            {shift > 0 ? "позже планового рейса" : "по расписанию"}
           </div>
         </div>
       </div>
+      {risk.arrival_delay_h > 0 && (
+        <div className="mt-[6px] text-[13px] leading-[18px] font-bold" style={{ color: tone.text }}>
+          Если рейс отменят: прибытие {formatHoursDelta(risk.arrival_delay_h)}
+        </div>
+      )}
       {risk.factors.length > 0 && (
         <ul className="mt-[6px]">
           {risk.factors.map((f, i) => (
@@ -164,6 +175,7 @@ function Co2Card({ shipment, edges }: { shipment: Shipment; edges: Map<string, E
 }
 
 function PassCard({ shipment, pass, nodes }: { shipment: Shipment; pass: Pass | null; nodes: Map<string, GraphNode> }) {
+  const [open, setOpen] = useState(false);
   const checkpoint = pass ? nodes.get(pass.checkpoint_node) : null;
   const where = pass ? checkpointLabel(checkpoint ?? undefined, pass.checkpoint_node) : "";
 
@@ -192,10 +204,17 @@ function PassCard({ shipment, pass, nodes }: { shipment: Shipment; pass: Pass | 
         <div className="mt-[4px] truncate text-[11.5px] leading-[14px] text-muted">{sub}</div>
       </div>
       {pass && shipment.pass_state !== "none" && (
-        <span className="ml-3 flex size-[48.5px] shrink-0 items-center justify-center rounded-[8px] bg-white">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Открыть пропуск"
+          title="Открыть пропуск"
+          className="ml-3 flex size-[48.5px] shrink-0 cursor-zoom-in items-center justify-center rounded-[8px] bg-white ring-action hover:ring-2"
+        >
           <QrCode value={pass.token} size={39} />
-        </span>
+        </button>
       )}
+      {open && pass && <PassModal pass={pass} shipment={shipment} nodes={nodes} onClose={() => setOpen(false)} />}
     </section>
   );
 }

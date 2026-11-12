@@ -69,6 +69,9 @@ class Edge(Model):
     base_hours: float
     cost_rub_per_t: float
     co2_g_per_tkm: float
+    path: list[list[float]] | None = Field(
+        None, description="Необязательно: промежуточные точки [lat, lon] для карты (без самих узлов). "
+                          "Только рисование: море по акватории, суша вдоль трасс")
 
 
 class Position(Model):
@@ -188,6 +191,8 @@ class Scenario(Model):
     end: datetime
     starts_in_h: float = Field(description="Через сколько часов от sim_now начинается угроза (storm_north — 36)")
     params: ScenarioParams
+    zone: list[list[float]] | None = Field(
+        None, description="Необязательно: зона угрозы для карты — полигон из точек [lat, lon]")
 
 
 class AlertItem(Model):

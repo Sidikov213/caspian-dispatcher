@@ -76,10 +76,10 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
       <div className="h-[38px] w-px bg-line" />
 
       <div className="caps ml-[21px] w-[151px] self-start pt-[25px] text-[10.5px] leading-[12px] font-bold text-muted">
-        Сэкономлено
+        Расчётная экономия
       </div>
       <div className="w-[125px]">
-        <Saved icon={<ClockIcon size={15} />} value={`${formatInt(hours)}\u00A0ч`} label="Время" good={hours > 0} />
+        <Saved icon={<ClockIcon size={15} />} value={formatInt(hours)} label="груз-часов" good={hours > 0} />
       </div>
       <div className="w-[159px]">
         <Saved icon={<RouteIcon size={15} />} value={formatRub(stats?.saved_rub ?? 0)} label="Расходы" good={(stats?.saved_rub ?? 0) > 0} />

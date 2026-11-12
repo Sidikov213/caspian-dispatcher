@@ -266,6 +266,14 @@ async def presets():
     return state.presets()
 
 
+@api.get("/scenarios", response_model=list[M.Scenario], tags=["сценарии"])
+async def active_scenarios():
+    """Только чтение: активные сценарии (после reset — пусто). Нужен клиентам для зоны угрозы на карте
+    (Scenario.zone) после перезагрузки страницы или когда сценарий запустил другой клиент."""
+    from .scenarios import public
+    return [public(sc) for sc in state.scenarios.values()]
+
+
 @api.post("/scenarios", response_model=M.ScenarioCreateOut, tags=["сценарии"])
 async def run_scenario(body: M.ScenarioIn):
     """Запуск сценария → конвейер диспетчера → алерт. Повторный запуск того же пресета возвращает его алерт."""

@@ -80,7 +80,9 @@ Tools LLM-агента в боте: `get_shipments(tg_id)`, `get_shipment(id)`, 
 ```
 Node      {id, name, country, type: port|station|border|city, lat, lon, congestion: 0..1}
 Edge      {id, from, to, mode: rail|sea|road, branch: west|transcaspian|east,
-           distance_km, base_hours, cost_rub_per_t, co2_g_per_tkm}
+           distance_km, base_hours, cost_rub_per_t, co2_g_per_tkm,
+           path?: [[lat, lon]]}   # промежуточные точки для карты (без узлов): море по акватории,
+                                  # суша вдоль трасс; только рисование, в расчётах не участвует
 Shipment  {id, title, cargo_type, weight_t, owner_tg_id, origin, destination,
            stage: planned|in_transit|delivered,
            risk_level: low|medium|high, rerouted: bool,
@@ -107,7 +109,8 @@ Risk      {miss_probability: 0..1, level: low|medium|high,
            # необязательно: три главных признака по SHAP классификатора CatBoost, вклад в
            # вероятность срыва в п. п.; у формулы и сухопутных маршрутов — null
 Scenario  {id, type: storm|congestion|customs, title, blocked_edges: [id],
-           affected_nodes: [id], start, end, starts_in_h, params: {wave_height_m, wind_ms}}
+           affected_nodes: [id], start, end, starts_in_h, params: {wave_height_m, wind_ms},
+           zone?: [[lat, lon]]}   # полигон зоны угрозы для карты; клиенты его не угадывают
            # starts_in_h — через сколько часов от sim_now начинается угроза (storm_north — 36)
 Alert     {id, scenario_id, created_at, starts_in_h, severity, title, text,
            items: [{shipment_id, action: reroute|wait, from_route, to_route,
@@ -149,6 +152,7 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | POST | `/shipments/{id}/reroute` | `{route_id}` | `Shipment` |
 | GET | `/weather` | — | `{updated_at, stale: bool, source: "open-meteo" \| "cache", points: [{node_id, wave_height_m, wind_ms, forecast: [{ts, wave_height_m}]}]}` |
 | GET | `/scenarios/presets` | — | `[{key, title}]` |
+| GET | `/scenarios` | — | `[Scenario]` — активные сценарии (после reset пусто), только чтение; нужен клиентам для `Scenario.zone` после перезагрузки страницы |
 | POST | `/scenarios` | `{preset: "storm_north" \| "storm_full" \| "congestion_astrakhan"}` | `{scenario: Scenario, alert: Alert}` |
 | GET | `/alerts?status=` | — | `[Alert]` |
 | POST | `/alerts/{id}/accept` | `{via: "web" \| "telegram", option_id?: string}` | `{alert: Alert, shipments: [Shipment], blocks: [Block], decision: Decision}`; без `option_id` — рекомендованный вариант; повтор → 200 с тем же результатом и `already_accepted: true`; устарел → 409 `superseded`; нет варианта → 404 `option_not_found`; `option_id: "wait"` → 422 `use_reject` |
@@ -230,7 +234,7 @@ website/  mobile/   docs/{PLAN.md,DEMO_SCENARIO.md,FLUTTER_CONTRACT.md,design/,p
 - 125 ₽/т·ч — «условная стоимость часа задержки»;
 - числа: «+18 ч», «298 тыс ₽», «−6,7% CO₂», «82%»; время «12 ноя, 14:30».
 
-Карта: сейчас схематичная SVG-схема с координатами узлов в коде сайта (`website/src/lib/map/layout.ts`), Leaflet не используется. Цель — тёмная подложка, по умолчанию вид на Каспий от Волгограда до Тегерана; дальние концы — стрелки у края; над картой линейная схема этапов выбранного груза. Иконки из `docs/design/` перевести на `stroke="currentColor"`.
+Карта: Leaflet 1.9 (`website/src/components/RealMap.tsx`) с растровой подложкой OpenStreetMap; узлы по `lat/lon` из `/api/graph`, рёбра по `Edge.path`, зона шторма по `Scenario.zone` — координат в коде сайта нет. Подложка следует теме сайта (`data-theme` на `<html>`, без него — системная): своей тёмной нет, в тёмной теме OSM приглушается фильтром. Адреса тайлов — `NEXT_PUBLIC_TILE_URL_LIGHT`, `_DARK`, `_FALLBACK` (CARTO без ключа отдаёт водяной знак, с ключом подключается этими переменными). Цепочка: основная подложка → запасная (`tile.openstreetmap.de`) → прежняя SVG-схема, если за 5 с не пришёл ни один тайл. Атрибуция OSM в углу карты обязательна. По умолчанию вид на Каспий от Волгограда до Тегерана, кнопка «Весь коридор» — до Мумбаи; дальние концы — стрелки у края; над картой линейная схема этапов выбранного груза. Иконки из `docs/design/` перевести на `stroke="currentColor"`.
 
 Свежесть данных: «Погода обновлена N мин назад»; старше часа — жёлтая пометка; в подвале «Расписание и загрузка портов — демо-данные».
 

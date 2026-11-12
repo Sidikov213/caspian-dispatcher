@@ -28,9 +28,9 @@ interface Props {
 }
 
 const RISK_TONE: Record<RiskLevel, { bg: string; border: string; text: string }> = {
-  high: { bg: "#FEF2F2", border: "#FECACA", text: "#DC2626" },
-  medium: { bg: "#FFFBEB", border: "#FDE68A", text: "#B45309" },
-  low: { bg: "#F0FDF4", border: "#BBF7D0", text: "#15803D" },
+  high: { bg: "var(--color-risk-soft)", border: "var(--color-risk-line)", text: "var(--color-risk)" },
+  medium: { bg: "var(--color-warn-soft)", border: "var(--color-warn-line)", text: "var(--color-warn)" },
+  low: { bg: "var(--color-ok-soft)", border: "var(--color-ok-line)", text: "var(--color-rerouted)" },
 };
 
 function nodeName(nodes: Map<string, GraphNode>, id: string) {
@@ -87,12 +87,12 @@ function RiskCard({ shipment }: { shipment: Shipment }) {
           {risk.factors.map((f, i) => (
             <li key={f.name} className="flex h-[19px] items-center text-[11.5px]">
               <span className="w-[158.5px] truncate">{f.label}</span>
-              <span className="relative h-[4px] w-[121px] overflow-hidden rounded-full bg-white/[0.08]">
+              <span className="relative h-[4px] w-[121px] overflow-hidden rounded-full bg-panel/[0.08]">
                 <span
                   className="absolute inset-y-0 left-0 rounded-full"
                   style={{
                     width: `${Math.max((f.impact_hours / maxImpact) * 100, 4)}%`,
-                    background: i === 0 && risk.level === "high" ? "#DC2626" : "#B45309",
+                    background: i === 0 && risk.level === "high" ? "var(--color-risk)" : "var(--color-warn)",
                   }}
                 />
               </span>
@@ -116,7 +116,7 @@ function Stops({ shipment, nodes }: { shipment: Shipment; nodes: Map<string, Gra
             {i < stops.length - 1 && <span className="absolute top-[29.5px] left-[14.5px] h-[16.5px] w-px bg-line-strong" />}
             <span
               className="flex size-[29.5px] shrink-0 items-center justify-center rounded-[7px]"
-              style={{ background: danger ? "#FEF2F2" : "#EFF6FF", color: danger ? "#DC2626" : "#245BDB" }}
+              style={{ background: danger ? "var(--color-risk-soft)" : "var(--color-info-soft)", color: danger ? "var(--color-risk)" : "var(--color-transit)" }}
             >
               <TransportIcon kind={modeIcon(stop.mode)} size={15} />
             </span>
@@ -125,7 +125,7 @@ function Stops({ shipment, nodes }: { shipment: Shipment; nodes: Map<string, Gra
                 <span className="truncate text-[14px] leading-[17px] font-bold">{nodeName(nodes, stop.nodeId)}</span>
                 <span
                   className="tnum ml-auto pl-3 text-[11.5px] whitespace-nowrap"
-                  style={{ color: danger ? "#DC2626" : "#64748B" }}
+                  style={{ color: danger ? "var(--color-risk)" : "var(--color-muted)" }}
                 >
                   {stopTime(stop)}
                 </span>
@@ -144,9 +144,9 @@ function Co2Card({ shipment, edges }: { shipment: Shipment; edges: Map<string, E
   const total = shipment.route.total_co2_kg || parts.rail + parts.sea + parts.road;
   const sum = parts.rail + parts.sea + parts.road || 1;
   const segments = [
-    { key: "rail", label: "Ж/д", value: parts.rail, color: "#245BDB" },
-    { key: "sea", label: "Море", value: parts.sea, color: "#087F8C" },
-    { key: "road", label: "Авто", value: parts.road, color: "#15803D" },
+    { key: "rail", label: "Ж/д", value: parts.rail, color: "var(--color-transit)" },
+    { key: "sea", label: "Море", value: parts.sea, color: "var(--color-cyan)" },
+    { key: "road", label: "Авто", value: parts.road, color: "var(--color-rerouted)" },
   ].filter((p) => p.value > 0);
 
   return (
@@ -181,15 +181,15 @@ function PassCard({ shipment, pass, nodes }: { shipment: Shipment; pass: Pass | 
 
   let title = "Пропуск оформлен";
   let sub = where;
-  let color = "#12304A";
+  let color = "var(--color-text)";
   if (shipment.pass_state === "reissue_pending") {
     title = "Пропуск ожидает переоформления";
     sub = pass ? `Действует старый: ${where}` : "Маршрут изменён";
-    color = "#B45309";
+    color = "var(--color-warn)";
   } else if (shipment.pass_state === "none" || !shipment.pass_id) {
     title = "Пропуск не оформлен";
     sub = "Нужен снимок инвойса в приложении";
-    color = "#64748B";
+    color = "var(--color-muted)";
   }
 
   return (
@@ -209,7 +209,7 @@ function PassCard({ shipment, pass, nodes }: { shipment: Shipment; pass: Pass | 
           onClick={() => setOpen(true)}
           aria-label="Открыть пропуск"
           title="Открыть пропуск"
-          className="ml-3 flex size-[48.5px] shrink-0 cursor-zoom-in items-center justify-center rounded-[8px] bg-white ring-action hover:ring-2"
+          className="ml-3 flex size-[48.5px] shrink-0 cursor-zoom-in items-center justify-center rounded-[8px] bg-panel ring-action hover:ring-2"
         >
           <QrCode value={pass.token} size={39} />
         </button>
@@ -221,7 +221,7 @@ function PassCard({ shipment, pass, nodes }: { shipment: Shipment; pass: Pass | 
 
 export function TwinPanel({ shipment, nodes, edges, pass, onClose, onAlternatives }: Props) {
   return (
-    <aside className="scroll-thin absolute inset-y-0 right-0 z-20 flex w-[400px] flex-col overflow-y-auto border-l border-line bg-panel pt-[20px] pr-[20.5px] pb-[27.5px] pl-[20px] shadow-[-8px_0_24px_rgba(18,48,74,0.06)]">
+    <aside className="scroll-thin absolute inset-y-0 right-0 z-20 flex w-[400px] flex-col overflow-y-auto border-l border-line bg-panel pt-[20px] pr-[20.5px] pb-[27.5px] pl-[20px] shadow-[-8px_0_24px_var(--color-shadow)]">
       <button
         type="button"
         onClick={onClose}

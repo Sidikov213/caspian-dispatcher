@@ -19,12 +19,12 @@
 }
 .rm .leaflet-tooltip.rm-node::before,
 .rm .leaflet-tooltip.rm-wave::before { display: none; }
-.rm-light .leaflet-tooltip.rm-node { background: rgba(255, 255, 255, 0.92); color: #12304a; }
+.rm-light .leaflet-tooltip.rm-node { background: rgba(255, 255, 255, 0.92); color: var(--color-text); }
 .rm-dark .leaflet-tooltip.rm-node { background: rgba(19, 28, 46, 0.92); color: #e6edf7; }
 .rm .leaflet-tooltip.rm-wave { font-size: 14px; font-weight: 700; }
-.rm-light .leaflet-tooltip.rm-wave { background: rgba(255, 255, 255, 0.95); color: #087f8c; border: 1px solid #c9d4e3; }
+.rm-light .leaflet-tooltip.rm-wave { background: rgba(255, 255, 255, 0.95); color: var(--color-cyan); border: 1px solid #c9d4e3; }
 .rm-dark .leaflet-tooltip.rm-wave { background: rgba(19, 28, 46, 0.95); color: #3fe0c5; border: 1px solid #24304a; }
-.rm .leaflet-tooltip.rm-wave.storm { color: #ffffff; background: #dc2626; border-color: #dc2626; }
+.rm .leaflet-tooltip.rm-wave.storm { color: #ffffff; background: var(--color-risk); border-color: var(--color-risk); }
 
 .rm-ship {
   display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%;

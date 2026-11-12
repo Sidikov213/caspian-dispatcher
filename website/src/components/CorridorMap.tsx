@@ -52,18 +52,18 @@ const MAX_SCALE = 4;
 const BOX = { x: 0, y: 0, w: 0, h: 0 };
 
 const MARKER_FILL: Record<DisplayStatus, string> = {
-  in_transit: "#245BDB",
-  at_risk: "#DC2626",
-  rerouted: "#15803D",
-  planned: "#64748B",
-  delivered: "#64748B",
+  in_transit: "var(--color-transit)",
+  at_risk: "var(--color-risk)",
+  rerouted: "var(--color-rerouted)",
+  planned: "var(--color-muted)",
+  delivered: "var(--color-muted)",
 };
 
 const ROUTE = {
-  active: "#245BDB",
-  pending: "#087F8C",
-  blocked: "#DC2626",
-  rerouted: "#15803D",
+  active: "var(--color-transit)",
+  pending: "var(--color-cyan)",
+  blocked: "var(--color-risk)",
+  rerouted: "var(--color-rerouted)",
   other: "#94A3B8",
   casing: "#E2E8F0",
   preview: "#60A5FA",
@@ -384,7 +384,7 @@ export function CorridorMap({
               y={y}
               textAnchor={c.anchor}
               dominantBaseline="central"
-              fill={c.sea ? "#087F8C" : "#64748B"}
+              fill={c.sea ? "var(--color-cyan)" : "var(--color-muted)"}
               fontSize={c.sea ? 11 : 9.5}
               fontWeight={700}
               letterSpacing={c.sea ? "0.2em" : "0.16em"}
@@ -408,7 +408,7 @@ export function CorridorMap({
           return (
             <g key={id} className="pointer-events-none">
               {label && (
-                <circle cx={x} cy={y} r={4.6} fill={id === checkpointNode ? "#15803D" : "#FFFFFF"} stroke="#12304A" strokeWidth={1.8} />
+                <circle cx={x} cy={y} r={4.6} fill={id === checkpointNode ? "var(--color-rerouted)" : "var(--color-panel)"} stroke="var(--color-text)" strokeWidth={1.8} />
               )}
               {label && node && (
                 <text
@@ -416,7 +416,7 @@ export function CorridorMap({
                   y={y + label.dy}
                   textAnchor={label.anchor}
                   dominantBaseline="central"
-                  fill="#12304A"
+                  fill="var(--color-text)"
                   fontSize={11}
                   fontWeight={700}
                 >
@@ -442,11 +442,11 @@ export function CorridorMap({
               height={17.5}
               rx={5}
               fill={MARKER_FILL[sh.display_status]}
-              stroke="#FFFFFF"
+              stroke="var(--color-panel)"
               strokeOpacity={0.9}
               strokeWidth={1}
             />
-            <text textAnchor="middle" dominantBaseline="central" y={0.5} fill="#FFFFFF" fontSize={10.5} fontWeight={700}>
+            <text textAnchor="middle" dominantBaseline="central" y={0.5} fill="var(--color-panel)" fontSize={10.5} fontWeight={700}>
               {shipmentIndex(sh.id)}
             </text>
             <title>{`${sh.title}: ${sh.display_status}`}</title>
@@ -468,9 +468,9 @@ export function CorridorMap({
               style={{
                 left: x + chip.dx,
                 top: y + chip.dy,
-                color: w.storm ? "#DC2626" : "#087F8C",
-                borderColor: w.storm ? "#FECACA" : "#DFE6EF",
-                background: w.storm ? "#FEF2F2" : "#FFFFFF",
+                color: w.storm ? "var(--color-risk)" : "var(--color-cyan)",
+                borderColor: w.storm ? "var(--color-risk-line)" : "var(--color-line)",
+                background: w.storm ? "var(--color-risk-soft)" : "var(--color-panel)",
               }}
             >
               <WavesIcon size={12} strokeWidth={1.8} />
@@ -504,7 +504,7 @@ export function CorridorMap({
             <LayersIcon size={16} />
           </MapButton>
           {layersOpen && (
-            <div className="absolute top-0 right-[44px] w-[168px] rounded-[10px] border border-line-strong bg-panel p-[6px] text-[12.5px] font-semibold shadow-[0_16px_40px_rgba(18,48,74,0.14)]">
+            <div className="absolute top-0 right-[44px] w-[168px] rounded-[10px] border border-line-strong bg-panel p-[6px] text-[12.5px] font-semibold shadow-[0_16px_40px_var(--color-shadow)]">
               {(
                 [
                   ["waves", "Волна в портах"],
@@ -572,7 +572,7 @@ function Grid({ k }: { k: number }) {
     lines.push(<line key={`y${y}`} x1={x0} y1={y} x2={x1} y2={y} />);
   }
   return (
-    <g stroke="rgba(18,48,74,0.06)" strokeWidth={1.6 * k}>
+    <g stroke="var(--color-shadow)" strokeWidth={1.6 * k}>
       {lines}
     </g>
   );
@@ -625,7 +625,7 @@ function LegendItem({
           y1={2}
           x2={33}
           y2={2}
-          stroke="#087F8C"
+          stroke="var(--color-cyan)"
           strokeWidth={pattern === "road" ? 2.2 : 2}
           strokeDasharray={pattern === "sea" ? "6 3" : pattern === "road" ? "0.01 4.2" : undefined}
           strokeLinecap={pattern === "road" ? "round" : "butt"}

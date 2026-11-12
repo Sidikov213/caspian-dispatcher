@@ -209,16 +209,17 @@ export function LogoMark({ size = 50 }: { size?: number }) {
 
 /** Знак с названием — шапка сайта. */
 export function LogoWordmark({ height = 44 }: { height?: number }) {
-  const width = Math.round(height * (1024 / 262));
+  // Знак — картинкой, название — текстом: читается в обеих темах (у PNG-логотипа тёмные буквы).
+  const font = Math.round(height * 0.36);
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/logo.png"
-      alt="Каспийский диспетчер"
-      width={width}
-      height={height}
-      className="block object-contain object-left"
-      draggable={false}
-    />
+    <span className="flex items-center gap-[10px]" style={{ height }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-mark.png" alt="" width={height} height={height} className="block object-contain" draggable={false} />
+      <span className="font-bold text-text" style={{ fontSize: font, lineHeight: 1.1 }}>
+        Каспийский
+        <br />
+        диспетчер
+      </span>
+    </span>
   );
 }

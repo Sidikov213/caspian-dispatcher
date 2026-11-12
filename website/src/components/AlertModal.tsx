@@ -1,8 +1,10 @@
 "use client";
 
-import { shipmentNumber, formatHoursDelta, formatRub, formatSignedPct, shortNodeName } from "@/lib/format";
+import { useState } from "react";
+import { formatInt, shipmentNumber, formatHoursDelta, formatRub, formatSignedPct, shortNodeName } from "@/lib/format";
 import { stormLeadHours, stormScope } from "@/lib/derive";
 import type { Alert, GraphNode, Scenario, Shipment, Weather } from "@/lib/types";
+import { AlertDecisionNote } from "./AlertDecisionNote";
 import { CheckIcon, CloseIcon, StormIcon } from "./icons";
 
 interface Props {
@@ -12,7 +14,10 @@ interface Props {
   shipments: Shipment[];
   nodes: Map<string, GraphNode>;
   busy: boolean;
-  onAccept(): void;
+  /** Право decide_alert: без него вместо кнопок — «Решение принимает логист». */
+  canDecide: boolean;
+  /** Принять выбранный вариант из Alert.options. */
+  onAccept(optionId: string): void;
   onOther(): void;
   onReject(): void;
   onClose(): void;
@@ -44,8 +49,11 @@ function plural(n: number, one: string, few: string, many: string) {
   return many;
 }
 
-export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, onAccept, onOther, onReject, onClose }: Props) {
-  const best = alert.options.find((o) => o.recommended) ?? alert.options.find((o) => o.id !== "wait") ?? null;
+export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, canDecide, onAccept, onOther, onReject, onClose }: Props) {
+  // Варианты — прямо из Alert.options (рекомендованный первый); «ждать» — это «Отклонить».
+  const choices = alert.options.filter((o) => o.id !== "wait");
+  const [picked, setPicked] = useState<string | null>(null);
+  const best = choices.find((o) => o.id === picked) ?? choices.find((o) => o.recommended) ?? choices[0] ?? null;
   const lead = alert.starts_in_h != null ? Math.round(alert.starts_in_h) : stormLeadHours(alert, weather, scenario);
   const affected = alert.items
     .map((i) => shipments.find((s) => s.id === i.shipment_id))
@@ -59,7 +67,7 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, o
       role="dialog"
       aria-label="Прогноз шторма"
       data-map-ui
-      className="absolute bottom-[96px] left-[22px] z-30 h-[371px] w-[632px] rounded-[12px] border border-[#FECACA] bg-panel px-[18px] shadow-[0_24px_60px_rgba(18,48,74,0.16)]"
+      className="absolute bottom-[96px] left-[22px] z-30 w-[632px] rounded-[12px] border border-[var(--color-risk-line)] bg-panel px-[18px] pb-[18px] shadow-[0_24px_60px_var(--color-shadow)]"
     >
       <button
         type="button"
@@ -75,7 +83,9 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, o
           <StormIcon size={18} />
         </span>
         <div className="caps mt-[2px] ml-[13px] text-[10.5px] leading-[13px] font-bold text-risk-text">
-          Прогноз шторма{lead !== null && <> &nbsp;/&nbsp; через {lead}&nbsp;ч</>}
+          {scenario && scenario.type !== "storm" ? "Угроза" : "Прогноз шторма"}
+          {lead !== null && <> &nbsp;/&nbsp; через {lead}&nbsp;ч</>}
+          {alert.source && <> &nbsp;/&nbsp; {alert.source === "forecast" ? "найдено в прогнозе" : "сценарий"}</>}
         </div>
       </div>
 
@@ -86,18 +96,18 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, o
       </p>
 
       <div className="mt-[17px] flex gap-[7px]">
-        <div className="h-[111px] flex-1 rounded-[12px] border border-[#FECACA] bg-risk-soft px-[13px] pt-[10px]">
+        <div className="h-[111px] flex-1 rounded-[12px] border border-[var(--color-risk-line)] bg-risk-soft px-[13px] pt-[10px]">
           <div className="text-[12.5px] leading-[20px] font-bold text-risk-text">Ничего не делать</div>
           <div className="tnum mt-[10px] text-[32px] leading-[36px] font-bold">{formatHoursDelta(alert.do_nothing.delay_hours)}</div>
           <div className="mt-[9px] text-[11px] leading-[13px] text-muted">Простой {formatRub(alert.do_nothing.loss_rub)}</div>
         </div>
-        <div className="h-[111px] flex-1 rounded-[12px] border border-[#BBF7D0] bg-ok-soft px-[13px] pt-[10px]">
+        <div className="h-[111px] flex-1 rounded-[12px] border border-[var(--color-ok-line)] bg-ok-soft px-[13px] pt-[10px]">
           <div className="text-[12.5px] leading-[20px] font-bold text-ok">Решение диспетчера</div>
           {best ? (
             <>
               <div className="tnum mt-[10px] text-[32px] leading-[36px] font-bold">{formatHoursDelta(best.delay_vs_plan_h)}</div>
-              <div className="mt-[9px] text-[11px] leading-[13px] text-muted">
-                {bestTitle} · {formatSignedPct(alert.totals.co2_delta_pct)}&nbsp;CO₂
+              <div className="mt-[9px] truncate text-[11px] leading-[13px] text-muted">
+                {bestTitle} · {formatRub(best.saved_rub)} · {best.recommended ? `${formatSignedPct(alert.totals.co2_delta_pct)}\u00A0CO₂` : `${best.co2_delta_kg > 0 ? "+" : ""}${formatInt(best.co2_delta_kg)}\u00A0кг CO₂`}
               </div>
             </>
           ) : (
@@ -106,12 +116,41 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, o
         </div>
       </div>
 
-      <div className="mt-[24px] flex items-center gap-[11px]">
-        {best && (
+      {choices.length > 1 && (
+        <div className="mt-[14px] flex flex-wrap gap-[8px]" role="radiogroup" aria-label="Вариант решения">
+          {choices.map((o) => {
+            const on = o.id === best?.id;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setPicked(o.id)}
+                className={`h-[34px] rounded-[8px] border px-[12px] text-[12.5px] font-bold transition-colors ${
+                  on ? "border-action bg-info-soft text-text" : "border-line text-muted hover:bg-tile"
+                }`}
+              >
+                {shortOptionTitle(o.title)} · {formatHoursDelta(o.delay_vs_plan_h)}
+                {o.recommended && <span className="ml-[6px] text-rerouted-text">рекомендуем</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!canDecide && (
+        <div className="mt-[18px]">
+          <AlertDecisionNote alert={alert} />
+        </div>
+      )}
+
+      <div className="mt-[18px] flex items-center gap-[11px]">
+        {canDecide && best && (
           <button
             type="button"
             disabled={busy}
-            onClick={onAccept}
+            onClick={() => onAccept(best.id)}
             className="flex h-[38px] w-[179px] items-center justify-center gap-[9px] rounded-[8px] bg-action text-[13px] font-bold text-white transition-colors hover:bg-action-hover disabled:opacity-60"
           >
             <CheckIcon size={14} strokeWidth={2} className="text-white/90" />
@@ -123,16 +162,18 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, o
           onClick={onOther}
           className="h-[38px] w-[169px] rounded-[8px] border border-line-strong bg-panel text-[13px] font-bold transition-colors hover:bg-tile"
         >
-          Другие варианты
+          {canDecide ? "Другие варианты" : "Подробнее"}
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onReject}
-          className="h-[38px] rounded-[9px] px-[16px] text-[13px] font-bold transition-colors hover:bg-tile disabled:opacity-60"
-        >
-          Отклонить
-        </button>
+        {canDecide && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onReject}
+            className="h-[38px] rounded-[9px] px-[16px] text-[13px] font-bold transition-colors hover:bg-tile disabled:opacity-60"
+          >
+            Отклонить
+          </button>
+        )}
       </div>
     </div>
   );

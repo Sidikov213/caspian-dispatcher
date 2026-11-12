@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { WeatherSummary } from "@/lib/derive";
 import { formatDecimal, formatInt, formatRub, formatSignedPct } from "@/lib/format";
-import { clearSession, getStoredUser } from "@/lib/session";
-import type { AuthUser, ScenarioPreset, Stats } from "@/lib/types";
+import { ROLE_LABEL, can, clearSession, useSessionUser } from "@/lib/session";
+import { setSiteTheme, useSiteTheme } from "@/lib/theme";
+import type { ScenarioPreset, Stats } from "@/lib/types";
 import { ChevronDownIcon, ClockIcon, CloseIcon, LeafIcon, LogoWordmark, RouteIcon, StormIcon, WavesIcon } from "./icons";
 
 interface Props {
@@ -29,30 +30,46 @@ function Saved({ icon, value, label, good }: { icon: React.ReactNode; value: str
   );
 }
 
-function initialOf(user: AuthUser | null) {
-  const src = user?.name?.trim() || user?.email || "Л";
-  return src.charAt(0).toUpperCase();
+function ThemeToggle() {
+  const theme = useSiteTheme();
+  const next = theme === "dark" ? "light" : "dark";
+  return (
+    <button
+      type="button"
+      onClick={() => setSiteTheme(next)}
+      title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+      aria-label={theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
+      className="flex size-[40px] items-center justify-center rounded-[8px] border border-line-strong bg-panel text-muted transition-colors hover:bg-tile hover:text-text"
+    >
+      {theme === "dark" ? (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <circle cx="12" cy="12" r="4.2" />
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" />
+        </svg>
+      ) : (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7Z" />
+        </svg>
+      )}
+    </button>
+  );
 }
 
 export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [userOpen, setUserOpen] = useState(false);
-  const [user] = useState<AuthUser | null>(() => getStoredUser());
+  const user = useSessionUser();
+  const canScenario = can(user, "run_scenario");
+  const canReset = can(user, "reset_demo");
   const menuRef = useRef<HTMLDivElement>(null);
-  const userRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open && !userOpen) return;
+    if (!open) return;
     const close = (e: MouseEvent) => {
-      if (open && menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-      if (userOpen && userRef.current && !userRef.current.contains(e.target as Node)) setUserOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
     };
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        setUserOpen(false);
-      }
+      if (e.key === "Escape") setOpen(false);
     };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", esc);
@@ -60,17 +77,15 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", esc);
     };
-  }, [open, userOpen]);
+  }, [open]);
 
   const hours = stats?.saved_hours ?? 0;
 
   return (
     <header className="relative z-30 flex h-20 shrink-0 items-center border-b border-line bg-panel pr-[21px] pl-5">
-      <div className="flex w-[260px] items-center gap-[10px]">
+      <div className="flex w-[200px] items-center gap-[10px]" title="Коридор «Север–Юг»">
         <LogoWordmark height={40} />
-        <div className="min-w-0 border-l border-line pl-[10px]">
-          <div className="text-[11.5px] leading-[14px] text-muted">Коридор «Север–Юг»</div>
-        </div>
+
       </div>
 
       <div className="h-[38px] w-px bg-line" />
@@ -106,7 +121,9 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
         </div>
       </div>
 
-      <div className="ml-auto flex items-center gap-[16px]">
+      <div className="ml-auto flex items-center gap-[12px]">
+        <ThemeToggle />
+        {(canScenario || canReset) && (
         <div ref={menuRef} className="relative">
           <button
             type="button"
@@ -120,9 +137,9 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
           {open && (
             <div
               role="menu"
-              className="absolute top-[47px] right-[-49px] w-[223px] rounded-[12px] border border-line bg-panel pt-px pb-[11px] shadow-[0_16px_40px_rgba(18,48,74,0.14)]"
+              className="absolute top-[47px] right-[-49px] w-[223px] rounded-[12px] border border-line bg-panel pt-px pb-[11px] shadow-[0_16px_40px_var(--color-shadow)]"
             >
-              {presets.map((p, i) => (
+              {canScenario && presets.map((p, i) => (
                 <button
                   key={p.key}
                   type="button"
@@ -143,7 +160,7 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
                   {p.title}
                 </button>
               ))}
-              <button
+              {canReset && <button
                 type="button"
                 role="menuitem"
                 onClick={() => {
@@ -154,42 +171,27 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
               >
                 <CloseIcon size={14} className="text-muted" />
                 Сбросить
-              </button>
+              </button>}
             </div>
           )}
         </div>
+        )}
 
-        <div ref={userRef} className="relative">
+        <div className="flex items-center gap-[12px] border-l border-line pl-[16px]">
+          <div className="text-right">
+            <div className="max-w-[180px] truncate text-[13px] leading-[16px] font-bold">{user?.name ?? "Пользователь"}</div>
+            <div className="mt-[3px] text-[11.5px] leading-[14px] text-muted">{user ? ROLE_LABEL[user.role] : ""}</div>
+          </div>
           <button
             type="button"
-            onClick={() => setUserOpen((v) => !v)}
-            aria-expanded={userOpen}
-            title={user?.name ?? "Профиль"}
-            className="flex size-[33px] items-center justify-center rounded-full border border-line bg-info-soft text-[12px] font-bold text-action transition-colors hover:bg-tile"
+            onClick={() => {
+              clearSession();
+              router.replace("/login");
+            }}
+            className="h-[40px] rounded-[8px] border border-line-strong bg-panel px-[14px] text-[13px] font-bold text-muted transition-colors hover:bg-tile hover:text-text"
           >
-            {initialOf(user)}
+            Выйти
           </button>
-          {userOpen && (
-            <div className="absolute top-[42px] right-0 w-[220px] rounded-[12px] border border-line bg-panel p-[6px] shadow-[0_16px_40px_rgba(18,48,74,0.14)]">
-              <div className="px-[10px] py-[8px]">
-                <div className="truncate text-[13px] font-bold">{user?.name ?? "Пользователь"}</div>
-                <div className="mt-[2px] truncate text-[11px] text-muted">{user?.email}</div>
-                <div className="mt-[4px] text-[11px] font-semibold text-action">
-                  {user?.role === "expeditor" ? "Экспедист" : "Логист"}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  clearSession();
-                  router.replace("/login");
-                }}
-                className="flex h-[36px] w-full items-center rounded-[8px] px-[10px] text-left text-[12.5px] font-semibold text-muted transition-colors hover:bg-tile hover:text-text"
-              >
-                Выйти
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </header>

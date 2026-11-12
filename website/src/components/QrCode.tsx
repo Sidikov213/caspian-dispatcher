@@ -19,7 +19,7 @@ export function QrCode({ value, size }: { value: string; size: number }) {
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${path.n} ${path.n}`} shapeRendering="crispEdges" aria-label="QR-код пропуска">
-      <path d={path.d} fill="#12304A" />
+      <path d={path.d} fill="var(--color-text)" />
     </svg>
   );
 }

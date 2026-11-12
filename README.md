@@ -6,5 +6,5 @@
 - `docs/DEMO_SCENARIO.md` — согласованный сценарий демо со всеми числами.
 - `docs/PLAN.md` — таймлайн, питч, вопросы жюри, риски.
 - `docs/design/` — макеты (PDF) и иконки.
-- `bot/` — стартер Telegram-бота (aiogram 3), будет перенесён в `backend/app/bot/`.
+- Telegram-бот диспетчера живёт внутри бэкенда: `backend/app/bot/` (aiogram 3), см. `backend/README.md`.
 - `backend/`, `web/`, `mobile/` — создаются в ходе работы.

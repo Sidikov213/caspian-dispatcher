@@ -90,3 +90,30 @@ def test_stacked_scenarios_extrapolate_schedule(st):
     assert all(i["action"] == "reroute" and i["to_route"]["branch"] == "west" for i in a["items"])
     assert a["do_nothing"]["delay_hours"] > 48
     assert all(i["saved_hours"] > 0 and i["saved_rub"] > 0 for i in a["items"])
+
+
+# ---------------- варианты решения: Alert.options и option_id ----------------
+
+def test_alert_options_and_accept_other_option(client):
+    a = client.post("/api/scenarios", json={"preset": "storm_north"}).json()["alert"]
+    assert [(o["id"], o["recommended"]) for o in a["options"]] == [("mkh", True), ("west", False), ("wait", False)]
+    assert a["options"][0]["saved_rub"] == a["totals"]["saved_rub"] == 596640
+    assert a["options"][2]["title"] == "Ждать рейс Б" and a["options"][2]["delay_vs_plan_h"] == 48
+    r = client.post("/api/alerts/alert-001/accept", json={"via": "web", "option_id": "wait"})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "use_reject"
+    r = client.post("/api/alerts/alert-001/accept", json={"via": "web", "option_id": "nope"})
+    assert r.status_code == 404
+    out = client.post("/api/alerts/alert-001/accept", json={"via": "web", "option_id": "west"}).json()
+    assert {s["route"]["id"].rsplit("-", 1)[-1] for s in out["shipments"]} == {"west"}
+    assert out["alert"]["totals"]["saved_rub"] == sum(i["saved_rub"] for i in out["decision"]["items"])
+    assert [o["id"] for o in out["alert"]["options"] if o["recommended"]] == ["west"]
+    assert {b["checkpoint_node"] for b in out["blocks"]} == {"samur"}
+    sail = {s["id"]: s for s in client.get("/api/sailings").json()}
+    assert sail[FERRY_M]["booked_t"] == 760                    # паром М не бронировали
+    assert client.get("/api/stats").json()["saved_rub"] == out["alert"]["totals"]["saved_rub"]
+
+
+def test_accept_without_option_is_recommended(client):
+    client.post("/api/scenarios", json={"preset": "storm_north"})
+    out = client.post("/api/alerts/alert-001/accept", json={"via": "telegram"}).json()
+    assert out["alert"]["totals"]["saved_rub"] == 596640

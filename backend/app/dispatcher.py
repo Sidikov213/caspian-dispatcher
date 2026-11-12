@@ -184,7 +184,7 @@ def candidates(st, sh: dict, ctx: Ctx, banned: set[str]) -> list[dict]:
         r = make_route(ctx, rid, prefix + legs, sh["weight_t"])
         res, fi = predict_route(st, sh, r)
         dep = st.sailings[r["legs"][fi]["sailing_id"]]["departure"] if fi is not None else None
-        out.append({"route": r, "risk": risk_of(res, dep),
+        out.append({"route": r, "risk": risk_of(res, dep), "tag": route_tag(st, path),
                     "sailing_id": r["legs"][fi]["sailing_id"] if fi is not None else None})
     out.sort(key=lambda c: (route_end(c["route"]), c["route"]["total_cost_rub"]))
     return out[:MAX_ALTERNATIVES]
@@ -235,12 +235,73 @@ def run_scenario(st, key: str) -> dict:
     return {"scenario": public(sc), "alert": copy.deepcopy(alert)}
 
 
+MAX_OPTIONS = 3
+
+
+def _item(st, base: dict, cand: dict | None, ctx: Ctx) -> tuple[dict, dict | None, float]:
+    """Позиция алерта для груза: обход cand или «ждать». (item, риск на новом маршруте, alt_cost)."""
+    sh, cur = base["sh"], base["cur"]
+    hour_cost = st.meta["hour_cost_rub_per_t"]
+    item = {"shipment_id": sh["id"], "from_route": base["from_route"]}
+    if cand is None:
+        item.update(action="wait", to_route=None, sailing_id=base["dn_sailing"],
+                    delay_vs_plan_h=base["dn_delay"], saved_hours=0, saved_rub=0, co2_delta_kg=0)
+        return item, None, 0
+    r = cand["route"]
+    alt_delay = hours(sh["planned_eta"], route_end(r))
+    residual = alt_delay * sh["weight_t"] * hour_cost
+    surcharge = r["total_cost_rub"] - cur["total_cost_rub"]
+    if cand["sailing_id"]:
+        ctx.extra_booked[cand["sailing_id"]] = ctx.extra_booked.get(cand["sailing_id"], 0) + sh["weight_t"]
+    item.update(action="reroute", to_route=r, sailing_id=cand["sailing_id"],
+                delay_vs_plan_h=alt_delay, saved_hours=hours(route_end(r), base["dn_end"]),
+                saved_rub=round(base["loss"] - residual - surcharge),
+                co2_delta_kg=round(r["total_co2_kg"] - cur["total_co2_kg"], 1))
+    return item, cand["risk"], residual + surcharge
+
+
+def _pick(st, base: dict, ctx: Ctx, banned: set[str], tag: str | None) -> dict | None:
+    """Лучший допустимый обход (tag=None) или обход с заданным тегом; None — обход хуже ожидания."""
+    for c in candidates(st, base["sh"], ctx, banned):
+        if (tag is None or c["tag"] == tag) and route_end(c["route"]) < base["dn_end"]:
+            return c
+    return None
+
+
+def totals_of(items: list[dict], co2_plan: dict[str, float]) -> dict:
+    rer = [i for i in items if i["action"] == "reroute"]
+    co2 = round(sum(i["co2_delta_kg"] for i in rer), 1)
+    base = sum(co2_plan[i["shipment_id"]] for i in rer)
+    return {"saved_hours": sum(i["saved_hours"] for i in rer), "saved_rub": sum(i["saved_rub"] for i in rer),
+            "co2_delta_kg": co2, "co2_delta_pct": round(co2 / base * 100, 1) if base else 0}
+
+
+def option_title(st, items: list[dict]) -> str:
+    rer = [i for i in items if i["action"] == "reroute"]
+    if not rer:
+        return "Ждать " + _flight(st, items[0]["sailing_id"]) if items else "Ждать"
+    r, sid = rer[0]["to_route"], rer[0]["sailing_id"]
+    title = via_title(st, r)
+    if sid:
+        title += f" ({_label(st, sid)}, {day_time(st.sailings[sid]['departure'])})"
+    return title
+
+
+def _option(st, oid: str, title: str, items: list[dict], recommended: bool) -> dict:
+    rer = [i for i in items if i["action"] == "reroute"]
+    route = rer[0]["to_route"] if rer else (items[0]["from_route"] if items else None)
+    return {"id": oid, "title": title, "route": copy.deepcopy(route),
+            "delay_vs_plan_h": max((i["delay_vs_plan_h"] for i in items), default=0),
+            "saved_hours": sum(i["saved_hours"] for i in rer), "saved_rub": sum(i["saved_rub"] for i in rer),
+            "co2_delta_kg": round(sum(i["co2_delta_kg"] for i in rer), 1), "recommended": recommended}
+
+
 def build_alert(st, sc: dict) -> dict:
     hour_cost = st.meta["hour_cost_rub_per_t"]
     ctx = st.ctx()
     banned = banned_edges(st)
     blocked = set(sc["blocked_edges"])
-    items, internal, touched = [], {}, []
+    bases, internal, touched = [], {}, []
     for sh in st.shipments.values():
         if sh["stage"] == "delivered":
             continue
@@ -259,60 +320,83 @@ def build_alert(st, sc: dict) -> dict:
         if shift <= 0:  # успевает на свой рейс — только обновить риск
             set_route(st, sh, sh["route"], risk_of(res, s["departure"]))
             continue
-
         cur = sh["route"]
         dn_end, dn_sailing = do_nothing(st, sh, ctx, fi, res.earliest_departure)
         dn_delay = hours(sh["planned_eta"], dn_end)
-        loss = dn_delay * sh["weight_t"] * hour_cost
-        cands = candidates(st, sh, ctx, banned)
-        best = cands[0] if cands and route_end(cands[0]["route"]) < dn_end else None
-        from_route = mark_route(cur, blocked, fi, hours(route_end(cur), dn_end))
-        item = {"shipment_id": sh["id"], "from_route": from_route}
-        if best:
-            r = best["route"]
-            alt_delay = hours(sh["planned_eta"], route_end(r))
-            residual = alt_delay * sh["weight_t"] * hour_cost
-            surcharge = r["total_cost_rub"] - cur["total_cost_rub"]
-            if best["sailing_id"]:
-                ctx.extra_booked[best["sailing_id"]] = ctx.extra_booked.get(best["sailing_id"], 0) + sh["weight_t"]
-            item.update(action="reroute", to_route=r, sailing_id=best["sailing_id"],
-                        delay_vs_plan_h=alt_delay, saved_hours=hours(route_end(r), dn_end),
-                        saved_rub=round(loss - residual - surcharge),
-                        co2_delta_kg=round(r["total_co2_kg"] - cur["total_co2_kg"], 1))
-        else:
-            item.update(action="wait", to_route=None, sailing_id=dn_sailing, delay_vs_plan_h=dn_delay,
-                        saved_hours=0, saved_rub=0, co2_delta_kg=0)
-            residual = surcharge = 0
-        items.append(item)
-        internal[sh["id"]] = {"to_risk": best["risk"] if best else None, "from_sailing": s["id"],
-                              "loss": loss, "alt_cost": residual + surcharge, "dn_sailing": dn_sailing,
-                              "dn_delay": dn_delay, "shift": shift, "p": res.miss_probability,
-                              "co2_plan": cur["total_co2_kg"], "weight": sh["weight_t"]}
-        set_route(st, sh, from_route, risk_of(res, s["departure"], dn_delay))
+        bases.append({"sh": sh, "cur": cur, "dn_end": dn_end, "dn_sailing": dn_sailing, "dn_delay": dn_delay,
+                      "loss": dn_delay * sh["weight_t"] * hour_cost,
+                      "from_route": mark_route(cur, blocked, fi, hours(route_end(cur), dn_end))})
+        internal[sh["id"]] = {"from_sailing": s["id"], "loss": dn_delay * sh["weight_t"] * hour_cost,
+                              "dn_sailing": dn_sailing, "dn_delay": dn_delay, "shift": shift,
+                              "p": res.miss_probability, "co2_plan": cur["total_co2_kg"],
+                              "weight": sh["weight_t"], "_risk": risk_of(res, s["departure"], dn_delay)}
+
+    # варианты: рекомендованный (лучший обход для каждого груза), другие обходы, «ждать»
+    options: dict[str, dict] = {}
+    rec_items, rec_risks = [], {}
+    tags_seen: list[str] = []
+    for base in bases:
+        cand = _pick(st, base, ctx, banned, None)
+        item, risk, alt_cost = _item(st, base, cand, ctx)
+        rec_items.append(item)
+        rec_risks[base["sh"]["id"]] = risk
+        internal[base["sh"]["id"]].update(to_risk=risk, alt_cost=alt_cost)
+        for c in candidates(st, base["sh"], st.ctx(), banned):
+            if c["tag"] not in tags_seen and route_end(c["route"]) < base["dn_end"]:
+                tags_seen.append(c["tag"])
+    rec_tags = {i["to_route"]["id"].rsplit("-", 1)[-1] if i["to_route"] else None for i in rec_items}
+    rer_tags = {next((c["tag"] for c in candidates(st, b["sh"], st.ctx(), banned)
+                      if c["route"]["id"] == i["to_route"]["id"]), None)
+                for b, i in zip(bases, rec_items) if i["action"] == "reroute"}
+    has_reroute = any(i["action"] == "reroute" for i in rec_items)
+    if has_reroute:
+        rec_id = next(iter(rer_tags)) if len(rer_tags) == 1 and None not in rec_tags else "best"
+        options[rec_id] = {"items": rec_items, "risks": rec_risks,
+                           "title": option_title(st, rec_items) if rec_id != "best"
+                           else "Лучший обход для каждого груза"}
+        for tag in tags_seen:
+            if len(options) >= MAX_OPTIONS - 1 or tag in options:
+                continue
+            octx = st.ctx()
+            items, risks = [], {}
+            for base in bases:
+                item, risk, _ = _item(st, base, _pick(st, base, octx, banned, tag), octx)
+                items.append(item)
+                risks[base["sh"]["id"]] = risk
+            if not any(i["action"] == "reroute" for i in items):
+                continue
+            if [i["to_route"] and i["to_route"]["id"] for i in items] == \
+                    [i["to_route"] and i["to_route"]["id"] for i in rec_items]:
+                continue
+            options[tag] = {"items": items, "risks": risks, "title": option_title(st, items)}
+    if bases:
+        wait_items = [_item(st, b, None, ctx)[0] for b in bases]
+        options["wait"] = {"items": wait_items, "risks": {}, "title": option_title(st, wait_items)}
+    rec_key = next(iter(options), None)
 
     st.seq["alert"] += 1
     aid = f"alert-{st.seq['alert']:03d}"
-    rer = [i for i in items if i["action"] == "reroute"]
-    co2 = round(sum(i["co2_delta_kg"] for i in rer), 1)
-    co2_base = sum(internal[i["shipment_id"]]["co2_plan"] for i in rer)
+    items = options[rec_key]["items"] if rec_key else []
+    co2_plan = {k: v["co2_plan"] for k, v in internal.items()}
     alert = {
         "id": aid, "scenario_id": sc["id"], "created_at": iso(st.clock.event_ts()),
-        "severity": "high" if any(st.shipments[i["shipment_id"]]["risk_level"] == "high" for i in items)
-        else "medium",
+        "severity": "high" if any(v["_risk"]["level"] == "high" for v in internal.values()) else "medium",
         "title": f"{sc['title']}: {cargo_word(len(items))} под риском" if items
         else f"{sc['title']}: грузов под риском нет",
-        "text": "", "items": items,
-        "totals": {"saved_hours": sum(i["saved_hours"] for i in rer),
-                   "saved_rub": sum(i["saved_rub"] for i in rer), "co2_delta_kg": co2,
-                   "co2_delta_pct": round(co2 / co2_base * 100, 1) if co2_base else 0},
+        "text": "", "items": copy.deepcopy(items),
+        "totals": totals_of(items, co2_plan),
         "do_nothing": {"delay_hours": max((v["dn_delay"] for v in internal.values()), default=0),
                        "loss_rub": sum(v["loss"] for v in internal.values())},
-        "port_load": port_load(st, rer),
+        "port_load": port_load(st, [i for i in items if i["action"] == "reroute"]),
+        "options": [_option(st, k, o["title"], o["items"], k == rec_key) for k, o in options.items()],
         "status": "new", "accepted_at": None, "accepted_via": None,
     }
     alert["text"] = alert_text(st, sc, alert, internal)
+    for base in bases:
+        set_route(st, base["sh"], base["from_route"], internal[base["sh"]["id"]].pop("_risk"))
     st.alerts[aid] = alert
     st.alert_internal[aid] = internal
+    st.alert_options[aid] = options
     st.emit("alert.created", alert)
     for sid in touched:
         st.emit("shipment.updated", st.shipments[sid])
@@ -400,6 +484,10 @@ def alert_text(st, sc: dict, alert: dict, internal: dict) -> str:
         lines += ["", f"Расчётная экономия по {cargo_dative(len(rer))}: {num(t['saved_hours'])} груз-часов, "
                       f"{k_rub(t['saved_rub'])}, {signed(t['co2_delta_kg'] / 1000)} т CO₂ "
                       f"({signed(t['co2_delta_pct'])}%)."]
+        pl = alert.get("port_load")
+        if pl:
+            lines.append(f"Загрузка порта {st.graph.nodes[pl['node_id']]['name']} после переноса: "
+                         f"{round(pl['before'] * 100)}% → {round(pl['after'] * 100)}%.")
     else:
         lines.append(f"Обхода нет: допустимого маршрута не нашлось, лучший вариант — "
                      f"{wait.split(', ')[-1]}, "
@@ -417,8 +505,8 @@ def _supersede(st, alert: dict, why: str):
     raise ApiError(409, "superseded", f"Предложение устарело ({why}). Новый вариант — {new['id']}")
 
 
-def accept(st, alert_id: str, via: str) -> dict:
-    """Вызывать только под st.lock."""
+def accept(st, alert_id: str, via: str, option_id: str | None = None) -> dict:
+    """Вызывать только под st.lock. option_id=None — рекомендованный вариант."""
     alert = st.alerts.get(alert_id)
     if alert is None:
         raise ApiError(404, "alert_not_found", f"Алерт {alert_id} не найден")
@@ -432,7 +520,14 @@ def accept(st, alert_id: str, via: str) -> dict:
     if alert["status"] == "superseded":
         raise ApiError(409, "superseded", "Предложение устарело, есть новый алерт")
     internal = st.alert_internal[alert_id]
-    rer = [i for i in alert["items"] if i["action"] == "reroute"]
+    opts = st.alert_options.get(alert_id, {})
+    oid = option_id or next((o["id"] for o in alert.get("options", []) if o["recommended"]), None)
+    if oid not in opts:
+        raise ApiError(404, "option_not_found", f"Варианта {option_id} у алерта {alert_id} нет")
+    if oid == "wait" and option_id is not None:  # обход есть, а выбрано «ждать» — это отклонение
+        raise ApiError(422, "use_reject", "«Ждать» — это отклонение предложения: POST /alerts/{id}/reject")
+    chosen = opts[oid]
+    rer = [i for i in chosen["items"] if i["action"] == "reroute"]
 
     # 1. повторная проверка рейса и резерв места — в той же операции
     ctx = st.ctx()
@@ -463,7 +558,7 @@ def accept(st, alert_id: str, via: str) -> dict:
     blocks = []
     for it in rer:
         sh = st.shipments[it["shipment_id"]]
-        set_route(st, sh, copy.deepcopy(it["to_route"]), copy.deepcopy(internal[sh["id"]]["to_risk"]),
+        set_route(st, sh, copy.deepcopy(it["to_route"]), copy.deepcopy(chosen["risks"][sh["id"]]),
                   rerouted=True)
         b = reissue_pass(st, sh, ts)
         if b:
@@ -476,6 +571,11 @@ def accept(st, alert_id: str, via: str) -> dict:
                            "saved_rub": i["saved_rub"], "co2_delta_kg": i["co2_delta_kg"],
                            "sailing_id": i["sailing_id"]} for i in rer]}
     st.decisions.append(decision)
+    if chosen["items"] is not alert["items"]:  # принят не рекомендованный вариант — алерт показывает принятое
+        alert["items"] = copy.deepcopy(chosen["items"])
+        alert["totals"] = totals_of(alert["items"], {k: v["co2_plan"] for k, v in internal.items()})
+        for o in alert["options"]:
+            o["recommended"] = o["id"] == oid
     alert.update(status="accepted", accepted_at=ts, accepted_via=via)
 
     out = {"alert": copy.deepcopy(alert),

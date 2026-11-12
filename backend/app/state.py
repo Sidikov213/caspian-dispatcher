@@ -72,10 +72,13 @@ class State:
                                     p["block_hash"], p["valid_until"])
         self.alerts: dict[str, dict] = {}
         self.alert_internal: dict[str, dict] = {}
+        self.alert_options: dict[str, dict] = {}
         self.accept_results: dict[str, dict] = {}
         self.decisions: list[dict] = []
         self.scenarios: dict[str, dict] = {}
-        self.users: dict[int, str] = {}
+        if not hasattr(self, "users"):  # привязки Telegram переживают reset
+            self.users: dict[int, str] = {}
+        self.epoch = getattr(self, "epoch", 0) + 1   # номер прогона демо — для кнопок в Telegram
         self.fail_next_pass = 0
         self.seq = {"alert": 0, "decision": 0,
                     "shipment": max(int(s[3:]) for s in self.shipments if s[3:].isdigit())}
@@ -275,9 +278,9 @@ class State:
         async with self.lock:
             return D.run_scenario(self, preset)
 
-    async def accept(self, alert_id: str, via: str):
+    async def accept(self, alert_id: str, via: str, option_id: str | None = None):
         async with self.lock:
-            return D.accept(self, alert_id, via)
+            return D.accept(self, alert_id, via, option_id)
 
     async def reject(self, alert_id: str):
         async with self.lock:

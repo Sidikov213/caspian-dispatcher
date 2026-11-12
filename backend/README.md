@@ -43,7 +43,7 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 | Съёмка инвойса №05 | `POST /api/documents` (multipart `shipment_id=sh-05`, `file`) → `POST /api/documents/doc-05/confirm` `{"fields": {...}}` | черновик с полями (фарси → русский; сейчас закэшированный результат), затем пропуск `pass-05` и блок `issued` |
 | Шторм | `POST /api/scenarios` `{"preset": "storm_north"}` | №01–03 «Под риском» 82/74/68%, отправление +18 ч, морской этап `blocked`, ETA +48 ч, алерт `alert-001` (`new`) |
 | Сбой пропуска (по желанию) | `POST /api/demo/fail_next_pass` перед «Принять» | у первого груза `pass_state: reissue_pending`, старый пропуск активен |
-| Принятие | `POST /api/alerts/alert-001/accept` `{"via": "web"}` (или `"telegram"`) | через Махачкалу, «Перестроен», новые пропуска `pass-0N-r1`, старые `reissued`, блоки `reissued`, место на пароме М зарезервировано, счётчики 126 груз-ч / 596 640 ₽ / 1 824 кг CO₂. Повтор → `already_accepted: true` |
+| Принятие | `POST /api/alerts/alert-001/accept` `{"via": "web"}` (или `"telegram"`; `option_id` — другой вариант) | через Махачкалу, «Перестроен», новые пропуска `pass-0N-r1`, старые `reissued`, блоки `reissued`, место на пароме М зарезервировано, счётчики 126 груз-ч / 596 640 ₽ / 1 824 кг CO₂. Повтор → `already_accepted: true` |
 | Повтор пропуска | `POST /api/shipments/sh-01/pass/retry` | пропуск выпущен один раз, экономия не меняется |
 | Отклонение | `POST /api/alerts/alert-001/reject` | алерт `rejected` |
 | Подделка реестра | `POST /api/ledger/tamper` `{"index": 1}` → `GET /api/ledger/verify` | `valid: false, broken_at: 1`; пропуск с этим блоком в `/passes/verify` → `valid: false` |
@@ -53,6 +53,26 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 `POST /api/demo/fail_next_pass` — **только демо**: следующий выпуск пропуска сорвётся.
 
 Ошибки принятия: `409 superseded` — место на рейсе уже занято или рейс закрыт, создан новый алерт с пересчётом; `409 alert_rejected` — алерт отклонён. Повтор пропуска при новом сбое — `503 pass_issue_failed`.
+
+### Варианты решения (`Alert.options`, `option_id`)
+
+У алерта есть `options` — до трёх вариантов, рекомендованный первый: например `mkh` (через Махачкалу), `west` (западная ветка), `wait` (ждать следующий рейс). У каждого `id`, `title`, `route` (маршрут первого груза как пример), `delay_vs_plan_h` (к плану), `saved_hours`, `saved_rub`, `co2_delta_kg` (сумма по грузам алерта), `recommended`. Вариант `best` появляется, когда лучший обход у грузов разный.
+
+- `POST /api/alerts/{id}/accept` `{"via": "web"}` — принимается рекомендованный, как раньше.
+- `{"via": "web", "option_id": "west"}` — выбранный вариант для всех грузов алерта: резерв места, пропуска, реестр, Decision с экономией этого варианта. После принятия `items`, `totals` и `recommended` у алерта показывают принятый вариант.
+- `wait` равен «Отклонить»: шлите `POST /alerts/{id}/reject`; `accept` с `option_id: "wait"` → `422 use_reject`. Неизвестный `option_id` → `404 option_not_found`.
+
+Сравнение для карточки варианта — две строки: «Прибытие +6 ч к плану» (`delay_vs_plan_h`) и «на 42 ч быстрее ожидания следующего рейса» (`delay_vs_plan_h` варианта `wait` минус этого варианта).
+
+## Telegram-бот
+
+Живёт в этом же процессе (`app/bot/`, aiogram 3): polling запускается в lifespan FastAPI и вызывает движок напрямую. Если `BOT_TOKEN` в `.env` пуст, сервер стартует без бота и пишет об этом в лог.
+
+- `/start` — приветствие, привязка пользователя, кнопки «📦 Мои грузы» и «🌊 Погода на Каспии». Для демо каждому привязанному видны все пять грузов. Привязки переживают `demo/reset`, но не перезапуск сервера — после перезапуска снова `/start`.
+- Новый алерт бот присылает сам каждому привязанному: текст движка (тот же, что на сайте) и кнопки «Принять», «Другие варианты», «Отклонить».
+- «Принять» — тот же `accept`, `via=telegram`. После принятия с любой платформы бот один раз редактирует сообщение (кнопки убраны, «Принято в 14:32 с сайта / из Telegram») и присылает итог: маршрут, пропуска, записи реестра, расчётная экономия. Повторное нажатие — короткий ответ. При `superseded` старое сообщение теряет кнопки, приходит новый алерт. Кнопки из прошлого прогона демо (до reset) не срабатывают.
+- «Мои грузы» — статусы ⚪ 🔵 🔴 🟢 ✅; `reissue_pending` — отдельной строкой с кнопкой «Повторить».
+- Свободный текст: если задан `LLM_API_KEY`, вопрос уходит в ИИ с инструментами только на чтение (`get_shipments`, `get_shipment`, `get_alternatives`, `get_weather`, `explain_risk`); без ключа — подсказка про кнопки.
 
 Пример (PowerShell — `curl.exe`, не `curl`):
 
@@ -69,7 +89,9 @@ curl -X POST -H "X-API-Key: caspian-dev-key" -H "Content-Type: application/json"
 ## Как устроено
 
 ```
-app/main.py        роуты, X-API-Key, CORS, ошибки, /ws (события из state.events)
+app/main.py        роуты, X-API-Key, CORS, ошибки, /ws, lifespan с ботом
+app/events.py      шина событий: state.events → WebSocket и Telegram-бот
+app/bot/           Telegram-бот: texts (шаблоны), service (нажатия), notifier (рассылка и правки), llm
 app/models.py      Pydantic-модели (раздел 4) + запросы/ответы (раздел 5)
 app/state.py       состояние в памяти из seed.json, reset, пропуска, реестр, документы, asyncio.Lock
 app/dispatcher.py  конвейер: affected → predict → «ничего не делать» → альтернативы → алерт → accept
@@ -83,7 +105,7 @@ app/ledger.py      hash-chain: хэш, добавление, проверка
 app/documents.py   хэш документа; распознавание vision-LLM — позже
 data/seed.json     узлы, рёбра, рейсы, грузы, документы, пропуска, реестр, параметры (meta)
 scripts/gen_mocks.py  строит seed.json, сверяет движок с числами DEMO_SCENARIO, пишет моки
-tests/             pytest: числа сценария, одновременный accept, сбой пропуска, reset
+tests/             pytest: числа сценария, одновременный accept, сбой пропуска, reset, бот с подменённым Bot API
 ```
 
 **Моки и сид руками не правим.** Поменяли расстояние, тариф или рейс в `scripts/gen_mocks.py` — запустили:

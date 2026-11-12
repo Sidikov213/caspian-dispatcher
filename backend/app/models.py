@@ -209,6 +209,19 @@ class PortLoad(Model):
     after: float
 
 
+class AlertOption(Model):
+    """Вариант решения по алерту. id: тег маршрута (mkh, west…), best — лучший для каждого груза,
+    wait — ждать следующего рейса (принимается через /reject). Числа — сумма по грузам алерта."""
+    id: str
+    title: str
+    route: Route | None = None
+    delay_vs_plan_h: float
+    saved_hours: float
+    saved_rub: float
+    co2_delta_kg: float
+    recommended: bool
+
+
 class Alert(Model):
     """Все деньги и часы до наступления события — расчётные."""
     id: str
@@ -221,6 +234,7 @@ class Alert(Model):
     totals: AlertTotals
     do_nothing: DoNothing
     port_load: PortLoad | None = None
+    options: list[AlertOption] = Field(default_factory=list, description="До трёх вариантов, рекомендованный первый")
     status: AlertStatus
     accepted_at: datetime | None = None
     accepted_via: Via | None = None
@@ -297,6 +311,7 @@ class ScenarioIn(Model):
 
 class AcceptIn(Model):
     via: Via
+    option_id: str | None = Field(None, description="id из Alert.options; без него — рекомендованный")
 
 
 class DocumentConfirmIn(Model):

@@ -104,8 +104,14 @@ Alert     {id, scenario_id, created_at, severity, title, text,
            totals: {saved_hours, saved_rub, co2_delta_kg, co2_delta_pct},
            do_nothing: {delay_hours, loss_rub},
            port_load: {node_id, before, after},
+           options: [{id, title, route: Route|null, delay_vs_plan_h, saved_hours,
+                      saved_rub, co2_delta_kg, recommended}],
            status: new|accepted|rejected|superseded, accepted_at, accepted_via}
            # все деньги и часы до наступления события — расчётные
+           # options — до трёх вариантов решения, рекомендованный первый; числа — сумма по грузам
+           # алерта. id: тег маршрута (mkh, west…), best — лучший обход для каждого груза,
+           # wait — «ждать следующий рейс», он равен «Отклонить» (/reject). items и totals
+           # описывают рекомендованный вариант, после принятия — принятый.
 Document  {id, shipment_id, type: invoice|cmr|packing_list, source_lang,
            image_url, fields: {seller, buyer, goods, hs_code, weight_kg,
            value, currency, origin_country}, checks: [{name, ok, note}],
@@ -132,7 +138,7 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | GET | `/scenarios/presets` | — | `[{key, title}]` |
 | POST | `/scenarios` | `{preset: "storm_north" \| "storm_full" \| "congestion_astrakhan"}` | `{scenario: Scenario, alert: Alert}` |
 | GET | `/alerts?status=` | — | `[Alert]` |
-| POST | `/alerts/{id}/accept` | `{via: "web" \| "telegram"}` | `{alert: Alert, shipments: [Shipment], blocks: [Block], decision: Decision}`; повтор → 200 с тем же результатом и `already_accepted: true`; устарел → 409 `superseded` |
+| POST | `/alerts/{id}/accept` | `{via: "web" \| "telegram", option_id?: string}` | `{alert: Alert, shipments: [Shipment], blocks: [Block], decision: Decision}`; без `option_id` — рекомендованный вариант; повтор → 200 с тем же результатом и `already_accepted: true`; устарел → 409 `superseded`; нет варианта → 404 `option_not_found`; `option_id: "wait"` → 422 `use_reject` |
 | GET | `/sailings?from=&to=` | — | `[Sailing]` |
 | POST | `/shipments/{id}/pass/retry` | — | `{shipment: Shipment, pass: Pass}` |
 | POST | `/alerts/{id}/reject` | — | `Alert` |

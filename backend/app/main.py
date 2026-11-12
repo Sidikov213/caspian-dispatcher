@@ -4,7 +4,9 @@
 этим же движком, для тех, кто читает файлы напрямую.
 Запуск: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 """
+import logging
 import secrets
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import (APIRouter, Depends, FastAPI, File, Form, Query, Request, UploadFile,
@@ -15,11 +17,34 @@ from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from . import events
 from . import models as M
+from .bot import start_bot, stop_bot
 from .config import API_KEY
 from .state import ApiError, state
 
+log = logging.getLogger("caspian")
+for _name in ("caspian", "aiogram"):  # uvicorn настраивает только свои логгеры; боту нужен свой вывод
+    _lg = logging.getLogger(_name)
+    if not _lg.handlers:
+        _h = logging.StreamHandler()
+        _h.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+        _lg.addHandler(_h)
+        _lg.setLevel(logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Бот живёт в процессе бэкенда: polling как asyncio-задача. Без BOT_TOKEN сервер работает без бота."""
+    runtime = await start_bot(state)
+    try:
+        yield
+    finally:
+        await stop_bot(runtime)
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Каспийский диспетчер API",
     version="0.2.0",
     description="Контракт — раздел 5 CLAUDE.md. Ответы считает движок сценария (состояние в памяти). "
@@ -87,6 +112,16 @@ class Hub:
 
 
 hub = Hub()
+WS_TYPES = {"shipment.updated", "alert.created", "alert.updated", "ledger.appended", "stats.updated",
+            "weather.updated"}
+
+
+async def _to_ws(type_: str, payload) -> None:
+    if type_ in WS_TYPES:
+        await hub.send(type_, payload)
+
+
+events.subscribe(_to_ws)
 
 
 @app.websocket("/ws")
@@ -104,9 +139,8 @@ async def ws_endpoint(ws: WebSocket, api_key: str | None = None):
 
 
 async def flush():
-    """Отправить в WS всё, что накопило состояние."""
-    for type_, payload in state.drain_events():
-        await hub.send(type_, payload)
+    """Раздать накопленные события: WebSocket и Telegram-бот."""
+    await events.flush(state)
 
 
 # ---------- служебное ----------
@@ -195,7 +229,7 @@ async def list_alerts(status: M.AlertStatus | None = None):
           responses={409: {"model": M.ErrorOut}})
 async def accept_alert(alert_id: str, body: M.AcceptIn):
     try:
-        return await state.accept(alert_id, body.via)
+        return await state.accept(alert_id, body.via, body.option_id)
     finally:
         await flush()
 

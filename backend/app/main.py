@@ -464,6 +464,14 @@ async def get_model():
     return model_info(state.predictor)
 
 
+@api.get("/data-sources", response_model=M.DataSourcesOut, tags=["модель"])
+async def get_data_sources():
+    """Откуда берутся данные: real — настоящие, modeled — смоделированы для демо, synthetic — сгенерированы.
+    Плюс факты о коридоре и сводка ретроспективной симуляции на исторической погоде."""
+    from .datasources import data_sources
+    return data_sources(state)
+
+
 @api.get("/demo/check", response_model=M.DemoCheckOut, tags=["демо"])
 async def demo_check(_=Depends(need("reset_demo"))):
     """Только демо: storm_north на копии исходного состояния, сверка ключевых чисел с эталоном."""

@@ -112,7 +112,7 @@
     "planned_eta": "2026-11-21T07:00:00Z",
     "eta": "2026-11-21T13:00:00Z",
     "risk": {
-      "miss_probability": 0.04,
+      "miss_probability": 0.06,
       "level": "low",
       "departure_shift_h": 0.0,
       "arrival_delay_h": 0.0,
@@ -124,8 +124,8 @@
         },
         {
           "name": "port_congestion",
-          "label": "Загрузка порта 55%",
-          "impact_hours": 0.0
+          "label": "Загрузка порта 64%",
+          "impact_hours": 1.0
         },
         {
           "name": "customs_queue",
@@ -252,7 +252,7 @@
     "planned_eta": "2026-11-21T07:00:00Z",
     "eta": "2026-11-21T13:00:00Z",
     "risk": {
-      "miss_probability": 0.04,
+      "miss_probability": 0.06,
       "level": "low",
       "departure_shift_h": 0.0,
       "arrival_delay_h": 0.0,
@@ -264,8 +264,8 @@
         },
         {
           "name": "port_congestion",
-          "label": "Загрузка порта 55%",
-          "impact_hours": 0.0
+          "label": "Загрузка порта 64%",
+          "impact_hours": 1.0
         },
         {
           "name": "customs_queue",
@@ -385,14 +385,14 @@
         }
       ],
       "total_hours": 220.0,
-      "total_cost_rub": 206000.0,
-      "total_co2_kg": 3890.0,
+      "total_cost_rub": 212424.0,
+      "total_co2_kg": 3948.4,
       "branch": "transcaspian"
     },
     "planned_eta": "2026-11-21T07:00:00Z",
     "eta": "2026-11-21T13:00:00Z",
     "risk": {
-      "miss_probability": 0.04,
+      "miss_probability": 0.06,
       "level": "low",
       "departure_shift_h": 0.0,
       "arrival_delay_h": 0.0,
@@ -404,8 +404,8 @@
         },
         {
           "name": "port_congestion",
-          "label": "Загрузка порта 55%",
-          "impact_hours": 0.0
+          "label": "Загрузка порта 64%",
+          "impact_hours": 1.0
         },
         {
           "name": "customs_queue",
@@ -501,8 +501,8 @@
         }
       ],
       "total_hours": 145.0,
-      "total_cost_rub": 204350.0,
-      "total_co2_kg": 3928.8,
+      "total_cost_rub": 197255.0,
+      "total_co2_kg": 3864.2,
       "branch": "west"
     },
     "planned_eta": "2026-11-18T06:00:00Z",

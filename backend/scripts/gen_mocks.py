@@ -64,7 +64,7 @@ NODES = [
     ("saratov", "Саратов", "RU", "station", 51.53, 46.03, 0.35),
     ("astrakhan", "Астрахань", "RU", "port", 46.35, 48.04, 0.62),
     ("olya", "Оля", "RU", "port", 45.78, 47.55, 0.50),
-    ("makhachkala", "Махачкала", "RU", "port", 42.98, 47.50, 0.55),
+    ("makhachkala", "Махачкала", "RU", "port", 42.98, 47.50, 0.64),   # загрузка мощностей 64% (2025)
     ("samur", "Самур (граница)", "RU/AZ", "border", 41.63, 48.43, 0.45),
     ("baku", "Баку / Алят", "AZ", "port", 39.95, 49.41, 0.50),
     ("astara", "Астара (граница)", "AZ/IR", "border", 38.43, 48.87, 0.55),
@@ -79,6 +79,35 @@ NODES = [
 ]
 NODE = {n[0]: n for n in NODES}
 
+# Проверенные факты о портах (Node.facts) и ссылки на источники (Node.sources).
+SRC_MKH_ALTA = "https://www.alta.ru/logistics_news/128638/"
+SRC_MKH_KOMMERSANT = "https://www.kommersant.ru/doc/8513260"
+SRC_AST_MINTRANS = "https://mintrans.gov.ru/file/396731"
+SRC_AST_EXPERT = "https://expert.ru/news/na-uchastke-volgo-kaspiyskogo-kanala-priostanovili-dvizhenie-sudov"
+SRC_CORRIDOR = "https://www.alta.ru/logistics_news/126536/"
+NODE_FACTS = {
+    "makhachkala": {
+        "facts": ["Незамерзающий, глубоководный — единственный такой порт России на Каспии",
+                  "Осадка судов до 4,5 м в сухогрузной гавани",
+                  "Грузооборот 2025 года — 3,22 млн т",
+                  "Загрузка мощностей — 64%"],
+        "sources": [SRC_MKH_ALTA, SRC_MKH_KOMMERSANT],
+    },
+    "astrakhan": {
+        "facts": ["Замерзающий порт: зимой ледокольная проводка судов",
+                  "Выход в море — по Волго-Каспийскому морскому судоходному каналу, 101,5 мили (≈188 км)"],
+        "sources": [SRC_AST_MINTRANS, SRC_AST_EXPERT],
+    },
+}
+# Коридор «Север–Юг» за 2025 год (по предварительным данным).
+CORRIDOR_FACTS = [
+    {"text": "Перевезено по МТК «Север–Юг» за 2025 год — около 21,5 млн т (предварительные данные)",
+     "source": SRC_CORRIDOR},
+    {"text": "Западный маршрут — 13,5 млн т", "source": SRC_CORRIDOR},
+    {"text": "Транскаспийский маршрут — более 7,5 млн т", "source": SRC_CORRIDOR},
+    {"text": "Восточный маршрут — чуть более 0,5 млн т", "source": SRC_CORRIDOR},
+]
+
 # ---------------- Рёбра ----------------
 # вид: (mode, ₽/т·км, г CO₂/т·км)
 KINDS = {
@@ -88,10 +117,11 @@ KINDS = {
     "ocean": ("sea", 0.5, 15),   # океанское судно
 }
 EDGE_DEFS = [
-    # from, to, вид, ветка, км, часы
+    # from, to, вид, ветка, км, часы. Км сверены с длиной Edge.path (сумма отрезков по координатам):
+    # где расхождение было больше 15%, стоит длина пути, прежнее значение — в комментарии.
     ("moscow", "astrakhan", "rail", "transcaspian", 1400, 40),
     ("samara", "astrakhan", "rail", "transcaspian", 1000, 29),
-    ("saratov", "astrakhan", "rail", "transcaspian", 560, 16),
+    ("saratov", "astrakhan", "rail", "transcaspian", 706, 16),   # было 560
     ("astrakhan", "olya", "rail", "transcaspian", 70, 2),
     ("astrakhan", "makhachkala", "rail", "transcaspian", 490, 14),
     ("astrakhan", "anzali", "ferry", "transcaspian", 1150, 48),
@@ -99,18 +129,18 @@ EDGE_DEFS = [
     ("olya", "amirabad", "ferry", "transcaspian", 1250, 52),
     ("makhachkala", "anzali", "ferry", "transcaspian", 650, 34),
     ("aktau", "baku", "ferry", "transcaspian", 450, 20),
-    ("anzali", "rasht", "road", "transcaspian", 40, 1),
+    ("anzali", "rasht", "road", "transcaspian", 40, 1),   # по Edge.path 24 км (−41%), не правим: ломает CO₂ №01 в DEMO_SCENARIO
     ("rasht", "tehran", "road", "transcaspian", 320, 5),
     ("amirabad", "tehran", "road", "transcaspian", 300, 6),
     ("tehran", "bandar_abbas", "road", "transcaspian", 1140, 18),
     ("bandar_abbas", "mumbai", "ocean", "transcaspian", 1900, 72),
-    ("makhachkala", "samur", "rail", "west", 200, 6),
+    ("makhachkala", "samur", "rail", "west", 170, 6),   # было 200
     ("samur", "baku", "rail", "west", 210, 6),
-    ("baku", "astara", "rail", "west", 320, 10),
+    ("baku", "astara", "rail", "west", 191, 10),   # было 320
     ("astara", "rasht", "road", "west", 170, 4),
     ("moscow", "aktau", "rail", "east", 2600, 74),
-    ("aktau", "incheh", "rail", "east", 1200, 34),
-    ("incheh", "tehran", "rail", "east", 650, 18),
+    ("aktau", "incheh", "rail", "east", 860, 34),   # было 1200
+    ("incheh", "tehran", "rail", "east", 514, 18),   # было 650
 ]
 # Геометрия рёбер для карты: промежуточные точки [lat, lon] между узлами (сами узлы не включены).
 # Только для рисования, в расчётах не участвует. Море — по акватории (в обход Апшерона, Волго-Каспийским
@@ -425,6 +455,7 @@ SEED_META = {
     "pass_valid_until": iso(VALID_UNTIL),
     "owner_tg_id": OWNER_TG_ID,
 }
+SEED_META["corridor_facts"] = CORRIDOR_FACTS
 SEED = {"meta": SEED_META, "nodes": None, "edges": list(EDGES.values()),
         "sailings": copy.deepcopy(list(SAILINGS.values())),
         "shipments": None, "documents": list(DOCS.values()),
@@ -558,8 +589,8 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8")
     for f in MOCK_DIR.glob("*.json"):
         f.unlink()
-    SEED.update(nodes=[dict(zip(("id", "name", "country", "type", "lat", "lon", "congestion"), n))
-                       for n in NODES],
+    SEED.update(nodes=[{**dict(zip(("id", "name", "country", "type", "lat", "lon", "congestion"), n)),
+                        **NODE_FACTS.get(n[0], {})} for n in NODES],
                 shipments=[ship_initial(s) for s in IDS], passes=list(PASSES.values()))
     M.GraphOut.model_validate({"nodes": SEED["nodes"], "edges": SEED["edges"]})
     dump("seed", SEED)

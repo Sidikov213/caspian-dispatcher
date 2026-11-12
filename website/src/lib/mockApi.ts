@@ -135,6 +135,9 @@ export const mockApi: Api = {
   getModel: async () => {
     throw new ApiError(501, "not_mocked", "Сведений о модели в заглушках нет — подключите API");
   },
+  getDataSources: async () => {
+    throw new ApiError(501, "not_mocked", "Источников данных в заглушках нет — подключите API");
+  },
   createShipment: async () => {
     throw new ApiError(501, "not_mocked", "Новый груз в заглушках не создаётся — подключите API");
   },

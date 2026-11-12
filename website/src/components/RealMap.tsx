@@ -26,6 +26,8 @@ interface Props {
   insetRight: number;
   freshness: { text: string; stale: boolean } | null;
   onSelect(id: string): void;
+  /** Клик по узлу (порт, станция): карточка с фактами из Node.facts. */
+  onNode?(id: string): void;
   /** Зона угрозы активного сценария (Scenario.zone); сайт её не угадывает. */
   zone?: LatLng[] | null;
   /** Алерты: исходный маршрут перестроенного груза берётся из принятого алерта (from_route). */
@@ -113,9 +115,11 @@ export function RealMap(props: Props) {
   /** Размер контейнера «ширина×высота»; пусто, пока раскладка не дала обе стороны. */
   const [size, setSize] = useState("");
   const onSelectRef = useRef(onSelect);
+  const onNodeRef = useRef(props.onNode);
   const themeRef = useRef<SiteTheme>(theme);
   useEffect(() => {
     onSelectRef.current = onSelect;
+    onNodeRef.current = props.onNode;
     themeRef.current = theme;
   });
 
@@ -243,8 +247,9 @@ export function RealMap(props: Props) {
         fillColor: theme === "dark" ? "#0B1220" : "var(--color-panel)", fillOpacity: 1,
       }).addTo(g);
       if (n.type !== "border") {
-        dot.bindTooltip(shortNodeName(n.name), { permanent: true, direction: "auto", className: "rm-node", offset: [8, 0] });
+        dot.bindTooltip(shortNodeName(n.name), { permanent: true, direction: "auto", className: "rm-node", offset: [8, 0], interactive: true });
       }
+      dot.on("click", () => onNodeRef.current?.(n.id));
     }
     if (checkpointNode) {
       const c = nodes.get(checkpointNode);

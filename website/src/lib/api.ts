@@ -9,6 +9,7 @@ import type {
   Block,
   Graph,
   LedgerVerify,
+  DataSources,
   ModelInfo,
   Pass,
   PassVerify,
@@ -54,6 +55,7 @@ export interface Api {
   /** Все пропуска, включая переоформленные; новые сверху. */
   getPasses(shipmentId?: string): Promise<Pass[]>;
   getModel(): Promise<ModelInfo>;
+  getDataSources(): Promise<DataSources>;
   createShipment(body: ShipmentCreate): Promise<Shipment>;
   getPass(id: string): Promise<Pass>;
   getScenarioPresets(): Promise<ScenarioPreset[]>;
@@ -111,6 +113,7 @@ const httpApi: Api = {
   getSailings: () => request("/sailings"),
   getPasses: (id) => request(`/passes${id ? `?shipment_id=${encodeURIComponent(id)}` : ""}`),
   getModel: () => request("/model"),
+  getDataSources: () => request("/data-sources"),
   createShipment: (body) => request("/shipments", { method: "POST", body: JSON.stringify(body) }),
   getPass: (id) => request(`/passes/${encodeURIComponent(id)}`),
   getScenarioPresets: () => request("/scenarios/presets"),

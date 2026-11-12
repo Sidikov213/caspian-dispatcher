@@ -12,6 +12,10 @@ export interface GraphNode {
   lat: number;
   lon: number;
   congestion: number;
+  /** Проверенные факты о порте; у остальных узлов нет. */
+  facts?: string[] | null;
+  /** Ссылки на источники фактов. */
+  sources?: string[] | null;
 }
 
 export interface Edge {
@@ -332,4 +336,55 @@ export interface ModelInfo {
   classifier: { auc: number; brier: number; n_train: number; n_test: number } | null;
   regressor: { mae_h: number; n_train: number; n_test: number } | null;
   feature_importance: { name: string; label: string; importance: number }[];
+}
+
+/** GET /api/data-sources */
+export type DataSourceType = "real" | "modeled" | "synthetic";
+
+export interface DataSource {
+  id: string;
+  title: string;
+  provides: string;
+  type: DataSourceType;
+  url: string | null;
+  urls?: string[] | null;
+  updated_at: string | null;
+  note: string | null;
+}
+
+export interface BacktestPort {
+  grid_point: [number, number];
+  hours_total: number;
+  hours_no_data: number;
+  windows: number;
+  closed_hours: number;
+  longest_window_h: number;
+  max_wave_m: number | null;
+  hours_over: Record<string, number>;
+  by_month: Record<string, { closed_h: number; no_data_h: number; max_wave_m: number }>;
+}
+
+export interface Backtest {
+  title: string;
+  note: string;
+  source: string;
+  fetched_at: string;
+  period: { start: string; end: string };
+  wave_limit_m: number;
+  schedule: Record<string, number | string>;
+  ports: Record<string, BacktestPort>;
+  sailings: {
+    departures: number;
+    closed: number;
+    saved_by_makhachkala: number;
+    no_data: number;
+    no_data_makhachkala_open: number;
+  };
+  chart: string;
+}
+
+export interface DataSources {
+  sources: DataSource[];
+  corridor_facts: { text: string; source: string }[];
+  backtest: Backtest | null;
 }

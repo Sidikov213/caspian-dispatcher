@@ -101,6 +101,29 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 
 Сравнение для карточки варианта — две строки: «Прибытие +6 ч к плану» (`delay_vs_plan_h`) и «на 42 ч быстрее ожидания следующего рейса» (`delay_vs_plan_h` варианта `wait` минус этого варианта).
 
+## Регистрация и вход
+
+Только чтобы клиент знал имя и роль пользователя. **Доступ к API не меняется:** все `/api/*`, включая `/api/auth/*`, по-прежнему требуют `X-API-Key`, а остальные эндпоинты Bearer-токен не требуют и по ролям ничего не ограничивают.
+
+| Метод | Путь | Запрос | Ответ |
+|---|---|---|---|
+| POST | `/api/auth/register` | `{name, email, password, role: "logist" \| "expeditor"}` | `{token, user: {id, name, email, role}}` |
+| POST | `/api/auth/login` | `{email, password}` | `{token, user}` |
+| GET | `/api/auth/me` | заголовок `Authorization: Bearer <token>` | `{id, name, email, role}` |
+
+Ошибки в общем формате: `409 email_taken` (email уже есть, регистр не важен), `401 invalid_credentials` (неверный email или пароль), `422 weak_password` (пароль короче 6 символов), `422 invalid_email`, `422 validation_error` (например, роль не из списка), `401 invalid_token` на `/auth/me` (нет токена, чужой, истёк).
+
+- **Демо-аккаунты** создаются при первом старте, если их нет: `logist@demo.ru` и `expeditor@demo.ru`, пароль `demo123`. Для быстрого входа на защите.
+- **Хранение:** `data/accounts.json` (не в git), отдельно от состояния демо: переживает `POST /api/demo/reset` и перезапуск сервера. Пароль хранится только как хэш scrypt с солью.
+- **Токен:** JWT HS256 на 7 дней, подписан ключом, выведенным из `JWT_SECRET` (отдельно от ключа QR-пропусков). Клиент хранит его и шлёт только на `/auth/me`. Подтверждения почты, восстановления и смены пароля нет.
+
+```bash
+curl -X POST -H "X-API-Key: caspian-dev-key" -H "Content-Type: application/json" -d '{"email":"logist@demo.ru","password":"demo123"}' http://localhost:8000/api/auth/login
+```
+```bash
+curl -H "X-API-Key: caspian-dev-key" -H "Authorization: Bearer <token>" http://localhost:8000/api/auth/me
+```
+
 ## Telegram-бот
 
 Живёт в этом же процессе (`app/bot/`, aiogram 3): polling запускается в lifespan FastAPI и вызывает движок напрямую. Если `BOT_TOKEN` в `.env` пуст, сервер стартует без бота и пишет об этом в лог.
@@ -127,6 +150,7 @@ curl -X POST -H "X-API-Key: caspian-dev-key" -H "Content-Type: application/json"
 
 ```
 app/main.py        роуты, X-API-Key, CORS, ошибки, /ws, lifespan с ботом
+app/auth.py        аккаунты: регистрация, вход, хэш scrypt, JWT на 7 дней, демо-аккаунты, data/accounts.json
 app/events.py      шина событий: state.events → WebSocket и Telegram-бот
 app/bot/           Telegram-бот: texts (шаблоны), service (нажатия), notifier (рассылка и правки), llm
 app/models.py      Pydantic-модели (раздел 4) + запросы/ответы (раздел 5)

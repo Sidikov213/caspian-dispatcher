@@ -9,3 +9,4 @@ local_db.json
 .pytest_cache/
 backend/data/users.json
 backend/data/weather_cache.json
+backend/data/accounts.json

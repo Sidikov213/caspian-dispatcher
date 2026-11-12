@@ -41,3 +41,6 @@ PREDICTOR = os.getenv("PREDICTOR", "catboost").strip().lower()
 MODEL_PATH = DATA_DIR / "model.cbm"               # классификатор срыва — используется сервером
 SHIFT_MODEL_PATH = DATA_DIR / "model_shift.cbm"   # регрессор сдвига — только проверка, в расчёт не входит
 MODEL_REPORT_PATH = DATA_DIR / "model_report.json"
+
+# Аккаунты логиста и экспедитора (регистрация и вход). Не в git; переживают demo/reset и перезапуск.
+ACCOUNTS_PATH = Path(os.getenv("ACCOUNTS_PATH", "").strip() or DATA_DIR / "accounts.json")

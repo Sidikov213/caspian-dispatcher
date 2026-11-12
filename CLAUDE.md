@@ -154,10 +154,15 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | POST | `/ledger/tamper` | `{index}` (только демо) | `{ok: true}` |
 | GET | `/stats` | — | `{saved_hours, saved_rub, co2_saved_kg, decisions, shipments_total, at_risk}` (сумма по Decision; часы — груз-часы) |
 | POST | `/users/link` | `{telegram_id, name}` | `{ok: true}` |
+| POST | `/auth/register` | `{name, email, password, role: "logist" \| "expeditor"}` | `{token, user: {id, name, email, role}}`; 409 `email_taken`; 422 `weak_password` (< 6 символов), `invalid_email` |
+| POST | `/auth/login` | `{email, password}` | `{token, user}`; 401 `invalid_credentials` |
+| GET | `/auth/me` | заголовок `Authorization: Bearer <token>` | `user`; 401 `invalid_token` |
 | POST | `/demo/reset` | — | `{ok: true}` |
 | GET | `/demo/check` (только демо) | — | `{ok, sim_now, weather: {source, stale, updated_at}, checks: [{name, label, expected, actual, ok}], problems: [string]}`: проверка «начальное состояние спокойное» (до сценария ни один груз не «Под риском», при провале — причина: груз, риск, волна в порту) и storm_north на копии исходного состояния, сверка с эталоном (риски 82/74/68% ±5 п. п. и порядок №01 > №02 > №03; точно: +18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, рекомендован `mkh`); `problems` — почему разошлось. Состояние не меняет |
 | GET | `/model` | — | `{summary, active: "catboost" \| "formula", requested, fallback_reason, synthetic: true, note, used_at_runtime: {miss_probability, departure_shift_and_delays, shift_regressor}, trained_at, seed, classifier: {auc, brier, n_train, n_test} \| null, regressor: {mae_h, n_train, n_test} \| null, feature_importance: [{name, label, importance}]}`: только чтение, метрики из `data/model_report.json`. `summary` — строка «Активен предиктор: …» (при откате — причина; та же строка в логе при старте, при откате — warning). На сервере работает только классификатор; сдвиг и задержки — расчёт; регрессор — только проверка |
 | POST | `/demo/fail_next_pass` (только демо) | — | `{ok: true}`; следующий выпуск пропуска сорвётся → груз получает `pass_state: reissue_pending`, старый пропуск активен, повтор через `/shipments/{id}/pass/retry` |
+
+Аккаунты: `X-API-Key` по-прежнему обязателен на всех `/api/*`, включая `/auth/*`; Bearer-токен (JWT HS256 на 7 дней, ключ из `JWT_SECRET`) нужен только для `/auth/me`, чтобы клиент знал имя и роль. Ограничений по ролям нет. Пароль хранится только как хэш scrypt с солью в `data/accounts.json` (не в git), аккаунты переживают `demo/reset` и перезапуск. Демо-аккаунты создаются при первом старте: `logist@demo.ru` и `expeditor@demo.ru`, пароль `demo123`.
 
 WebSocket `/ws`, сообщения `{type, payload}`:
 `shipment.updated` (Shipment), `alert.created` (Alert), `alert.updated` (Alert), `ledger.appended` (Block), `stats.updated`, `weather.updated`.

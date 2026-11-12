@@ -507,3 +507,32 @@ class ModelInfoOut(Model):
     classifier: ClassifierMetrics | None
     regressor: RegressorMetrics | None
     feature_importance: list[FeatureImportance]
+
+
+# ---------- Аккаунты (POST /api/auth/register, /api/auth/login, GET /api/auth/me) ----------
+
+Role = Literal["logist", "expeditor"]
+
+
+class AuthRegisterIn(Model):
+    name: str
+    email: str
+    password: str
+    role: Role
+
+
+class AuthLoginIn(Model):
+    email: str
+    password: str
+
+
+class AuthUser(Model):
+    id: str
+    name: str
+    email: str
+    role: Role
+
+
+class AuthOut(Model):
+    token: str = Field(description="JWT на 7 дней: заголовок Authorization: Bearer <token> для /api/auth/me")
+    user: AuthUser

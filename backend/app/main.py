@@ -15,13 +15,14 @@ from fastapi import (APIRouter, Depends, FastAPI, File, Form, Query, Request, Up
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import events
 from . import models as M
 from .bot import start_bot, stop_bot
-from .config import API_KEY, WEATHER_MODE
+from .auth import Accounts
+from .config import ACCOUNTS_PATH, API_KEY, WEATHER_MODE
 from .democheck import log_check, run_check
 from .modelinfo import log_active, model_info
 from .state import ApiError, state
@@ -34,6 +35,10 @@ for _name in ("caspian", "aiogram"):  # uvicorn настраивает толь�
         _h.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
         _lg.addHandler(_h)
         _lg.setLevel(logging.INFO)
+
+
+# Аккаунты живут отдельно от состояния демо: demo/reset их не трогает. Демо-аккаунты — при первом старте.
+accounts = Accounts(ACCOUNTS_PATH)
 
 
 async def refresh_weather() -> bool:
@@ -349,6 +354,30 @@ async def demo_reset():
     log.info("Reset: sim_now %s", state.sim_now.isoformat())
     log_check(state, "reset")
     return {"ok": True}
+
+
+# ---------- аккаунты: только имя и роль для клиента; доступ к API по-прежнему по X-API-Key ----------
+
+bearer = HTTPBearer(auto_error=False)
+
+
+@api.post("/auth/register", response_model=M.AuthOut, tags=["аккаунты"],
+          responses={409: {"model": M.ErrorOut}, 422: {"model": M.ErrorOut}})
+async def auth_register(body: M.AuthRegisterIn):
+    """Регистрация логиста или экспедитора. 409 email_taken, 422 weak_password (< 6 символов) / invalid_email."""
+    return accounts.register(body.name, body.email, body.password, body.role)
+
+
+@api.post("/auth/login", response_model=M.AuthOut, tags=["аккаунты"])
+async def auth_login(body: M.AuthLoginIn):
+    """Вход. Неверный email или пароль — 401 invalid_credentials. Демо: logist@demo.ru / expeditor@demo.ru, demo123."""
+    return accounts.login(body.email, body.password)
+
+
+@api.get("/auth/me", response_model=M.AuthUser, tags=["аккаунты"])
+async def auth_me(cred: HTTPAuthorizationCredentials | None = Depends(bearer)):
+    """Кто вошёл: по заголовку Authorization: Bearer <token>. Нет или неверный токен — 401 invalid_token."""
+    return accounts.me(cred.credentials if cred else None)
 
 
 @api.get("/model", response_model=M.ModelInfoOut, tags=["модель"])

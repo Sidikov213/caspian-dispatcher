@@ -18,6 +18,9 @@ PRESETS = {
         "overlay": {"storm_nodes": ["astrakhan", "olya"], "peak": 3.4,
                     "bumps": {"makhachkala": [0.7, 50, 12]}},
         "congestion": {"astrakhan": 0.85}, "customs_h": {"astrakhan": 2},
+        # Северный Каспий: дельта Волги, Астрахань, Оля, до широты Махачкалы не доходит
+        "zone": [[46.75, 47.55], [46.75, 49.6], [46.2, 51.2], [45.1, 51.0], [44.45, 50.1],
+                 [44.55, 48.4], [45.3, 47.3], [46.1, 47.15]],
     },
     "storm_full": {
         "id": "scn-storm-full", "type": "storm", "title": "Шторм на всём Каспии",
@@ -28,6 +31,10 @@ PRESETS = {
         "overlay": {"storm_nodes": ["astrakhan", "olya", "makhachkala", "aktau", "baku",
                                     "anzali", "amirabad"], "peak": 4.1},
         "congestion": {"astrakhan": 0.85, "makhachkala": 0.8}, "customs_h": {"astrakhan": 2},
+        # всё море с портами по берегам
+        "zone": [[46.9, 47.1], [47.25, 51.3], [46.3, 53.3], [44.2, 51.5], [42.5, 52.9], [40.0, 53.4],
+                 [38.3, 54.1], [36.7, 54.0], [36.6, 52.2], [37.0, 50.2], [37.3, 49.0], [38.6, 48.7],
+                 [40.4, 49.5], [41.6, 48.4], [43.0, 47.2], [44.6, 46.7]],
     },
     "congestion_astrakhan": {
         "id": "scn-congestion-astrakhan", "type": "congestion", "title": "Затор в порту Астрахань",
@@ -35,6 +42,7 @@ PRESETS = {
         "start_h": 18, "end_h": 48, "params": {"wave_height_m": None, "wind_ms": None},
         "overlay": None,
         "congestion": {"astrakhan": 0.95}, "customs_h": {"astrakhan": 6},
+        "zone": [[46.55, 47.75], [46.55, 48.35], [46.15, 48.35], [46.15, 47.75]],   # порт Астрахань
     },
 }
 
@@ -48,7 +56,7 @@ def make_scenario(key: str, sim_now) -> dict:
             "blocked_edges": p["blocked_edges"], "affected_nodes": p["affected_nodes"],
             "start": iso(sim_now + H(p["start_h"])), "end": iso(sim_now + H(p["end_h"])),
             "starts_in_h": p["start_h"],
-            "params": p["params"],
+            "params": p["params"], "zone": p.get("zone"),
             "_preset": key, "_overlay": p["overlay"], "_congestion": p["congestion"],
             "_customs_h": p["customs_h"]}
 

@@ -19,7 +19,7 @@ import { useDashboard } from "@/lib/useDashboard";
 import { AlertModal } from "./AlertModal";
 import { AlternativesPanel } from "./AlternativesPanel";
 import { AppHeader } from "./AppHeader";
-import { CorridorMap } from "./CorridorMap";
+import { RealMap } from "./RealMap";
 import { LedgerView } from "./LedgerView";
 import { ShipmentList } from "./ShipmentList";
 import { Toast } from "./Toast";
@@ -212,7 +212,7 @@ export function Dashboard() {
           />
         ) : (
           <div className="relative flex min-w-0 flex-1">
-            <CorridorMap
+            <RealMap
               nodes={d.nodes}
               edges={d.edges}
               shipments={d.shipments}
@@ -220,6 +220,8 @@ export function Dashboard() {
               focusId={selected?.id ?? null}
               preview={previewRoute}
               stormZone={zone}
+              zone={d.scenario && d.alerts.some((a) => a.scenario_id === d.scenario?.id) ? d.scenario.zone : null}
+              alerts={d.alerts}
               calmWaves={calm}
               checkpointNode={checkpointNode}
               insetRight={panelOpen ? PANEL_W : 0}

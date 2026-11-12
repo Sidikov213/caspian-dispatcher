@@ -10,6 +10,7 @@ import type {
   Graph,
   LedgerVerify,
   Pass,
+  PassVerify,
   Scenario,
   ScenarioPreset,
   Shipment,
@@ -49,8 +50,10 @@ export interface Api {
   /** Только для демо. */
   tamperLedger(index: number): Promise<void>;
   createScenario(preset: string): Promise<{ scenario: Scenario; alert: Alert }>;
-  /** Только моки: в контракте нет GET сценария, на бэкенде сценарий приходит из POST /scenarios. */
+  /** Сценарий по id: моки — из файлов, бэкенд — из GET /scenarios (активные сценарии с зоной). */
   getScenario?(id: string): Promise<Scenario | null>;
+  /** Проверка пропуска: POST /passes/verify. */
+  verifyPass(token: string): Promise<PassVerify>;
   resetDemo(): Promise<void>;
   register(body: { name: string; email: string; password: string; role: AuthRole }): Promise<AuthOut>;
   login(body: { email: string; password: string }): Promise<AuthOut>;
@@ -89,6 +92,8 @@ const httpApi: Api = {
   getPass: (id) => request(`/passes/${encodeURIComponent(id)}`),
   getScenarioPresets: () => request("/scenarios/presets"),
   createScenario: (preset) => request("/scenarios", { method: "POST", body: JSON.stringify({ preset }) }),
+  getScenario: async (id) => (await request<Scenario[]>("/scenarios")).find((s) => s.id === id) ?? null,
+  verifyPass: (token) => request("/passes/verify", { method: "POST", body: JSON.stringify({ token }) }),
   getAlternatives: (id) => request(`/shipments/${encodeURIComponent(id)}/alternatives`),
   acceptAlert: (id, body) =>
     request(`/alerts/${encodeURIComponent(id)}/accept`, { method: "POST", body: JSON.stringify(body) }),
@@ -111,6 +116,7 @@ const httpApi: Api = {
     const base = new URL(API_URL || window.location.origin);
     base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
     base.pathname = "/ws";
+    if (API_KEY) base.searchParams.set("api_key", API_KEY); // без ключа сервер закрывает /ws (403)
     base.search = "";
     base.hash = "";
     // Браузер не умеет слать заголовки в WebSocket: ключ идёт query-параметром.
@@ -229,6 +235,13 @@ const mockApi: Api = {
     const pass = (await load<Pass[]>("passes")).find((p) => p.id === id);
     if (!pass) throw new ApiError(404, "not_found", "Пропуск не найден");
     return pass;
+  },
+  verifyPass: async (token) => {
+    const pass = (await load<Pass[]>("passes")).find((p) => p.token === token);
+    if (!pass) return { valid: false, shipment_id: null, checkpoint_node: null, reason: "Пропуск не найден" };
+    return pass.status === "active"
+      ? { valid: true, shipment_id: pass.shipment_id, checkpoint_node: pass.checkpoint_node, reason: null }
+      : { valid: false, shipment_id: pass.shipment_id, checkpoint_node: pass.checkpoint_node, reason: `Пропуск ${pass.status}` };
   },
   getScenarioPresets: async () => {
     const all = (await import("@/mocks/scenario_presets.json")).default as ScenarioPreset[];

@@ -1,0 +1,38 @@
+/* Карта Leaflet: наши маркеры и подписи, читаемые на проекторе. Стили Leaflet — из пакета, без CDN. */
+.rm { position: absolute; inset: 0; z-index: 0; font-family: var(--font-sans); }
+.rm.rm-dark { background: #0b1220; }
+.rm.rm-light { background: #e8eef6; }
+
+/* Базовые стили Tailwind задают img { max-width: 100% }: слой тайлов Leaflet нулевой ширины,
+   и тайлы сжимаются в 0 px. Правило Leaflet это отменяет, но проигрывает каскаду — повторяем явно. */
+.rm img.leaflet-tile,
+.rm .leaflet-marker-pane img,
+.rm .leaflet-shadow-pane img { max-width: none !important; max-height: none !important; }
+
+/* Своей тёмной подложки нет — в тёмной теме приглушаем светлую фильтром (только тайлы, не линии) */
+.rm-dim .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(0.85) saturate(0.6); }
+
+.rm .leaflet-tooltip.rm-node,
+.rm .leaflet-tooltip.rm-wave {
+  border: 0; box-shadow: none; border-radius: 6px; padding: 2px 7px; white-space: nowrap;
+  font-size: 14px; line-height: 20px; font-weight: 700;
+}
+.rm .leaflet-tooltip.rm-node::before,
+.rm .leaflet-tooltip.rm-wave::before { display: none; }
+.rm-light .leaflet-tooltip.rm-node { background: rgba(255, 255, 255, 0.92); color: #12304a; }
+.rm-dark .leaflet-tooltip.rm-node { background: rgba(19, 28, 46, 0.92); color: #e6edf7; }
+.rm .leaflet-tooltip.rm-wave { font-size: 14px; font-weight: 700; }
+.rm-light .leaflet-tooltip.rm-wave { background: rgba(255, 255, 255, 0.95); color: #087f8c; border: 1px solid #c9d4e3; }
+.rm-dark .leaflet-tooltip.rm-wave { background: rgba(19, 28, 46, 0.95); color: #3fe0c5; border: 1px solid #24304a; }
+.rm .leaflet-tooltip.rm-wave.storm { color: #ffffff; background: #dc2626; border-color: #dc2626; }
+
+.rm-ship {
+  display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%;
+  color: #fff; font: 800 14px/1 var(--font-sans); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.rm-ship.focus { width: 36px; height: 36px; font-size: 16px; box-shadow: 0 0 0 4px rgba(36, 91, 219, 0.35), 0 2px 6px rgba(0, 0, 0, 0.35); }
+
+.rm .leaflet-control-attribution { font-size: 11px; }
+.rm-dark .leaflet-control-attribution { background: rgba(11, 18, 32, 0.8); color: #8a97ad; }
+.rm-dark .leaflet-control-attribution a { color: #8fb8ff; }

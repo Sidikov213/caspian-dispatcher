@@ -24,6 +24,8 @@ export interface Edge {
   base_hours: number;
   cost_rub_per_t: number;
   co2_g_per_tkm: number;
+  /** Необязательно: промежуточные точки [lat, lon] для карты (без самих узлов). */
+  path?: [number, number][] | null;
 }
 
 export interface Graph {
@@ -152,6 +154,8 @@ export interface Scenario {
   /** Через сколько часов от sim_now начинается угроза. Не считать от created_at. */
   starts_in_h: number;
   params: { wave_height_m?: number; wind_ms?: number };
+  /** Необязательно: зона угрозы для карты, полигон [lat, lon]. Сайт её не угадывает. */
+  zone?: [number, number][] | null;
 }
 
 export interface ScenarioPreset {
@@ -250,6 +254,14 @@ export interface Block {
 export interface LedgerVerify {
   valid: boolean;
   broken_at: number | null;
+}
+
+/** POST /api/passes/verify */
+export interface PassVerify {
+  valid: boolean;
+  shipment_id: string | null;
+  checkpoint_node: string | null;
+  reason: string | null;
 }
 
 /** Аккаунты — POST /api/auth/register|login, GET /api/auth/me. */

@@ -50,4 +50,9 @@ ACCOUNTS_PATH = Path(os.getenv("ACCOUNTS_PATH", "").strip() or DATA_DIR / "accou
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 PUBLIC_URL = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
 DEMO_COMPANY = os.getenv("DEMO_COMPANY", "").strip() or "Каспий Логистик"
+
+# Пуши в мобильное приложение (FCM): путь к JSON-ключу сервисного аккаунта Firebase (не в git).
+# Пусто — пуши выключены, токены устройств всё равно принимаются. Устройства переживают reset.
+FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS", "").strip()
+DEVICES_PATH = Path(os.getenv("DEVICES_PATH", "").strip() or DATA_DIR / "devices.json")
 MINIAPP_DIR = BASE_DIR / "app" / "miniapp"

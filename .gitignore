@@ -11,6 +11,9 @@ backend/data/users.json
 backend/data/weather_cache.json
 backend/data/accounts.json
 
+# пуши: токены устройств и ключ Firebase — не в git
+backend/data/devices.json
+backend/secrets/
 # Flutter mobile
 mobile/.flutter-plugins-dependencies
 mobile/ios/Pods/

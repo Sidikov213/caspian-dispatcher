@@ -23,7 +23,8 @@ from . import events
 from . import models as M
 from .bot import start_bot, stop_bot
 from .auth import PERMISSIONS, Accounts
-from .config import ACCOUNTS_PATH, API_KEY, MINIAPP_DIR, WEATHER_MODE
+from .config import ACCOUNTS_PATH, API_KEY, DEVICES_PATH, FIREBASE_CREDENTIALS, MINIAPP_DIR, WEATHER_MODE
+from .push import Devices, PushNotifier, make_client
 from .democheck import log_check, run_check
 from .modelinfo import log_active, model_info
 from .state import ApiError, state
@@ -41,6 +42,12 @@ for _name in ("caspian", "aiogram"):  # uvicorn настраивает толь�
 
 # Аккаунты живут отдельно от состояния демо: demo/reset их не трогает. Демо-аккаунты — при первом старте.
 accounts = Accounts(ACCOUNTS_PATH)
+
+# Пуши в приложение: подписчик шины событий рядом с Telegram-уведомителем. Без ключа Firebase — выключены.
+devices = Devices(DEVICES_PATH)
+push_notifier = PushNotifier(devices, client) if (client := make_client(FIREBASE_CREDENTIALS)) else None
+if push_notifier:
+    events.subscribe(push_notifier)
 
 
 async def refresh_weather() -> bool:
@@ -455,6 +462,29 @@ async def auth_login(body: M.AuthLoginIn):
 async def auth_me(cred: HTTPAuthorizationCredentials | None = Depends(bearer)):
     """Кто вошёл: по заголовку Authorization: Bearer <token>. Нет или неверный токен — 401 invalid_token."""
     return accounts.me(cred.credentials if cred else None)
+
+
+# ---------- устройства для пушей (FCM) ----------
+
+def current_user(cred: HTTPAuthorizationCredentials | None = Depends(bearer)) -> dict:
+    """Пользователь по токену входа (/api/auth/login). Без него — 401 invalid_token."""
+    return accounts.me(cred.credentials if cred else None)
+
+
+@api.post("/devices", response_model=M.DeviceOut, tags=["пуши"],
+          responses={401: {"model": M.ErrorOut}, 422: {"model": M.ErrorOut}})
+async def register_device(body: M.DeviceIn, user=Depends(current_user)):
+    """FCM-токен устройства для пушей. Нужен Authorization: Bearer из /api/auth/login (и X-API-Key).
+    Повторная регистрация того же токена его обновляет; токен с другого аккаунта переезжает к этому."""
+    devices.register(user["id"], body.token, body.platform)
+    return {"ok": True, "push_enabled": push_notifier is not None}
+
+
+@api.delete("/devices", response_model=M.DeviceOut, tags=["пуши"], responses={401: {"model": M.ErrorOut}})
+async def unregister_device(body: M.DeviceDeleteIn, _=Depends(current_user)):
+    """Забыть токен (выход из приложения). Неизвестный токен — тоже ok."""
+    devices.unregister(body.token)
+    return {"ok": True, "push_enabled": push_notifier is not None}
 
 
 @api.get("/model", response_model=M.ModelInfoOut, tags=["модель"])

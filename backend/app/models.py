@@ -623,3 +623,20 @@ class DataSourcesOut(Model):
     backtest: dict | None = Field(
         None, description="Ретроспективная симуляция на исторической погоде (data/backtest.json, сводка); "
                           "chart — путь к графику на сайте")
+
+
+# ---------- Устройства для пушей (POST/DELETE /api/devices) ----------
+
+class DeviceIn(Model):
+    token: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4096)] = Field(
+        description="FCM-токен: FirebaseMessaging.instance.getToken()")
+    platform: Literal["ios", "android"]
+
+
+class DeviceDeleteIn(Model):
+    token: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4096)]
+
+
+class DeviceOut(Model):
+    ok: bool
+    push_enabled: bool = Field(description="false — на сервере нет ключа Firebase, пуши не уходят")

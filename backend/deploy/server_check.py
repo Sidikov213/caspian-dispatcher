@@ -54,8 +54,9 @@ def demo_check():
     c = get(f"{API}/demo/check", {"X-API-Key": env["API_KEY"]}, timeout=60)
     bad = [f"{x['name']}: {x['actual']} вместо {x['expected']}" for x in c["checks"] if not x["ok"]]
     risks = "/".join(str(int(x["actual"])) for x in c["checks"] if x["name"].startswith("risk_sh"))
-    return c["ok"], (f"риск {risks}%, погода {c['weather']['source']}" if c["ok"]
-                     else "; ".join(bad + c["problems"]))
+    quiet = next((x["actual"] for x in c["checks"] if x["name"] == "forecast_quiet"), "—")
+    return c["ok"], (f"риск {risks}%, погода {c['weather']['source']}; наблюдатель до сценария: {quiet}"
+                     if c["ok"] else "; ".join(bad + c["problems"]))
 
 
 check("Telegram API getMe", telegram)

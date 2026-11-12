@@ -28,11 +28,13 @@ $before = (gh run list --workflow deploy.yml -L 1 --json databaseId -q ".[0].dat
 gh workflow run deploy.yml --ref main -f action=$Action -f upgrade=$upgradeArg
 if ($LASTEXITCODE -ne 0) { throw "gh workflow run не запустился" }
 
-$id = $before
-for ($i = 0; $i -lt 30 -and $id -eq $before; $i++) {
+# Ждём появления нового запуска. Сбой сети при запросе (пустой ответ) — не номер, пробуем ещё.
+$id = $null
+for ($i = 0; $i -lt 45 -and (-not $id -or $id -eq $before); $i++) {
     Start-Sleep -Seconds 2
-    $id = (gh run list --workflow deploy.yml -L 1 --json databaseId -q ".[0].databaseId")
+    $id = (gh run list --workflow deploy.yml -L 1 --json databaseId -q ".[0].databaseId" 2>$null)
 }
+if (-not $id -or $id -eq $before) { throw "Новый запуск deploy не найден — смотрите вкладку Actions" }
 Write-Host "Запуск: https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions/runs/$id"
 gh run watch $id --exit-status --interval 10
 $code = $LASTEXITCODE

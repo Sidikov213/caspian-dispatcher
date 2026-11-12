@@ -5,9 +5,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 
 class Model(BaseModel):
@@ -168,11 +168,19 @@ class DecisionItem(Model):
     sailing_id: str | None = None
 
 
+class AcceptedBy(Model):
+    """Кто принял решение. Есть, если запрос пришёл с Bearer-токеном входа сайта, из мини-приложения
+    или из бота (имя пользователя Telegram). Без него клиенты пишут «через сайт / через Telegram»."""
+    name: str
+    role: Literal["logist", "expeditor"]
+
+
 class Decision(Model):
     id: str
     alert_id: str
     ts: datetime
     accepted_via: Via
+    accepted_by: AcceptedBy | None = None
     items: list[DecisionItem]
 
 
@@ -258,6 +266,7 @@ class Alert(Model):
     status_note: str | None = Field(None, description="Почему алерт закрыт: «угроза снята», «прогноз изменился…»")
     accepted_at: datetime | None = None
     accepted_via: Via | None = None
+    accepted_by: AcceptedBy | None = None
 
 
 class DocumentFields(Model):
@@ -313,16 +322,28 @@ class Block(Model):
 
 # ---------- Запросы ----------
 
+CargoType = Literal["grain", "metal", "equipment", "textile", "fertilizer", "explosives"]
+NodeId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)]
+Id = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
+MAX_WEIGHT_T = 5000
+
+
 class ShipmentCreate(Model):
-    title: str
-    cargo_type: str
-    weight_t: float
-    origin: str
-    destination: str
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    cargo_type: CargoType
+    weight_t: float = Field(gt=0, le=MAX_WEIGHT_T, allow_inf_nan=False, description="Больше 0, не больше 5000 т")
+    origin: NodeId
+    destination: NodeId
+
+    @model_validator(mode="after")
+    def _different_points(self):
+        if self.origin == self.destination:
+            raise ValueError("пункт отправления и назначения совпадают")
+        return self
 
 
 class RerouteIn(Model):
-    route_id: str
+    route_id: Id
 
 
 class ScenarioIn(Model):
@@ -331,7 +352,7 @@ class ScenarioIn(Model):
 
 class AcceptIn(Model):
     via: Via
-    option_id: str | None = Field(None, description="id из Alert.options; без него — рекомендованный")
+    option_id: Annotated[str, StringConstraints(min_length=1, max_length=32)] | None = Field(None, description="id из Alert.options; без него — рекомендованный")
 
 
 class DocumentConfirmIn(Model):
@@ -339,16 +360,16 @@ class DocumentConfirmIn(Model):
 
 
 class PassVerifyIn(Model):
-    token: str
+    token: Annotated[str, StringConstraints(min_length=1, max_length=4096)]
 
 
 class TamperIn(Model):
-    index: int
+    index: int = Field(ge=0)
 
 
 class UserLinkIn(Model):
-    telegram_id: int
-    name: str
+    telegram_id: int = Field(gt=0)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 
 
 # ---------- Ответы ----------
@@ -527,16 +548,19 @@ class ModelInfoOut(Model):
 Role = Literal["logist", "expeditor"]
 
 
+Permission = Literal["run_scenario", "reset_demo", "decide_alert"]
+
+
 class AuthRegisterIn(Model):
-    name: str
-    email: str
-    password: str
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    email: Annotated[str, StringConstraints(max_length=254)]
+    password: Annotated[str, StringConstraints(max_length=256)]
     role: Role
 
 
 class AuthLoginIn(Model):
-    email: str
-    password: str
+    email: Annotated[str, StringConstraints(max_length=254)]
+    password: Annotated[str, StringConstraints(max_length=256)]
 
 
 class AuthUser(Model):
@@ -544,6 +568,8 @@ class AuthUser(Model):
     name: str
     email: str
     role: Role
+    permissions: list[Permission] = Field(
+        default_factory=list, description="Логист: run_scenario, reset_demo, decide_alert; экспедитор — пусто")
 
 
 class AuthOut(Model):
@@ -555,7 +581,7 @@ class AuthOut(Model):
 # ---------- Telegram Mini App (POST /api/tg/auth) ----------
 
 class TgAuthIn(Model):
-    init_data: str = Field(description="Telegram.WebApp.initData как есть")
+    init_data: Annotated[str, StringConstraints(min_length=1, max_length=8192)] = Field(description="Telegram.WebApp.initData как есть")
 
 
 class TgUser(Model):

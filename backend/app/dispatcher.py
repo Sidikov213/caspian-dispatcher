@@ -299,11 +299,17 @@ def _changed(old: dict, new: dict) -> bool:
             or abs(old["_peak"] - new["_peak"]) >= CHANGE_WAVE_M)
 
 
-def close_alert(st, alert: dict, note: str) -> None:
-    """Алерт больше не актуален: superseded с пометкой; грузы, оставшиеся на плане, — к обычному прогнозу."""
+NOTE_DECIDED = "по этим грузам решение уже принято"
+
+
+def close_alert(st, alert: dict, note: str, keep: set[str] = frozenset()) -> None:
+    """Алерт больше не актуален: superseded с пометкой; грузы, оставшиеся на плане, — к обычному прогнозу.
+    keep — грузы, которые уже взял новый алерт: их маршрут и риск не трогаем."""
     alert["status"], alert["status_note"] = "superseded", note
     internal = st.alert_internal.get(alert["id"], {})
     for it in alert["items"]:
+        if it["shipment_id"] in keep:
+            continue
         sh = st.shipments.get(it["shipment_id"])
         before = internal.get(it["shipment_id"], {}).get("route_before")
         if sh and before and sh["route"]["id"] == before["id"] and not sh["rerouted"]:
@@ -311,6 +317,17 @@ def close_alert(st, alert: dict, note: str) -> None:
             refresh_shipment(st, sh)
             st.emit("shipment.updated", sh)
     st.emit("alert.updated", alert)
+
+
+def alert_shipments(alert: dict) -> set[str]:
+    return {i["shipment_id"] for i in alert["items"]}
+
+
+def close_overlapping(st, ids: set[str], note: str, keep: set[str] = frozenset(), skip: str | None = None) -> None:
+    """Груз входит только в один активный алерт: открытые алерты с этими грузами закрываются."""
+    for other in list(st.alerts.values()):
+        if other["id"] != skip and other["status"] == "new" and ids & alert_shipments(other):
+            close_alert(st, other, note, keep)
 
 
 def watch(st) -> list[dict]:
@@ -522,10 +539,13 @@ def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
                        "loss_rub": sum(v["loss"] for v in internal.values())},
         "port_load": port_load(st, [i for i in items if i["action"] == "reroute"]),
         "options": [_option(st, k, o["title"], o["items"], k == rec_key) for k, o in options.items()],
-        "status": "new", "accepted_at": None, "accepted_via": None,
+        "status": "new", "accepted_at": None, "accepted_via": None, "accepted_by": None,
         "source": sc.get("_source", "scenario"), "status_note": None,
     }
     alert["text"] = alert_text(st, sc, alert, internal)
+    ids = {b["sh"]["id"] for b in bases}
+    # новая угроза по тем же грузам заменяет прежний алерт: груз входит только в один активный алерт
+    close_overlapping(st, ids, f"заменён алертом {aid} ({sc['title']}): угроза по тем же грузам", keep=ids)
     for base in bases:
         set_route(st, base["sh"], base["from_route"], internal[base["sh"]["id"]].pop("_risk"))
     st.alerts[aid] = alert
@@ -657,8 +677,9 @@ def _supersede(st, alert: dict, why: str):
     raise ApiError(409, "superseded", f"Предложение устарело ({why}). Новый вариант — {new['id']}")
 
 
-def accept(st, alert_id: str, via: str, option_id: str | None = None) -> dict:
-    """Вызывать только под st.lock. option_id=None — рекомендованный вариант."""
+def accept(st, alert_id: str, via: str, option_id: str | None = None, by: dict | None = None) -> dict:
+    """Вызывать только под st.lock. option_id=None — рекомендованный вариант.
+    by — кто принял {name, role}: вход сайта по Bearer, мини-приложение или бот; без него — None."""
     alert = st.alerts.get(alert_id)
     if alert is None:
         raise ApiError(404, "alert_not_found", f"Алерт {alert_id} не найден")
@@ -680,6 +701,12 @@ def accept(st, alert_id: str, via: str, option_id: str | None = None) -> dict:
         raise ApiError(422, "use_reject", "«Ждать» — это отклонение предложения: POST /alerts/{id}/reject")
     chosen = opts[oid]
     rer = [i for i in chosen["items"] if i["action"] == "reroute"]
+
+    # 0. алерт считали от маршрутов, которые с тех пор могли смениться (другое решение, ручная смена)
+    for it in chosen["items"]:
+        sh = st.shipments.get(it["shipment_id"])
+        if sh is None or sh["route"]["id"] != it["from_route"]["id"]:
+            _supersede(st, alert, f"маршрут груза {it['shipment_id']} уже изменён")
 
     # 1. повторная проверка рейса и резерв места — в той же операции
     ctx = st.ctx()
@@ -719,6 +746,7 @@ def accept(st, alert_id: str, via: str, option_id: str | None = None) -> dict:
     # 6. Decision с замороженными числами; stats — сумма Decision
     st.seq["decision"] += 1
     decision = {"id": f"dec-{st.seq['decision']:03d}", "alert_id": alert_id, "ts": ts, "accepted_via": via,
+                "accepted_by": copy.deepcopy(by),
                 "items": [{"shipment_id": i["shipment_id"], "saved_hours": i["saved_hours"],
                            "saved_rub": i["saved_rub"], "co2_delta_kg": i["co2_delta_kg"],
                            "sailing_id": i["sailing_id"]} for i in rer],
@@ -730,7 +758,8 @@ def accept(st, alert_id: str, via: str, option_id: str | None = None) -> dict:
         alert["totals"] = totals_of(alert["items"], {k: v["co2_plan"] for k, v in internal.items()})
         for o in alert["options"]:
             o["recommended"] = o["id"] == oid
-    alert.update(status="accepted", accepted_at=ts, accepted_via=via)
+    alert.update(status="accepted", accepted_at=ts, accepted_via=via, accepted_by=copy.deepcopy(by))
+    close_overlapping(st, alert_shipments(alert), NOTE_DECIDED, skip=alert_id)
 
     out = {"alert": copy.deepcopy(alert),
            "shipments": [copy.deepcopy(st.shipments[i["shipment_id"]]) for i in rer],
@@ -817,10 +846,8 @@ def reroute(st, sid: str, route_id: str) -> dict:
     set_route(st, sh, copy.deepcopy(new_route), copy.deepcopy(alt["risk"]),
               rerouted=route_id != st.plan_routes[sid]["id"])
     reissue_pass(st, sh, iso(st.clock.event_ts()))
-    for a in st.alerts.values():  # открытые алерты по этому грузу больше не актуальны
-        if a["status"] == "new" and any(i["shipment_id"] == sid for i in a["items"]):
-            a["status"] = "superseded"
-            st.emit("alert.updated", a)
+    # открытые алерты по этому грузу больше не актуальны
+    close_overlapping(st, {sid}, "маршрут груза изменён вручную", keep={sid})
     st.emit("shipment.updated", sh)
     st.emit("stats.updated", st.stats())
     return copy.deepcopy(sh)
@@ -830,7 +857,7 @@ def plan_new_shipment(st, body: dict) -> dict:
     g = st.graph
     for n in (body["origin"], body["destination"]):
         if n not in g.nodes:
-            raise ApiError(404, "node_not_found", f"Узел {n} не найден")
+            raise ApiError(422, "node_not_found", f"Пункта {n} нет в графе")
     ctx = st.ctx()
     st.seq["shipment"] += 1
     sid = f"sh-{st.seq['shipment']:02d}"

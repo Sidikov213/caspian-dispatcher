@@ -897,7 +897,8 @@
     "source": "scenario",
     "status_note": null,
     "accepted_at": "2026-11-12T11:32:00Z",
-    "accepted_via": "web"
+    "accepted_via": "web",
+    "accepted_by": null
   },
   "shipments": [
     {
@@ -1358,6 +1359,7 @@
     "alert_id": "alert-001",
     "ts": "2026-11-12T11:32:00Z",
     "accepted_via": "web",
+    "accepted_by": null,
     "items": [
       {
         "shipment_id": "sh-01",

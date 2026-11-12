@@ -79,10 +79,11 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 | `ledger.appended` | Block | дописать в реестр |
 | `stats.updated` | Stats | обновить счётчики |
 | `weather.updated` | **`null`** | перезапросить `GET /weather` |
+| `demo.reset` | **`null`** | демо сброшено: забыть открытые экраны и кэш сервера, перезапросить всё (локальную историю пропусков не трогать) |
 
 - При обрыве WS — опрос `/shipments`, `/alerts`, `/stats` раз в 3 с.
 - Время — UTC ISO 8601, показывать в `Europe/Moscow`.
-- Ошибки: `{"error": {"code", "message"}}`.
+- Ошибки: `{"error": {"code", "message", "fields"?}}`; `fields` — поля запроса с ошибкой (есть у `document_invalid`).
 
 ### Эндпоинты для экспедитора
 
@@ -92,7 +93,8 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 | `GET /shipments/{id}` | — | `Shipment` |
 | `GET /shipments/{id}/alternatives` | — | `[{route, risk, delta: {hours, rub, co2_kg}, recommended}]` — только показ |
 | `POST /documents` | multipart: `shipment_id`, `file` | `Document` (`status: draft`); 409 `document_confirmed` |
-| `POST /documents/{id}/confirm` | `{fields}` | `{document, pass, block}`; 422 `document_invalid` |
+| `POST /documents/{id}/confirm` | `{fields}` | `{document, pass, block}`; 422 `document_invalid` + `error.fields`: обязательные `goods, hs_code, weight_kg, value, origin_country`; `weight_kg > 0` и ±5% от заявки; `value > 0`; `currency` из `USD, EUR, RUB, CNY, IRR, AZN, KZT, TMT, INR, AED, TRY`; `hs_code` — 6–10 цифр |
+| `GET /passes?shipment_id=` | — | `[Pass]` — все пропуска груза, включая переоформленные, новые сверху (вкладка «Пропуска») |
 | `GET /passes/{id}` | — | `Pass` |
 | `POST /passes/verify` | `{token}` | `{valid, shipment_id, checkpoint_node, reason}` |
 | `POST /shipments/{id}/pass/retry` | — | `{shipment, pass}`; 503 `pass_issue_failed` |
@@ -100,8 +102,8 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 | `GET /stats` | — | `Stats` |
 | `GET /weather` | — | `{updated_at, stale, source: "open-meteo"\|"cache", points: [{node_id, wave_height_m, wind_ms, forecast: [{ts, wave_height_m}]}]}` |
 | `GET /graph` | — | `{nodes, edges}` — названия узлов для подписей |
-| `POST /auth/login` (по желанию) | `{email, password}` | `{token, user: {id, name, email, role}}`; 401 `invalid_credentials` |
-| `GET /auth/me` (по желанию) | `Authorization: Bearer <token>` | `{id, name, email, role}`; 401 `invalid_token` |
+| `POST /auth/login` (по желанию) | `{email, password}` | `{token, user: {id, name, email, role, permissions}}`; 401 `invalid_credentials` |
+| `GET /auth/me` (по желанию) | `Authorization: Bearer <token>` | `{id, name, email, role, permissions}`; 401 `invalid_token` |
 
 ### Модели (имена полей точные)
 
@@ -118,7 +120,7 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 - `items: [{shipment_id, action: reroute|wait, from_route, to_route|null, sailing_id|null, delay_vs_plan_h, saved_hours, saved_rub, co2_delta_kg}]`;
 - `totals: {saved_hours, saved_rub, co2_delta_kg, co2_delta_pct}`, `do_nothing: {delay_hours, loss_rub}`, `port_load: {node_id, before, after} | null`;
 - `options: [{id, title, route|null, delay_vs_plan_h, saved_hours, saved_rub, co2_delta_kg, recommended}]`;
-- `source?: forecast|scenario|null`, `status_note?: string|null`, `accepted_at|null`, `accepted_via: web|telegram|null`.
+- `source?: forecast|scenario|null`, `status_note?: string|null`, `accepted_at|null`, `accepted_via: web|telegram|null`, `accepted_by?: {name, role}|null`.
 
 **Stats**: `saved_hours` (груз-часы), `saved_rub`, `co2_saved_kg`, `co2_saved_pct`, `decisions`, `shipments_total`, `at_risk`.
 
@@ -140,6 +142,8 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 | `Alert.source` | есть у новых алертов | не показывать источник |
 | `Alert.status_note` | `null`, пока алерт открыт | у закрытого — только статус |
 | `Stats.co2_saved_pct` | всегда есть | не показывать процент CO₂ |
+| `Alert.accepted_by` | есть, если решение принято с входом сайта, из мини-приложения или бота | «через сайт» / «через Telegram» по `accepted_via` |
+| `user.permissions` | всегда есть в `/auth/*` | экспедитор: `[]` |
 
 ### Правила для экспедитора
 
@@ -152,7 +156,10 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 - Базовый адрес и ключ — из настроек сборки, не в коде.
 - WebSocket — с `?api_key=`.
 - Обработать `weather.updated` с `payload: null`.
-- Обработать `status_note: "угроза снята"`.
+- Обработать `status_note` («угроза снята», «заменён алертом …», «по этим грузам решение уже принято»): показывать текстом как есть.
+- Обработать `demo.reset`.
+- Вкладка «Пропуска» — `GET /passes?shipment_id=`.
+- Если приложение шлёт `Authorization: Bearer` экспедитора, `accept`/`reject`/сценарии/`/demo/*` отвечают 403 `forbidden_role` — их и так не вызываем.
 - Скрывать блоки при отсутствии необязательных полей.
 - По желанию — экран входа с кнопкой «Демо-вход».
 

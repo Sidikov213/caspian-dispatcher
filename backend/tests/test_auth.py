@@ -29,7 +29,8 @@ def test_register_login_me(client, accounts):
     r = register(client, email="  Anna@Example.RU ")
     assert r.status_code == 200
     out = r.json()
-    assert out["user"] == {"id": out["user"]["id"], "name": "Анна", "email": "anna@example.ru", "role": "logist"}
+    assert out["user"] == {"id": out["user"]["id"], "name": "Анна", "email": "anna@example.ru", "role": "logist",
+                           "permissions": ["run_scenario", "reset_demo", "decide_alert"]}
     assert client.get("/api/auth/me", headers=bearer(out["token"])).json() == out["user"]
 
     r = client.post("/api/auth/login", json={"email": "anna@example.ru", "password": "secret1"})

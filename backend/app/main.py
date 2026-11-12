@@ -22,12 +22,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import events
 from . import models as M
 from .bot import start_bot, stop_bot
-from .auth import Accounts
+from .auth import PERMISSIONS, Accounts
 from .config import ACCOUNTS_PATH, API_KEY, MINIAPP_DIR, WEATHER_MODE
 from .democheck import log_check, run_check
 from .modelinfo import log_active, model_info
 from .state import ApiError, state
-from .tgauth import issue_session, session_ok, verify_init_data
+from .tgauth import issue_session, session_claims, session_ok, verify_init_data
 
 log = logging.getLogger("caspian")
 for _name in ("caspian", "aiogram"):  # uvicorn настраивает только свои логгеры; боту нужен свой вывод
@@ -100,13 +100,16 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 # ---------- ошибки: {"error": {"code", "message"}} ----------
 
-def err(status: int, code: str, message: str) -> JSONResponse:
-    return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
+def err(status: int, code: str, message: str, fields: list[str] | None = None) -> JSONResponse:
+    body = {"code": code, "message": message}
+    if fields:
+        body["fields"] = fields
+    return JSONResponse(status_code=status, content={"error": body})
 
 
 @app.exception_handler(ApiError)
 async def _api_error(_: Request, e: ApiError):
-    return err(e.status, e.code, e.message)
+    return err(e.status, e.code, e.message, e.fields)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -148,6 +151,39 @@ async def require_key(key: str | None = Depends(api_key_header),
     raise ApiError(401, "unauthorized", "Нужен заголовок X-API-Key")
 
 
+# ---------- права по роли ----------
+# Проверяются, только если запрос пришёл с Authorization: Bearer: токен входа сайта (/api/auth) — права роли,
+# сессия мини-приложения — логист. Запросы с одним X-API-Key (бот, приложение, тесты) работают как раньше.
+
+ROLE_LABEL = {"logist": "логист", "expeditor": "экспедитор"}
+
+
+def actor_of(cred: HTTPAuthorizationCredentials | None) -> dict | None:
+    """Кто делает запрос: {name, role, permissions} или None (только X-API-Key)."""
+    if cred is None:
+        return None
+    claims = session_claims(cred.credentials)
+    if claims is not None:
+        return {"name": claims.get("name") or "Telegram", "role": "logist",
+                "permissions": list(PERMISSIONS["logist"])}
+    user = accounts.me(cred.credentials)   # неверный или истёкший токен — 401 invalid_token
+    return {"name": user["name"], "role": user["role"], "permissions": user["permissions"]}
+
+
+def need(permission: str):
+    async def dep(cred: HTTPAuthorizationCredentials | None = Depends(tg_bearer)) -> dict | None:
+        actor = actor_of(cred)
+        if actor is not None and permission not in actor["permissions"]:
+            role = ROLE_LABEL.get(actor["role"], actor["role"])
+            raise ApiError(403, "forbidden_role", f"Действие недоступно роли «{role}»")
+        return actor
+    return dep
+
+
+def by_of(actor: dict | None) -> dict | None:
+    return {"name": actor["name"], "role": actor["role"]} if actor else None
+
+
 # ---------- WebSocket /ws?api_key=... ----------
 
 class Hub:
@@ -167,7 +203,7 @@ class Hub:
 
 hub = Hub()
 WS_TYPES = {"shipment.updated", "alert.created", "alert.updated", "ledger.appended", "stats.updated",
-            "weather.updated"}
+            "weather.updated", "demo.reset"}
 
 
 async def _to_ws(type_: str, payload) -> None:
@@ -240,7 +276,7 @@ async def get_alternatives(sid: str):
 
 @api.post("/shipments/{sid}/reroute", response_model=M.Shipment, tags=["грузы"],
           responses={409: {"model": M.ErrorOut}})
-async def reroute(sid: str, body: M.RerouteIn):
+async def reroute(sid: str, body: M.RerouteIn, _=Depends(need("decide_alert"))):
     """Ручная смена маршрута: резерв места, переоформление пропуска. Счётчики экономии не меняются."""
     out = await state.reroute(sid, body.route_id)
     await flush()
@@ -275,7 +311,7 @@ async def active_scenarios():
 
 
 @api.post("/scenarios", response_model=M.ScenarioCreateOut, tags=["сценарии"])
-async def run_scenario(body: M.ScenarioIn):
+async def run_scenario(body: M.ScenarioIn, _=Depends(need("run_scenario"))):
     """Запуск сценария → конвейер диспетчера → алерт. Повторный запуск того же пресета возвращает его алерт."""
     out = await state.run_scenario(body.preset)
     await flush()
@@ -289,16 +325,16 @@ async def list_alerts(status: M.AlertStatus | None = None):
 
 @api.post("/alerts/{alert_id}/accept", response_model=M.AcceptOut, tags=["алерты"],
           responses={409: {"model": M.ErrorOut}})
-async def accept_alert(alert_id: str, body: M.AcceptIn):
+async def accept_alert(alert_id: str, body: M.AcceptIn, actor=Depends(need("decide_alert"))):
     try:
-        return await state.accept(alert_id, body.via, body.option_id)
+        return await state.accept(alert_id, body.via, body.option_id, by_of(actor))
     finally:
         await flush()
 
 
 @api.post("/alerts/{alert_id}/reject", response_model=M.Alert, tags=["алерты"],
           responses={409: {"model": M.ErrorOut}})
-async def reject_alert(alert_id: str):
+async def reject_alert(alert_id: str, _=Depends(need("decide_alert"))):
     out = await state.reject(alert_id)
     await flush()
     return out
@@ -322,6 +358,12 @@ async def confirm_document(doc_id: str, body: M.DocumentConfirmIn):
     out = await state.confirm(doc_id, body.fields.model_dump())
     await flush()
     return out
+
+
+@api.get("/passes", response_model=list[M.Pass], tags=["пропуска"])
+async def list_passes(shipment_id: str | None = None):
+    """Все пропуска, включая переоформленные (reissued) и отозванные; новые сверху."""
+    return state.passes_list(shipment_id)
 
 
 @api.get("/passes/{pid}", response_model=M.Pass, tags=["пропуска"])
@@ -363,9 +405,10 @@ async def link_user(body: M.UserLinkIn):
 
 
 @api.post("/demo/reset", response_model=M.OkOut, tags=["демо"])
-async def demo_reset():
+async def demo_reset(_=Depends(need("reset_demo"))):
     async with state.lock:
         state.reset()
+    await hub.send("demo.reset", None)   # первым: клиенты сбрасывают всё и перезапрашивают
     for s in state.shipments_list():
         await hub.send("shipment.updated", s)
     await hub.send("stats.updated", state.stats())
@@ -422,13 +465,13 @@ async def get_model():
 
 
 @api.get("/demo/check", response_model=M.DemoCheckOut, tags=["демо"])
-async def demo_check():
+async def demo_check(_=Depends(need("reset_demo"))):
     """Только демо: storm_north на копии исходного состояния, сверка ключевых чисел с эталоном."""
     return run_check(state)
 
 
 @api.post("/demo/fail_next_pass", response_model=M.OkOut, tags=["демо"])
-async def demo_fail_next_pass():
+async def demo_fail_next_pass(_=Depends(need("reset_demo"))):
     """Только демо: следующий выпуск пропуска завершится сбоем (груз получит reissue_pending)."""
     state.arm_pass_failure()
     return {"ok": True}

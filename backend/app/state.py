@@ -10,6 +10,7 @@ import asyncio
 import copy
 import json
 import logging
+import math
 import re
 from datetime import timedelta
 from pathlib import Path
@@ -34,7 +35,8 @@ __all__ = ["ApiError", "State", "state"]
 
 REQUIRED_FIELDS = ("goods", "hs_code", "weight_kg", "value", "origin_country")
 WEIGHT_TOLERANCE = 0.05
-HS_RE = re.compile(r"^\d{4}( ?\d{2})?( ?\d{2,4})?$")
+HS_RE = re.compile(r"^\d[\d .]*\d$")   # цифры, пробелы и точки; цифр 6–10
+CURRENCIES = ("USD", "EUR", "RUB", "CNY", "IRR", "AZN", "KZT", "TMT", "INR", "AED", "TRY")
 ISO_RE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
 log = logging.getLogger("caspian")
 
@@ -213,6 +215,11 @@ class State:
             raise ApiError(404, "pass_not_found", f"Пропуск {pid} не найден")
         return copy.deepcopy(p)
 
+    def passes_list(self, shipment_id: str | None = None):
+        """Все пропуска, включая переоформленные и отозванные; новые сверху (порядок выпуска)."""
+        return [copy.deepcopy(p) for p in reversed(list(self.passes.values()))
+                if not shipment_id or p["shipment_id"] == shipment_id]
+
     def verify_pass(self, token: str):
         try:
             claims = jwt.decode(token, PASS_SECRET, algorithms=["HS256"], options={"verify_exp": False})
@@ -273,21 +280,45 @@ class State:
     # ---------------- документы ----------------
 
     def _checks(self, fields: dict, sh: dict) -> list[dict]:
-        missing = [f for f in REQUIRED_FIELDS if fields.get(f) in (None, "")]
-        checks = [{"name": "required_fields", "ok": not missing,
+        """Проверки полей документа. Любая проваленная блокирует подтверждение (422 document_invalid)."""
+        def blank(v):
+            return v is None or (isinstance(v, str) and not v.strip())
+
+        def num_(v):
+            return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+        missing = [f for f in REQUIRED_FIELDS if blank(fields.get(f))]
+        checks = [{"name": "required_fields", "ok": not missing, "fields": missing,
                    "note": "Все обязательные поля заполнены" if not missing
                    else "Не заполнено: " + ", ".join(missing)}]
         kg, want = fields.get("weight_kg"), sh["weight_t"] * 1000
-        if kg:
+        if not num_(kg) or kg <= 0:
+            checks.append({"name": "weight_match", "ok": False, "fields": ["weight_kg"],
+                           "note": "Вес должен быть больше нуля"})
+        else:
             ok = abs(kg - want) <= WEIGHT_TOLERANCE * want
             kgs = f"{kg:,.0f}".replace(",", " ")
             note = (f"Вес {kgs} кг совпадает с заявкой ({sh['weight_t']:g} т)" if ok
                     else f"Вес {kgs} кг расходится с заявкой ({sh['weight_t']:g} т) больше чем на 5%")
-            checks.append({"name": "weight_match", "ok": ok, "note": note})
+            checks.append({"name": "weight_match", "ok": ok, "fields": ["weight_kg"], "note": note})
+        val = fields.get("value")
+        ok = num_(val) and val > 0
+        checks.append({"name": "value_positive", "ok": ok, "fields": ["value"],
+                       "note": "Стоимость указана" if ok else "Стоимость должна быть больше нуля"})
+        cur = (fields.get("currency") or "").strip().upper()
+        ok = cur in CURRENCIES
+        checks.append({"name": "currency", "ok": ok, "fields": ["currency"],
+                       "note": f"Валюта {cur}" if ok else
+                       f"Валюта «{fields.get('currency') or ''}» не из списка: " + ", ".join(CURRENCIES)})
         hs = fields.get("hs_code") or ""
-        checks.append({"name": "hs_code", "ok": bool(HS_RE.match(hs)),
-                       "note": f"Код ТН ВЭД {hs}" if HS_RE.match(hs) else f"Проверьте код ТН ВЭД «{hs}»"})
+        ok = isinstance(hs, str) and bool(HS_RE.match(hs.strip())) and 6 <= sum(c.isdigit() for c in hs) <= 10
+        checks.append({"name": "hs_code", "ok": ok, "fields": ["hs_code"],
+                       "note": f"Код ТН ВЭД {hs}" if ok else f"Код ТН ВЭД «{hs}» должен содержать от 6 до 10 цифр"})
         return checks
+
+    @staticmethod
+    def _public_checks(checks: list[dict]) -> list[dict]:
+        return [{k: c[k] for k in ("name", "ok", "note")} for c in checks]
 
     def upload_document(self, sid: str) -> dict:
         sh = self.get_shipment(sid)
@@ -298,7 +329,7 @@ class State:
         cached = self.demo_drafts.get(sid) or next(iter(self.demo_drafts.values()))
         doc = copy.deepcopy(cached)
         doc.update(id=did, shipment_id=sid, status="draft", hash=None)
-        doc["checks"] = self._checks(doc["fields"], sh)
+        doc["checks"] = self._public_checks(self._checks(doc["fields"], sh))
         self.documents[did] = doc
         return copy.deepcopy(doc)
 
@@ -311,16 +342,20 @@ class State:
         sh = self.get_shipment(doc["shipment_id"])
         fields = normalize_fields(fields)
         checks = self._checks(fields, sh)
-        bad = [c["note"] for c in checks if not c["ok"] and c["name"] != "hs_code"]
+        bad = [c for c in checks if not c["ok"]]
         if bad:
-            raise ApiError(422, "document_invalid", "; ".join(bad))
+            bad_fields = list(dict.fromkeys(f for c in bad for f in c["fields"]))
+            raise ApiError(422, "document_invalid", "Проверьте поля: " + ", ".join(bad_fields) + ". "
+                           + "; ".join(c["note"] for c in bad), fields=bad_fields)
+        if isinstance(fields.get("currency"), str):
+            fields["currency"] = fields["currency"].strip().upper()
         h = doc_hash(fields)
         try:
             p, block = self.issue_pass(sh["id"], D.checkpoint_of(self, sh["route"]), "issued", h,
                                        self._event_iso())
         except PassIssueError:
             raise ApiError(503, "pass_issue_failed", "Пропуск не выпущен, повторите подтверждение")
-        doc.update(fields=fields, checks=checks, status="confirmed", hash=h)
+        doc.update(fields=fields, checks=self._public_checks(checks), status="confirmed", hash=h)
         sh["pass_id"], sh["pass_state"] = p["id"], "active"
         self.emit("shipment.updated", sh)
         return {"document": copy.deepcopy(doc), "pass": copy.deepcopy(p), "block": copy.deepcopy(block)}
@@ -334,9 +369,9 @@ class State:
         async with self.lock:
             return D.run_scenario(self, preset)
 
-    async def accept(self, alert_id: str, via: str, option_id: str | None = None):
+    async def accept(self, alert_id: str, via: str, option_id: str | None = None, by: dict | None = None):
         async with self.lock:
-            return D.accept(self, alert_id, via, option_id)
+            return D.accept(self, alert_id, via, option_id, by)
 
     async def reject(self, alert_id: str):
         async with self.lock:

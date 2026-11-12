@@ -33,9 +33,9 @@ def build_router(service: BotService, settings) -> Router:
     async def callbacks(q: CallbackQuery):
         action, epoch, arg, extra = parse_cb(q.data)
         if action == ACCEPT:
-            await q.answer(await service.accept(epoch, arg))
+            await q.answer(await service.accept(epoch, arg, by=q.from_user.full_name))
         elif action == CHOOSE:
-            await q.answer(await service.accept(epoch, arg, extra))
+            await q.answer(await service.accept(epoch, arg, extra, by=q.from_user.full_name))
         elif action == REJECT:
             await q.answer(await service.reject(epoch, arg))
         elif action == OPTIONS:

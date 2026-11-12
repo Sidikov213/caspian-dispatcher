@@ -125,6 +125,7 @@
       let msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       const p = msg.payload;
+      if (msg.type === "demo.reset") { resetAll(); return; }
       if (msg.type === "shipment.updated" && p) { upsert(S.shipments, p); delete S.alts[p.id]; }
       else if ((msg.type === "alert.created" || msg.type === "alert.updated") && p) upsert(S.alerts, p);
       else if (msg.type === "stats.updated" && p) S.stats = p;
@@ -133,6 +134,12 @@
       render();
     };
   }
+  /** demo.reset: демо вернулось к началу — сбросить всё локальное и перезапросить с сервера. */
+  function resetAll() {
+    Object.assign(S, { alts: {}, passes: {}, verify: null, selectedOption: null, showOptions: false, busy: false });
+    loadAll().then(render).catch(() => {});
+  }
+  const byWhom = (a) => a.accepted_by ? esc(a.accepted_by.name) + " " : "";
   function startPolling() {
     if (S.pollTimer) return;
     S.pollTimer = setInterval(() => refreshLive().catch(() => {}), POLL_MS);
@@ -226,7 +233,7 @@
     const done = S.alerts.filter((a) => a.status === "accepted" || a.status === "rejected")
       .sort((a, b) => (b.accepted_at || b.created_at).localeCompare(a.accepted_at || a.created_at));
     const rows = done.map((a) => a.status === "accepted"
-      ? `<div class="hist"><div><b>Принято</b> ${a.accepted_via ? VIA[a.accepted_via] || "" : ""}<div class="small">${esc(a.title)}</div></div>
+      ? `<div class="hist"><div><b>Принято</b> ${byWhom(a)}${a.accepted_via ? VIA[a.accepted_via] || "" : ""}<div class="small">${esc(a.title)}</div></div>
           <div style="text-align:right"><b>${rub(a.totals.saved_rub)}</b><div class="small">${a.accepted_at ? when(a.accepted_at) : ""}</div></div></div>`
       : `<div class="hist"><div><b>Отклонено</b><div class="small">${esc(a.title)}</div></div><div class="small">${when(a.created_at)}</div></div>`).join("");
     return `<section class="card"><p class="h">История решений</p>${rows || `<div class="sub">Решений пока нет</div>`}</section>`;

@@ -73,11 +73,16 @@ def issue_session(user: dict) -> dict:
             "company": DEMO_COMPANY}
 
 
-def session_ok(token: str | None) -> bool:
+def session_claims(token: str | None) -> dict | None:
+    """Claims сессии мини-приложения или None."""
     if not token:
-        return False
+        return None
     try:
         claims = jwt.decode(token, SESSION_KEY, algorithms=["HS256"], options={"require": ["exp", "sub"]})
     except jwt.PyJWTError:
-        return False
-    return claims.get("typ") == "tg"
+        return None
+    return claims if claims.get("typ") == "tg" else None
+
+
+def session_ok(token: str | None) -> bool:
+    return session_claims(token) is not None

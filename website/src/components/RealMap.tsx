@@ -487,6 +487,7 @@ export function RealMap(props: Props) {
         <LiveCard
           shipment={pickedShipment}
           nodes={nodes}
+          right={insetRight + 72}
           onOpen={() => {
             setPicked(null);
             onSelect(pickedShipment.id);
@@ -497,6 +498,7 @@ export function RealMap(props: Props) {
       {!pickedShipment && groupShipments.length > 1 && (
         <LiveList
           shipments={groupShipments}
+          right={insetRight + 72}
           onPick={(id) => {
             setGroup(null);
             setPicked(id);

@@ -185,6 +185,7 @@ class Scenario(Model):
     affected_nodes: list[str]
     start: datetime
     end: datetime
+    starts_in_h: float = Field(description="Через сколько часов от sim_now начинается угроза (storm_north — 36)")
     params: ScenarioParams
 
 
@@ -236,6 +237,7 @@ class Alert(Model):
     id: str
     scenario_id: str
     created_at: datetime
+    starts_in_h: float = Field(description="Через сколько часов от sim_now начинается угроза — из сценария")
     severity: str
     title: str
     text: str
@@ -424,6 +426,8 @@ class StatsOut(Model):
     saved_hours: float = Field(description="Груз-часы, сумма по Decision")
     saved_rub: float
     co2_saved_kg: float
+    co2_saved_pct: float = Field(description="На сколько % ниже CO₂ по принятым решениям к исходным маршрутам "
+                                             "этих грузов: 6.9 → показывать «−6,9% CO₂»")
     decisions: int
     shipments_total: int
     at_risk: int

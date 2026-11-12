@@ -185,8 +185,14 @@ class State:
         return {"saved_hours": sum(i["saved_hours"] for i in items),
                 "saved_rub": sum(i["saved_rub"] for i in items),
                 "co2_saved_kg": round(-sum(i["co2_delta_kg"] for i in items), 1),
+                "co2_saved_pct": self._co2_saved_pct(items),
                 "decisions": len(self.decisions), "shipments_total": len(sh),
                 "at_risk": sum(s["display_status"] == "at_risk" for s in sh)}
+
+    def _co2_saved_pct(self, items) -> float:
+        """На сколько процентов ниже CO₂ по принятым решениям, к исходным маршрутам этих грузов (6,9 → «−6,9%»)."""
+        base = sum(d.get("_co2_plan_kg", 0) for d in self.decisions)
+        return round(-sum(i["co2_delta_kg"] for i in items) / base * 100, 1) if base else 0.0
 
     def ledger_list(self):
         return copy.deepcopy(self.ledger)

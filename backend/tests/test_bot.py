@@ -265,3 +265,20 @@ def test_bad_token_does_not_crash(st, monkeypatch, caplog):
     with caplog.at_level(logging.ERROR):
         assert asyncio.run(start_bot(st)) is None
     assert "BOT_TOKEN" in caplog.text
+
+
+# ---------------- лог отправки и правки ----------------
+
+def test_bot_logs_send_and_edit_without_text(bot_env, caplog):
+    import logging
+    st, fake, service = bot_env
+    with caplog.at_level(logging.INFO, logger="caspian.bot"):
+        storm(st)
+        asyncio.run(service.accept(st.epoch, "alert-001"))
+    lines = [r.getMessage() for r in caplog.records if r.name == "caspian.bot" and r.levelno == logging.INFO]
+    n = len(USERS)
+    assert f"Бот: алерт alert-001 отправлен, получателей {n} из {n}" in lines
+    assert f"Бот: алерт alert-001 — сообщения отредактированы (accepted), получателей {n} из {n}" in lines
+    assert f"Бот: итог принятия alert-001 отправлен, получателей {n} из {n}" in lines
+    joined = "\n".join(lines)
+    assert "Махачкал" not in joined and all(str(uid) not in joined for uid in USERS)   # ни текста, ни chat_id

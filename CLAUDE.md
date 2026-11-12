@@ -100,8 +100,9 @@ Risk      {miss_probability: 0..1, level: low|medium|high,
            # необязательно: три главных признака по SHAP классификатора CatBoost, вклад в
            # вероятность срыва в п. п.; у формулы и сухопутных маршрутов — null
 Scenario  {id, type: storm|congestion|customs, title, blocked_edges: [id],
-           affected_nodes: [id], start, end, params: {wave_height_m, wind_ms}}
-Alert     {id, scenario_id, created_at, severity, title, text,
+           affected_nodes: [id], start, end, starts_in_h, params: {wave_height_m, wind_ms}}
+           # starts_in_h — через сколько часов от sim_now начинается угроза (storm_north — 36)
+Alert     {id, scenario_id, created_at, starts_in_h, severity, title, text,
            items: [{shipment_id, action: reroute|wait, from_route, to_route,
                     sailing_id, delay_vs_plan_h, saved_hours, saved_rub, co2_delta_kg}],
            totals: {saved_hours, saved_rub, co2_delta_kg, co2_delta_pct},
@@ -152,7 +153,7 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | GET | `/ledger` | — | `[Block]` |
 | GET | `/ledger/verify` | — | `{valid: bool, broken_at: int \| null}` |
 | POST | `/ledger/tamper` | `{index}` (только демо) | `{ok: true}` |
-| GET | `/stats` | — | `{saved_hours, saved_rub, co2_saved_kg, decisions, shipments_total, at_risk}` (сумма по Decision; часы — груз-часы) |
+| GET | `/stats` | — | `{saved_hours, saved_rub, co2_saved_kg, co2_saved_pct, decisions, shipments_total, at_risk}` (сумма по Decision; часы — груз-часы; `co2_saved_pct` — на сколько % ниже CO₂ по принятым решениям к исходным маршрутам этих грузов, 6.9 → «−6,9% CO₂», клиенты сами не считают) |
 | POST | `/users/link` | `{telegram_id, name}` | `{ok: true}` |
 | POST | `/auth/register` | `{name, email, password, role: "logist" \| "expeditor"}` | `{token, user: {id, name, email, role}}`; 409 `email_taken`; 422 `weak_password` (< 6 символов), `invalid_email` |
 | POST | `/auth/login` | `{email, password}` | `{token, user}`; 401 `invalid_credentials` |

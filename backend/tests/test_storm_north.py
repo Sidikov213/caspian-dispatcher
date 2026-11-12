@@ -87,7 +87,7 @@ def test_accept_applies_everything(client):
         assert s["display_status"] == "rerouted" and s["route"]["id"].endswith("-mkh")
         assert s["pass_id"].endswith("-r1") and s["pass_state"] == "active"
     stats = client.get("/api/stats").json()
-    assert stats == {"saved_hours": 126, "saved_rub": 596640, "co2_saved_kg": 1824, "decisions": 1,
+    assert stats == {"saved_hours": 126, "saved_rub": 596640, "co2_saved_kg": 1824, "co2_saved_pct": 6.9, "decisions": 1,
                      "shipments_total": 5, "at_risk": 0}
     sail = {s["id"]: s for s in client.get("/api/sailings").json()}
     assert sail[FERRY_M]["booked_t"] == 760 + 120 and sail[FERRY_A]["booked_t"] == 1310 - 120
@@ -148,7 +148,7 @@ def test_pass_failure_then_retry_is_idempotent(client):
 
     ledger = client.get("/api/ledger").json()
     assert len(ledger) == 4 + 3 and [b["shipment_id"] for b in ledger[4:]] == ["sh-02", "sh-03", "sh-01"]
-    assert client.get("/api/stats").json() == {"saved_hours": 126, "saved_rub": 596640, "co2_saved_kg": 1824,
+    assert client.get("/api/stats").json() == {"saved_hours": 126, "saved_rub": 596640, "co2_saved_kg": 1824, "co2_saved_pct": 6.9,
                                                "decisions": 1, "shipments_total": 5, "at_risk": 0}
     for n in ("01", "02", "03"):
         assert client.get(f"/api/passes/pass-{n}-r1").status_code == 200

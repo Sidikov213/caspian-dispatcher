@@ -47,6 +47,7 @@ def make_scenario(key: str, sim_now) -> dict:
     return {"id": p["id"], "type": p["type"], "title": p["title"],
             "blocked_edges": p["blocked_edges"], "affected_nodes": p["affected_nodes"],
             "start": iso(sim_now + H(p["start_h"])), "end": iso(sim_now + H(p["end_h"])),
+            "starts_in_h": p["start_h"],
             "params": p["params"],
             "_preset": key, "_overlay": p["overlay"], "_congestion": p["congestion"],
             "_customs_h": p["customs_h"]}

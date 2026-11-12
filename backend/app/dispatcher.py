@@ -384,6 +384,7 @@ def build_alert(st, sc: dict) -> dict:
     co2_plan = {k: v["co2_plan"] for k, v in internal.items()}
     alert = {
         "id": aid, "scenario_id": sc["id"], "created_at": iso(st.clock.event_ts()),
+        "starts_in_h": sc["starts_in_h"],
         "severity": "high" if any(v["_risk"]["level"] == "high" for v in internal.values()) else "medium",
         "title": f"{sc['title']}: {cargo_word(len(items))} под риском" if items
         else f"{sc['title']}: грузов под риском нет",
@@ -589,7 +590,9 @@ def accept(st, alert_id: str, via: str, option_id: str | None = None) -> dict:
     decision = {"id": f"dec-{st.seq['decision']:03d}", "alert_id": alert_id, "ts": ts, "accepted_via": via,
                 "items": [{"shipment_id": i["shipment_id"], "saved_hours": i["saved_hours"],
                            "saved_rub": i["saved_rub"], "co2_delta_kg": i["co2_delta_kg"],
-                           "sailing_id": i["sailing_id"]} for i in rer]}
+                           "sailing_id": i["sailing_id"]} for i in rer],
+                # служебное, в ответ не попадает: CO₂ исходных маршрутов — база для stats.co2_saved_pct
+                "_co2_plan_kg": round(sum(internal[i["shipment_id"]]["co2_plan"] for i in rer), 1)}
     st.decisions.append(decision)
     if chosen["items"] is not alert["items"]:  # принят не рекомендованный вариант — алерт показывает принятое
         alert["items"] = copy.deepcopy(chosen["items"])

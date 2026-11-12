@@ -6,6 +6,7 @@ import { stormLeadHours, stormScope } from "@/lib/derive";
 import type { Alert, GraphNode, Scenario, Shipment, Weather } from "@/lib/types";
 import { AlertDecisionNote } from "./AlertDecisionNote";
 import { CheckIcon, CloseIcon, HazardIcon } from "./icons";
+import { NegotiationBlock, RescueWindow, optionExpired, useDeadlineClock } from "./Negotiation";
 
 interface Props {
   alert: Alert;
@@ -71,13 +72,16 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, c
   const count = alert.items.length;
   // «По западной ветке через Самур и Астару (…)» → «Через Самур и Астару»: подпись плитки короткая.
   const bestTitle = shortOptionTitle(best?.title ?? "");
+  // «Окно спасения»: после decide_by вариант серый, «Принять» недоступна (сервер ответит 409).
+  const now = useDeadlineClock();
+  const bestExpired = optionExpired(best, now);
 
   return (
     <div
       role="dialog"
       aria-label="Прогноз шторма"
       data-map-ui
-      className="absolute bottom-[96px] left-[22px] z-30 w-[632px] rounded-[12px] border border-[var(--color-risk-line)] bg-panel px-[18px] pb-[18px] shadow-[0_24px_60px_var(--color-shadow)]"
+      className="absolute bottom-[96px] left-[22px] z-30 max-h-[calc(100%-112px)] w-[632px] overflow-y-auto rounded-[12px] border border-[var(--color-risk-line)] bg-panel px-[18px] shadow-[0_24px_60px_var(--color-shadow)]"
     >
       <button
         type="button"
@@ -119,12 +123,12 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, c
       {alert.card?.note && <p className="mt-[8px] text-[11.5px] font-semibold text-warn-text">{alert.card.note}</p>}
 
       <div className="mt-[17px] flex gap-[7px]">
-        <div className="h-[111px] flex-1 rounded-[12px] border border-[var(--color-risk-line)] bg-risk-soft px-[13px] pt-[10px]">
+        <div className="h-[111px] min-w-0 flex-1 rounded-[12px] border border-[var(--color-risk-line)] bg-risk-soft px-[13px] pt-[10px]">
           <div className="text-[12.5px] leading-[20px] font-bold text-risk-text">Ничего не делать</div>
           <div className="tnum mt-[10px] text-[32px] leading-[36px] font-bold">{formatHoursDelta(alert.do_nothing.delay_hours)}</div>
           <div className="mt-[9px] text-[11px] leading-[13px] text-muted">Простой {formatRub(alert.do_nothing.loss_rub)}</div>
         </div>
-        <div className="h-[111px] flex-1 rounded-[12px] border border-[var(--color-ok-line)] bg-ok-soft px-[13px] pt-[10px]">
+        <div className="h-[111px] min-w-0 flex-1 rounded-[12px] border border-[var(--color-ok-line)] bg-ok-soft px-[13px] pt-[10px]">
           <div className="text-[12.5px] leading-[20px] font-bold text-ok">Решение диспетчера</div>
           {best ? (
             <>
@@ -143,24 +147,33 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, c
         <div className="mt-[14px] flex flex-wrap gap-[8px]" role="radiogroup" aria-label="Вариант решения">
           {choices.map((o) => {
             const on = o.id === best?.id;
+            const gone = optionExpired(o, now);
             return (
               <button
                 key={o.id}
                 type="button"
                 role="radio"
                 aria-checked={on}
+                aria-disabled={gone}
+                title={gone ? "Срок решения истёк: вариант недоступен" : o.title}
                 onClick={() => setPicked(o.id)}
-                className={`h-[34px] rounded-[8px] border px-[12px] text-[12.5px] font-bold transition-colors ${
-                  on ? "border-action bg-info-soft text-text" : "border-line text-muted hover:bg-tile"
+                className={`min-h-[34px] max-w-full rounded-[8px] border px-[12px] py-[6px] text-left text-[12.5px] leading-[18px] font-bold transition-colors ${
+                  gone
+                    ? "border-line bg-tile text-faint line-through decoration-1"
+                    : on
+                      ? "border-action bg-info-soft text-text"
+                      : "border-line text-muted hover:bg-tile"
                 }`}
               >
                 {shortOptionTitle(o.title)} · {formatHoursDelta(o.delay_vs_plan_h)}
-                {o.recommended && <span className="ml-[6px] text-rerouted-text">рекомендуем</span>}
+                {o.recommended && !gone && <span className="ml-[6px] text-rerouted-text">рекомендуем</span>}
               </button>
             );
           })}
         </div>
       )}
+
+      {alert.negotiation && alert.negotiation.length > 0 && <NegotiationBlock key={alert.id} steps={alert.negotiation} />}
 
       {!canDecide && (
         <div className="mt-[18px]">
@@ -168,13 +181,17 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, c
         </div>
       )}
 
-      <div className="mt-[18px] flex items-center gap-[11px]">
+      {/* Таймер и кнопки решения всегда видны: карточка с согласованием может быть выше экрана и прокручивается. */}
+      <div className="sticky bottom-0 z-10 -mx-[18px] mt-[4px] bg-panel px-[18px] pb-[18px]">
+      {best?.decide_by && <RescueWindow decideBy={best.decide_by} expired={bestExpired} now={now} />}
+      <div className="flex items-center gap-[11px] pt-[14px]">
         {canDecide && best && (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || bestExpired}
+            title={bestExpired ? "Срок решения истёк: вариант недоступен" : undefined}
             onClick={() => onAccept(best.id)}
-            className="flex h-[38px] w-[179px] items-center justify-center gap-[9px] rounded-[8px] bg-action text-[13px] font-bold text-white transition-colors hover:bg-action-hover disabled:opacity-60"
+            className="flex h-[38px] w-[179px] items-center justify-center gap-[9px] rounded-[8px] bg-action text-[13px] font-bold text-white transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:bg-[var(--color-line-strong)] disabled:text-muted disabled:opacity-60"
           >
             <CheckIcon size={14} strokeWidth={2} className="text-white/90" />
             Принять
@@ -197,6 +214,7 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, c
             Отклонить
           </button>
         )}
+      </div>
       </div>
     </div>
   );

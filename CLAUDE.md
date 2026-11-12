@@ -74,6 +74,13 @@ website (Next.js, SVG-схема)   mobile (Flutter)   Telegram: бот + Mini A
 7. accept, одна операция под `asyncio.Lock`: проверить, что алерт `new` (иначе вернуть «уже принято») → проверить, что `from_route` каждого груза — его текущий маршрут (иначе 409 `superseded`, пересчёт) → заново проверить и зарезервировать место на рейсе (нет места → алерт `superseded`, пересчёт) → сменить маршрут → выпустить новый пропуск → отозвать старый → блок в реестр → запись Decision → обновить stats → открытые алерты с теми же грузами `superseded` с пометкой «по этим грузам решение уже принято»
 8. если выпуск пропуска не удался: груз получает `pass_state: reissue_pending`, старый пропуск остаётся активным, есть повтор; экономия начисляется один раз
 
+Согласование и «окно спасения» (`app/negotiation.py`, только пресет `ice_north_tight` — главный сценарий не трогает). Прототип многостороннего согласования с криптографически проверяемым журналом:
+- на пароме М свободно 80 т, грузов на 120 т. Кто получает место, решает код (`negotiation.allocate`): набор грузов, который помещается по весу и даёт максимум спасённых груз-часов (ценность места — спасённые часы на рейсе минус спасённые часы на лучшем обходе без него); при равенстве — больше расчётная экономия в ₽, затем меньшие номера. Не LLM;
+- участники — цифровые модели участников, простой детерминированный код: паром проверяет свободное место, порт — загрузку причала (порог 90%), таможня — действующие пропуска и хэши документов, железная дорога — успевает ли переадресация к окончанию приёма. Шаг: заявка системы и ответ модели; `counter` — система скорректировала заявку;
+- каждый шаг — запись журнала с `event: negotiation`; `doc_hash` записи — SHA-256 от содержимого шага, цепочка проверяется тем же `/ledger/verify`;
+- `decide_by` — отправление последнего поезда, который успевает к окончанию приёма на паром обхода (рейс минус оформление и доезд, с учётом расписания). После него вариант `available: false`, accept → 409 `decide_by_passed`; «ждать» (`/reject`) остаётся.
+Слова: «цифровые модели участников», «проверяемый журнал». Не пишем «блокчейн», «ИИ-агенты договариваются», «смарт-контракт».
+
 Tools LLM-агента в боте: `get_shipments(tg_id)`, `get_shipment(id)`, `get_alternatives(id)`, `get_weather()`, `explain_risk(id)`. Менять состояние агент не может, только кнопки.
 
 ## 4. Модель данных
@@ -139,7 +146,8 @@ Alert     {id, scenario_id, created_at, starts_in_h, severity, title, text,
            do_nothing: {delay_hours, loss_rub},
            port_load: {node_id, before, after},
            options: [{id, title, route: Route|null, delay_vs_plan_h, saved_hours,
-                      saved_rub, co2_delta_kg, recommended}],
+                      saved_rub, co2_delta_kg, recommended,
+                      decide_by?, available?}],   # только ice_north_tight: срок варианта и «ещё доступен»
            status: new|accepted|rejected|superseded, accepted_at, accepted_via,
            accepted_by?: {name, role: logist|expeditor},   # кто принял: Bearer входа сайта, мини-приложение, бот
            source?: forecast|scenario,   # откуда угроза: наблюдатель нашёл в прогнозе или сценарий
@@ -150,7 +158,13 @@ Alert     {id, scenario_id, created_at, starts_in_h, severity, title, text,
                    decision: null | {status: accepted|rejected, title, detail, via, via_label, accepted_by_name}},
            # card — компактная карточка из тех же данных, что text/items/options/accepted_*; готовые
            # строки по разделу 9, клиент рисует как есть. text не меняется. note у шторма — «Стресс-тест: …»
-           status_note?}                 # почему закрыт: «угроза снята», «прогноз изменился…»
+           status_note?,                 # почему закрыт: «угроза снята», «прогноз изменился…»
+           negotiation?: [{actor: port|ferry|customs|rail, action, result: ok|reject|counter,
+                           detail, ts, block_index}],
+           # необязательно, только ice_north_tight: шаги согласования с цифровыми моделями участников,
+           # block_index — запись журнала. Согласовано, если последний ответ каждого участника — ok.
+           decide_by?}                   # необязательно: до какого момента можно принять рекомендованный
+           # вариант («окно спасения»). У прежних сценариев полей negotiation, decide_by, available нет в JSON.
            # все деньги и часы до наступления события — расчётные
            # options — до трёх вариантов решения, рекомендованный первый; числа — сумма по грузам
            # алерта. id: тег маршрута (mkh, west…), best — лучший обход для каждого груза,
@@ -162,8 +176,12 @@ Document  {id, shipment_id, type: invoice|cmr|packing_list, source_lang,
            status: draft|confirmed, hash}
 Pass      {id, shipment_id, checkpoint_node, token (JWT), doc_hash, block_hash,
            valid_until, status: active|reissued|revoked}
-Block     {index, ts, event: issued|reissued|verified, shipment_id,
-           checkpoint_node, doc_hash, prev_hash, hash}
+Block     {index, ts, event: issued|reissued|verified|negotiation, shipment_id,
+           checkpoint_node, doc_hash, prev_hash, hash,
+           alert_id?, actor?, result?, action?}
+           # последние четыре — только у event: negotiation (шаг согласования); в хэш блока входят через
+           # doc_hash = SHA-256 от {alert_id, n, actor, action, result, detail, ts}. shipment_id у такой
+           # записи — первый перестраиваемый груз алерта, checkpoint_node — порт обхода.
 ```
 
 ## 5. Контракт API
@@ -181,9 +199,9 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | GET | `/weather` | — | `{updated_at, stale: bool, source: "open-meteo" \| "cache", points: [{node_id, wave_height_m, wind_ms, forecast: [{ts, wave_height_m}]}]}` |
 | GET | `/scenarios/presets` | — | `[{key, title, hazard, main, note}]`; `main: true` — главный сценарий (`ice_north`), у шторма `note` «Стресс-тест: …» |
 | GET | `/scenarios` | — | `[Scenario]` — активные сценарии (после reset пусто), только чтение; нужен клиентам для `Scenario.zone` после перезагрузки страницы |
-| POST | `/scenarios` | `{preset: "ice_north" \| "storm_north" \| "storm_full" \| "congestion_astrakhan"}` | `{scenario: Scenario, alert: Alert}`; главный — `ice_north` (лёд), шторм — стресс-тест |
+| POST | `/scenarios` | `{preset: "ice_north" \| "storm_north" \| "storm_full" \| "congestion_astrakhan" \| "ice_north_tight"}` | `{scenario: Scenario, alert: Alert}`; главный — `ice_north` (лёд), шторм — стресс-тест; `ice_north_tight` («Лёд, мест мало») — тот же лёд, на пароме М свободно 80 т: в алерте `negotiation` и `decide_by` |
 | GET | `/alerts?status=` | — | `[Alert]` |
-| POST | `/alerts/{id}/accept` | `{via: "web" \| "telegram", option_id?: string}` | `{alert: Alert, shipments: [Shipment], blocks: [Block], decision: Decision}`; без `option_id` — рекомендованный вариант; повтор → 200 с тем же результатом и `already_accepted: true`; устарел → 409 `superseded`; нет варианта → 404 `option_not_found`; `option_id: "wait"` → 422 `use_reject` |
+| POST | `/alerts/{id}/accept` | `{via: "web" \| "telegram", option_id?: string}` | `{alert: Alert, shipments: [Shipment], blocks: [Block], decision: Decision}`; без `option_id` — рекомендованный вариант; повтор → 200 с тем же результатом и `already_accepted: true`; устарел → 409 `superseded`; срок варианта `decide_by` прошёл → 409 `decide_by_passed` (алерт остаётся `new`, вариант `available: false`); нет варианта → 404 `option_not_found`; `option_id: "wait"` → 422 `use_reject` |
 | GET | `/sailings?from=&to=` | — | `[Sailing]` |
 | POST | `/shipments/{id}/pass/retry` | — | `{shipment: Shipment, pass: Pass}` |
 | POST | `/alerts/{id}/reject` | — | `Alert` |
@@ -261,6 +279,8 @@ website/  mobile/   docs/{PLAN.md,DEMO_SCENARIO.md,FLUTTER_CONTRACT.md,design/,p
 ## 9. Демо-данные и единые подписи
 
 Главный сценарий — лёд на Северном Каспии (`ice_north`), шторм — стресс-тест: за 12 месяцев волна у Астрахани не превышала 1,44 м (`docs/DEMO_SCENARIO.md`, раздел 0). Слова для льда: «Лёд на Северном Каспии», «канал закрыт для проводки»; в ледовых текстах нет «волна» и «шторм». Тексты по типу угрозы — только из `app/hazards.py`.
+
+Пресет `ice_north_tight` («Лёд, мест мало», второй ряд сценариев): рекомендован вариант `best` — №01 и №03 через Махачкалу (+6 ч), №02 по западной ветке (+13 ч): 119 груз-часов, 532 192 ₽; второй вариант `mkh` — №01 и №03 через Махачкалу, №02 ждёт рейс Б: 84 груз-часа, 397 760 ₽; 7 шагов согласования; срок решения — через 30 ч от «сейчас» (13 ноя, 20:00). Расчёт — `docs/DEMO_SCENARIO.md`, раздел 5.
 
 Грузы (как в макете): №01 Зерно 60 т Москва → Мумбаи; №02 Металл 40 т Самара → Мумбаи; №03 Оборудование 20 т Саратов → Мумбаи; №04 Текстиль Баку → Мумбаи; №05 Удобрения Астрахань → Энзели (этап `planned`, пропуска нет — на нём показываем съёмку инвойса). Грузы №01–03 идут на один паром А Астрахань → Энзели.
 

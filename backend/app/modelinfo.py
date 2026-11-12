@@ -27,6 +27,27 @@ def load_report(path=MODEL_REPORT_PATH) -> dict | None:
         return None
 
 
+def summary(predictor, path=MODEL_REPORT_PATH) -> str:
+    """Одна строка: какой предиктор реально активен. Для ответа /api/model и лога при старте."""
+    name = getattr(predictor, "name", "formula")
+    reason = getattr(predictor, "fallback_reason", None)
+    if name == "catboost":
+        clf = (load_report(path) or {}).get("classifier") or {}
+        auc = f", AUC {clf['auc']:.3f}".replace(".", ",") if "auc" in clf else ""
+        return f"Активен предиктор: CatBoost (data/model.cbm, синтетическая история{auc})"
+    if reason:
+        return f"Активен предиктор: логистическая формула — ОТКАТ с CatBoost: {reason}"
+    return "Активен предиктор: логистическая формула (PREDICTOR=formula)"
+
+
+def log_active(predictor) -> None:
+    line = summary(predictor)
+    if getattr(predictor, "fallback_reason", None):
+        log.warning(line)
+    else:
+        log.info(line)
+
+
 def model_info(predictor, path=MODEL_REPORT_PATH) -> dict:
     rep = load_report(path) or {}
     active = getattr(predictor, "name", "formula")
@@ -39,6 +60,7 @@ def model_info(predictor, path=MODEL_REPORT_PATH) -> dict:
         prob = "логистическая формула (PREDICTOR=formula)"
     clf, reg = rep.get("classifier"), rep.get("regressor")
     return {
+        "summary": summary(predictor, path),
         "active": active, "requested": PREDICTOR, "fallback_reason": reason,
         "synthetic": rep.get("synthetic", True), "note": NOTE,
         "used_at_runtime": {"miss_probability": prob, "departure_shift_and_delays": SHIFT,

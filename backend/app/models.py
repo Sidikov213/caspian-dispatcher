@@ -495,6 +495,7 @@ class FeatureImportance(Model):
 
 
 class ModelInfoOut(Model):
+    summary: str = Field(description="Одна строка: какой предиктор реально активен; при откате — причина")
     active: Literal["catboost", "formula"]
     requested: str = Field(description="PREDICTOR из .env")
     fallback_reason: str | None = Field(description="Почему включилась формула вместо CatBoost")

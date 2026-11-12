@@ -23,7 +23,7 @@ from . import models as M
 from .bot import start_bot, stop_bot
 from .config import API_KEY, WEATHER_MODE
 from .democheck import log_check, run_check
-from .modelinfo import model_info
+from .modelinfo import log_active, model_info
 from .state import ApiError, state
 
 log = logging.getLogger("caspian")
@@ -70,6 +70,7 @@ async def lifespan(_: FastAPI):
     else:
         log.info("Погода: WEATHER_MODE=%s — синтетический прогноз, сеть не трогаем", WEATHER_MODE)
     log.info("Сценарий: sim_now %s", state.sim_now.isoformat())
+    log_active(state.predictor)
     log_check(state, "старт")
     runtime = await start_bot(state)
     try:

@@ -2,7 +2,8 @@
 
 Прогоняет storm_north на копии исходного состояния (как сразу после reset, тот же sim_now и тот же
 прогноз погоды), живое состояние не трогает. Сверяет ключевые числа с эталоном DEMO_SCENARIO.md
-(вероятности — с допуском ±5 п. п. и порядком №01 > №02 > №03, остальное точно) и,
+(вероятности — с допуском ±5 п. п. и порядком №01 > №02 > №03, остальное точно), проверяет, что до
+сценария ни один груз не «Под риском» (начальное состояние спокойное), и,
 если что-то разошлось, объясняет почему: волна, место на пароме, порт после шторма.
 """
 import logging
@@ -28,16 +29,44 @@ def _check(name: str, label: str, expected, actual, tol: float = 1e-6) -> dict:
     return {"name": name, "label": label, "expected": expected, "actual": actual, "ok": ok}
 
 
+def calm_start(cp) -> tuple[dict, list[str]]:
+    """До сценария ни один груз не «Под риском» (на текущей погоде и активном предикторе).
+    Возвращает (проверка, причины провала)."""
+    bad, problems = [], []
+    for sid, sh in sorted(cp.shipments.items()):
+        if sh["display_status"] != "at_risk":
+            continue
+        bad.append(sid)
+        res, fi = D.predict_route(cp, sh, sh["route"])
+        why = f"риск {round(sh['risk']['miss_probability'] * 100)}%"
+        if fi is not None:
+            port = sh["route"]["legs"][fi]["from"]
+            name = cp.graph.nodes[port]["name"].split(" (")[0]
+            f = res.features
+            why += (f", волна в порту {name} {ru(f['wave_height_m'])} м (предел {ru(cp.meta['wave_limit_m'])} м), "
+                    f"ветер {ru(f['wind_ms'], 0)} м/с, загрузка {round(f['port_congestion'] * 100)}%, "
+                    f"запас {ru(f['buffer_hours'], 0)} ч")
+        else:
+            why += ", сухопутный маршрут"
+        problems.append(f"№{sid[3:]} под риском до сценария: {why} (предиктор {cp.predictor.name})")
+    top = max(cp.shipments.values(), key=lambda s: s["risk"]["miss_probability"])
+    actual = f"{len(bad)} под риском (макс. риск №{top['id'][3:]} {round(top['risk']['miss_probability'] * 100)}%)"
+    check = {"name": "calm_start", "label": "Начальное состояние спокойное: до сценария ни один груз не «Под риском»",
+             "expected": "0 под риском", "actual": actual, "ok": not bad}
+    return check, problems
+
+
 def run_check(st) -> dict:
     from .state import State  # здесь, чтобы не было циклического импорта
     cp = State(st.seed_path, clock=FixedClock(st.sim_now), predictor=st.predictor, forecast=st.forecast)
+    calm, calm_problems = calm_start(cp)
     out = D.run_scenario(cp, "storm_north")
     alert, sc = out["alert"], out["scenario"]
     items = {i["shipment_id"]: i for i in alert["items"]}
     rec = next((o for o in alert["options"] if o["recommended"]), None)
     mkh = next((o for o in alert["options"] if o["id"] == "mkh"), None)
 
-    checks = []
+    checks = [calm]
     pct = {sid: round(cp.shipments[sid]["risk"]["miss_probability"] * 100) for sid in EXPECTED_RISK}
     for sid, want in EXPECTED_RISK.items():
         checks.append(_check(f"risk_{sid}", f"Риск №{sid[3:]}, % (±{RISK_TOLERANCE_PP} п. п.)", want, pct[sid],
@@ -56,7 +85,7 @@ def run_check(st) -> dict:
         _check("recommended", "Рекомендованный вариант", EXPECTED["recommended"], rec["id"] if rec else None),
     ]
     ok = all(c["ok"] for c in checks)
-    problems = [] if ok else explain(cp, sc, checks, items)
+    problems = [] if ok else calm_problems + explain(cp, sc, [c for c in checks if c["name"] != "calm_start"], items)
     w = cp.weather_out()
     return {"ok": ok, "sim_now": cp.sim_now.isoformat().replace("+00:00", "Z"),
             "weather": {"source": w["source"], "stale": w["stale"], "updated_at": w["updated_at"]},
@@ -111,8 +140,10 @@ def log_check(st, when: str) -> dict:
     src = f"погода: {res['weather']['source']}{', устарела' if res['weather']['stale'] else ''}"
     if res["ok"]:
         risk = "/".join(str(c["actual"]) for c in res["checks"] if c["name"].startswith("risk_sh"))
-        log.info("Проверка демо (%s): числа сценария сходятся — риск %s%% (%s), +18 ч, +48 ч, +6 ч, "
-                 "126 груз-ч, 596 640 ₽, через Махачкалу (%s)", when, risk, st.predictor.name, src)
+        calm = next(c["actual"] for c in res["checks"] if c["name"] == "calm_start")
+        log.info("Проверка демо (%s): начальное состояние спокойное — %s; числа сценария сходятся — риск %s%% (%s), "
+                 "+18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, через Махачкалу (%s)", when, calm, risk,
+                 st.predictor.name, src)
     else:
         diff = "; ".join(f"{c['label']}: {c['actual']} вместо {c['expected']}" for c in res["checks"] if not c["ok"])
         log.warning("Проверка демо (%s): РАСХОЖДЕНИЕ — %s. Почему: %s (%s)", when, diff,

@@ -110,7 +110,26 @@ def test_catboost_probability_drivers(cb):
 def test_demo_check_ok_for_both(kind, cb):
     res = run_check(make_state(cb if kind == "catboost" else P.FormulaPredictor()))
     assert res["ok"], res["problems"]
-    assert {c["name"] for c in res["checks"]} >= {"risk_sh-01", "risk_order", "saved_rub"}
+    assert {c["name"] for c in res["checks"]} >= {"calm_start", "risk_sh-01", "risk_order", "saved_rub"}
+    calm = next(c for c in res["checks"] if c["name"] == "calm_start")
+    assert calm["ok"] and calm["actual"].startswith("0 под риском")
+
+
+def test_demo_check_calm_start_fails_with_reason():
+    class Nervous(P.FormulaPredictor):
+        """Риск 90% на любом пароме — и до сценария тоже."""
+        def predict(self, ctx):
+            r = super().predict(ctx)
+            if ctx.port:
+                r.miss_probability = 0.9
+            return r
+
+    res = run_check(make_state(Nervous()))
+    calm = next(c for c in res["checks"] if c["name"] == "calm_start")
+    assert not calm["ok"] and not res["ok"] and calm["actual"].startswith("4 под риском")   # №01–03 и №05 на пароме
+    first = res["problems"][0]
+    assert first.startswith("№01 под риском до сценария: риск 90%, волна в порту Астрахань")
+    assert "предел 2,5 м" in first and "запас 2 ч" in first
 
 
 def test_demo_check_tolerance_and_order():
@@ -171,6 +190,7 @@ def test_selection_by_env():
 
 def test_api_model(client, cb):
     r = client.get("/api/model").json()
+    assert r["summary"] == "Активен предиктор: логистическая формула (PREDICTOR=formula)"
     assert r["active"] == "formula" and r["requested"] == "formula" and r["fallback_reason"] is None
     assert r["synthetic"] is True and "синтетической истории" in r["note"]
     assert 0.85 <= r["classifier"]["auc"] <= 0.95 and r["regressor"]["mae_h"] > 0
@@ -182,6 +202,7 @@ def test_api_model(client, cb):
     try:
         r = client.get("/api/model").json()
         assert r["active"] == "catboost"
+        assert r["summary"].startswith("Активен предиктор: CatBoost (data/model.cbm") and "AUC 0," in r["summary"]
         assert r["used_at_runtime"]["miss_probability"].startswith("классификатор CatBoost")
     finally:
         main.state.predictor = old
@@ -215,3 +236,23 @@ def test_committed_history_matches_generator():
     df = pd.read_csv(G.HISTORY_PATH)
     assert df.to_csv(index=False, lineterminator="\n") == G.generate(G.ROWS, G.SEED).to_csv(
         index=False, lineterminator="\n")
+
+
+def test_active_predictor_summary_and_startup_log(tmp_path, monkeypatch, caplog):
+    from app.modelinfo import log_active, summary
+    monkeypatch.setattr("app.config.MODEL_PATH", tmp_path / "nope.cbm")
+    fb = P.get_predictor("catboost")
+    assert summary(fb).startswith("Активен предиктор: логистическая формула — ОТКАТ с CatBoost: модель не загрузилась")
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="caspian"):
+        log_active(fb)
+    assert caplog.records[-1].levelno == logging.WARNING and "ОТКАТ" in caplog.records[-1].getMessage()
+
+
+def test_startup_logs_active_predictor_and_calm_start(caplog):
+    from fastapi.testclient import TestClient
+    with caplog.at_level(logging.INFO, logger="caspian"):
+        with TestClient(main.app):
+            pass
+    assert "Активен предиктор: логистическая формула (PREDICTOR=formula)" in caplog.text
+    assert "начальное состояние спокойное — 0 под риском" in caplog.text

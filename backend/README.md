@@ -105,9 +105,41 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 
 Сравнение для карточки варианта — две строки: «Прибытие +6 ч к плану» (`delay_vs_plan_h`) и «на 42 ч быстрее ожидания следующего рейса» (`delay_vs_plan_h` варианта `wait` минус этого варианта).
 
+## Продакшен-сервер
+
+Постоянный адрес для команды, сайта, приложения и бота:
+
+- **API:** `https://129-101-122-103.sslip.io/api`, заголовок `X-API-Key: <ключ из чата>` (это не `caspian-dev-key`).
+- **WebSocket:** `wss://129-101-122-103.sslip.io/ws?api_key=<ключ>`.
+- **Swagger:** https://129-101-122-103.sslip.io/docs
+
+Сервер: VPS Timeweb (Амстердам), Ubuntu 24.04, 1 ГБ памяти + 2 ГБ подкачки. HTTPS — Caddy с сертификатом Let's Encrypt на домен `sslip.io` (он сам указывает на IP, покупать домен не нужно). Наружу открыты только 22, 80, 443 (ufw); uvicorn слушает `127.0.0.1:8000`, один процесс, сервис systemd `caspian-backend` с автозапуском и перезапуском при падении. Код лежит в `/opt/caspian/backend`, `.env` собирается из секретов репозитория при выкатке.
+
+**Telegram-бот работает только здесь.** Один токен — одно место: в локальном `.env` `BOT_TOKEN` пустой. Привязки пользователей (`data/users.json`) на сервер не переносились — после переезда каждый один раз жмёт `/start`. Аккаунты сайта (`data/accounts.json`) на сервере свои; демо-аккаунты `logist@demo.ru` / `expeditor@demo.ru` созданы при первом старте.
+
+### Выкатка и обслуживание — одной командой
+
+Выкатка идёт через GitHub Actions (`.github/workflows/deploy.yml`): раннер GitHub заходит на сервер по SSH, копирует `backend/` через rsync (без `.venv`, `.env`, кэшей и локальных данных), пишет `.env`, ставит зависимости, перезапускает сервис и прогоняет проверки. Выкатывается то, что запушено в `main`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1            # выкатить main
+powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 logs       # журнал: journalctl -u caspian-backend -n 200
+powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 restart    # systemctl restart caspian-backend
+powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 check      # только проверки
+powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 deploy -Upgrade   # с apt upgrade
+```
+
+Нужен `gh` с доступом к репозиторию. То же самое — кнопкой **Run workflow** на вкладке Actions → `deploy`. Скрипт печатает итог проверок: с сервера — Telegram `getMe`, волна из Open-Meteo, `/api/model` (CatBoost), `/api/demo/check`; снаружи — `/api/graph` с ключом, вход `logist@demo.ru`, WebSocket `/ws`, `/docs`.
+
+Если есть прямой SSH-доступ (ключ `~/.ssh/caspian_vps`): `ssh -i ~/.ssh/caspian_vps root@129.101.122.103`, дальше `journalctl -u caspian-backend -f`, `systemctl restart caspian-backend`, `journalctl -u caddy -n 50`. С ноутбука тимлида сервер напрямую недоступен (сеть режет адрес), поэтому всё — через Actions.
+
+**Секреты репозитория** (Settings → Secrets → Actions): `VPS_HOST`, `VPS_SSH_KEY` (приватный ключ деплоя), `API_KEY`, `JWT_SECRET`, `BOT_TOKEN`. Сменить ключ API: `gh secret set API_KEY`, затем выкатка — и раздать новый ключ команде.
+
+**HTTPS.** Если Let's Encrypt не выдаст сертификат за 5 минут, `server_setup.sh` оставит HTTP на 80 порту (`http://129.101.122.103/api`) и напишет `HTTPS_FAILED` в логе; при следующей выкатке HTTPS пробуется снова.
+
 ## Общий сервер
 
-Один ноутбук держит сервер, остальные ходят к нему по публичному https-адресу через SSH-туннель [pinggy](https://pinggy.io) (без регистрации и без установки: `ssh` есть в Windows).
+**Запасной вариант**, если продакшен-сервер недоступен. Один ноутбук держит сервер, остальные ходят к нему по публичному https-адресу через SSH-туннель [pinggy](https://pinggy.io) (без регистрации и без установки: `ssh` есть в Windows).
 
 1. **Ключи.** Перед тем как открывать адрес наружу, поставьте в `backend/.env` свои случайные `API_KEY` и `JWT_SECRET`. `caspian-dev-key` записан в этом README и годится только для локального запуска: с ним любой может вызвать `/api/demo/reset` или `/api/ledger/tamper`. Новый ключ раздайте в чате, в репозиторий не кладите. После смены `JWT_SECRET` старые токены входа перестают действовать — войдите заново.
 2. **Сервер** на свежем коде: `.\run.ps1` или `.venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`. Старый процесс сначала остановить.

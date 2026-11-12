@@ -11,6 +11,8 @@ param(
     [switch]$Upgrade
 )
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$OutputEncoding = [Text.Encoding]::UTF8
 Set-Location (Join-Path $PSScriptRoot "..\..")
 
 if ($Action -eq "deploy") {
@@ -36,11 +38,12 @@ gh run watch $id --exit-status --interval 10
 $code = $LASTEXITCODE
 
 # Итог: строки проверок и адрес; для logs — журнал целиком.
-$log = gh run view $id --log
+# Строка лога GitHub: «задача<TAB>шаг<TAB>[BOM]2026-11-12T12:38:31.1234567Z текст» — оставляем только текст.
+$log = gh run view $id --log | ForEach-Object { ($_ -split "`t", 3)[-1] -replace '^﻿?\d{4}-\d\d-\d\dT[\d:.]+Z ', '' }
 if ($Action -eq "logs") {
-    $log | ForEach-Object { ($_ -split "`t", 3)[-1] } | Select-Object -Last 240
+    $log | Select-Object -Last 240
 } else {
-    $log | ForEach-Object { ($_ -split "`t", 3)[-1] } |
+    $log |
         Select-String -Pattern "^(OK  |FAIL|адрес:|HTTPS_)" | ForEach-Object { $_.Line }
 }
 exit $code

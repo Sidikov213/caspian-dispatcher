@@ -15,14 +15,14 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 
 Скрипт сам создаст `.venv`, поставит зависимости, скопирует `.env.example` → `.env` и поднимет сервер на `0.0.0.0:8000` с автоперезагрузкой.
 
-Проверка: `curl -H "X-API-Key: caspian-dev-key" http://localhost:8000/api/stats`
+Проверка: `curl -H "X-API-Key: <ключ>" http://localhost:8000/api/stats`. Ключ — `API_KEY` из `backend/.env`; для локального запуска `.env.example` ставит `caspian-dev-key`. На общем сервере ключ другой — его раздают в чате.
 
 Тесты: `.venv/Scripts/python -m pip install -r requirements-dev.txt`, затем `.venv/Scripts/python -m pytest` (из `backend/`).
 
 ## Для фронтенда и Flutter
 
 - **Базовый адрес:** `http://<ip-ноутбука>:8000/api` (локально `http://localhost:8000/api`). Телефон должен быть в той же сети; IP — `ipconfig` / `ifconfig`. Эмулятор Android ходит на `http://10.0.2.2:8000/api`.
-- **Ключ:** заголовок `X-API-Key: <API_KEY из backend/.env>` на **каждом** запросе к `/api/*`. По умолчанию `caspian-dev-key`. Без ключа — `401 {"error": {"code": "unauthorized", ...}}`.
+- **Ключ:** заголовок `X-API-Key: <API_KEY из backend/.env>` на **каждом** запросе к `/api/*`. Локально из `.env.example` — `caspian-dev-key`, на общем сервере — ключ из чата. Без ключа — `401 {"error": {"code": "unauthorized", ...}}`.
 - **WebSocket:** `ws://<host>:8000/ws?api_key=<ключ>` (браузер не умеет слать заголовки в WS). Сообщения `{type, payload}`: `shipment.updated`, `alert.created`, `alert.updated`, `ledger.appended`, `stats.updated`, `weather.updated`. Не успеваете с WS — опрашивайте `/shipments`, `/alerts`, `/stats` раз в 3 с.
 - **Документация и «попробовать»:** http://localhost:8000/docs (Swagger, кнопка **Authorize** → ключ), схема — `/openapi.json`.
 - **Время** в JSON — UTC (`2026-11-12T11:00:00Z`). Показывать в `Europe/Moscow`.
@@ -101,6 +101,31 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 
 Сравнение для карточки варианта — две строки: «Прибытие +6 ч к плану» (`delay_vs_plan_h`) и «на 42 ч быстрее ожидания следующего рейса» (`delay_vs_plan_h` варианта `wait` минус этого варианта).
 
+## Общий сервер
+
+Один ноутбук держит сервер, остальные ходят к нему по публичному https-адресу через SSH-туннель [pinggy](https://pinggy.io) (без регистрации и без установки: `ssh` есть в Windows).
+
+1. **Ключи.** Перед тем как открывать адрес наружу, поставьте в `backend/.env` свои случайные `API_KEY` и `JWT_SECRET`. `caspian-dev-key` записан в этом README и годится только для локального запуска: с ним любой может вызвать `/api/demo/reset` или `/api/ledger/tamper`. Новый ключ раздайте в чате, в репозиторий не кладите. После смены `JWT_SECRET` старые токены входа перестают действовать — войдите заново.
+2. **Сервер** на свежем коде: `.\run.ps1` или `.venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`. Старый процесс сначала остановить.
+3. **Туннель** во втором окне:
+
+```powershell
+ssh -p 443 -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -R0:127.0.0.1:8000 a.pinggy.io
+```
+
+Именно `127.0.0.1`, не `localhost`: ssh в Windows разрешает `localhost` в IPv6 `::1`, а uvicorn слушает IPv4. Тогда все запросы в окне pinggy висят с пометкой `Reset`, а снаружи приходит «socket hang up».
+
+4. В окне появятся два адреса вида `https://<слово>-<ip>.free.pinggy.net`. Раздайте первый:
+   - API — `https://<адрес>/api` с заголовком `X-API-Key: <ключ>`;
+   - WebSocket — `wss://<адрес>/ws?api_key=<ключ>` (через pinggy работает: проверено, события `alert.created`, `shipment.updated`, `stats.updated` приходят);
+   - Swagger — `https://<адрес>/docs`.
+
+**Ограничения бесплатного pinggy.** Туннель живёт **60 минут**, потом закрывается. **Адрес меняется при каждом перезапуске туннеля** (и после обрыва сети или сна ноутбука). Перезапустили — новый адрес в общий чат. Для защиты держите запасной вариант: локальная сеть, `http://<ip-ноутбука>:8000/api`.
+
+**Что не сработало на ноутбуке тимлида** (сеть с VPN):
+- Cloudflare quick tunnel (`cloudflared tunnel --url http://localhost:8000`): DNS не отдаёт `argotunnel.com`, а с явными узлами `--edge 198.41.192.167:7844` обрывается TLS с Cloudflare. Адрес выдаётся, но снаружи `530` / Error 1033. В другой сети может заработать.
+- localhost.run (`ssh -R 80:localhost:8000 nokey@localhost.run`): соединение на порту 22 закрывается сразу.
+
 ## Регистрация и вход
 
 Только чтобы клиент знал имя и роль пользователя. **Доступ к API не меняется:** все `/api/*`, включая `/api/auth/*`, по-прежнему требуют `X-API-Key`, а остальные эндпоинты Bearer-токен не требуют и по ролям ничего не ограничивают.
@@ -118,10 +143,10 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 - **Токен:** JWT HS256 на 7 дней, подписан ключом, выведенным из `JWT_SECRET` (отдельно от ключа QR-пропусков). Клиент хранит его и шлёт только на `/auth/me`. Подтверждения почты, восстановления и смены пароля нет.
 
 ```bash
-curl -X POST -H "X-API-Key: caspian-dev-key" -H "Content-Type: application/json" -d '{"email":"logist@demo.ru","password":"demo123"}' http://localhost:8000/api/auth/login
+curl -X POST -H "X-API-Key: <ключ>" -H "Content-Type: application/json" -d '{"email":"logist@demo.ru","password":"demo123"}' http://localhost:8000/api/auth/login
 ```
 ```bash
-curl -H "X-API-Key: caspian-dev-key" -H "Authorization: Bearer <token>" http://localhost:8000/api/auth/me
+curl -H "X-API-Key: <ключ>" -H "Authorization: Bearer <token>" http://localhost:8000/api/auth/me
 ```
 
 ## Telegram-бот
@@ -137,7 +162,7 @@ curl -H "X-API-Key: caspian-dev-key" -H "Authorization: Bearer <token>" http://l
 Пример (PowerShell — `curl.exe`, не `curl`):
 
 ```bash
-curl -X POST -H "X-API-Key: caspian-dev-key" -H "Content-Type: application/json" -d '{"preset":"storm_north"}' http://localhost:8000/api/scenarios
+curl -X POST -H "X-API-Key: <ключ>" -H "Content-Type: application/json" -d '{"preset":"storm_north"}' http://localhost:8000/api/scenarios
 ```
 
 ### Файлы моков

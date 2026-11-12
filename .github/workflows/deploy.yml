@@ -1,7 +1,8 @@
 # Выкатка бэкенда + сайта на VPS. Запуск вручную или scripts/deploy.ps1.
 # Раннер GitHub ходит на VPS по SSH: с ноутбука тимлида сервер недоступен.
 # Секреты: VPS_HOST, VPS_SSH_KEY, API_KEY, JWT_SECRET, BOT_TOKEN.
-# PUBLIC_URL: https://129-101-122-103.sslip.io — сайт на /, API /api, WS /ws, мини-приложение /tg/.
+# PUBLIC_URL: https://caspian-dispatcher.ru — сайт на /, API /api, WS /ws, мини-приложение /tg/.
+# Caddy обслуживает caspian-dispatcher.ru, www и запасной адрес <ip>.sslip.io — сертификаты Let's Encrypt на все.
 name: deploy
 
 on:
@@ -22,7 +23,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PUBLIC_URL: https://129-101-122-103.sslip.io
+  PUBLIC_URL: https://caspian-dispatcher.ru
+  SITE_DOMAIN: caspian-dispatcher.ru
 
 jobs:
   run:
@@ -43,7 +45,8 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -T 20 -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          echo "DOMAIN=${HOST//./-}.sslip.io" >> "$GITHUB_ENV"
+          echo "DOMAIN=$SITE_DOMAIN" >> "$GITHUB_ENV"
+          echo "SITE_HOSTS=$SITE_DOMAIN,www.$SITE_DOMAIN,${HOST//./-}.sslip.io" >> "$GITHUB_ENV"
           ssh -o BatchMode=yes root@"$HOST" 'echo "вход по ключу: $(hostname)"'
 
       - name: Сборка сайта (Next static export)
@@ -100,8 +103,10 @@ jobs:
       - name: Настройка сервера и запуск (ufw, swap, venv, systemd, Caddy)
         if: inputs.action == 'deploy'
         run: |
-          ssh root@"$HOST" "bash $APP/deploy/server_setup.sh $DOMAIN ${{ inputs.upgrade && '1' || '0' }}" | tee setup.log
-          if grep -q '^HTTPS_OK' setup.log; then echo "BASE=https://$DOMAIN" >> "$GITHUB_ENV"; else echo "BASE=http://$HOST" >> "$GITHUB_ENV"; fi
+          ssh root@"$HOST" "bash $APP/deploy/server_setup.sh $SITE_HOSTS ${{ inputs.upgrade && '1' || '0' }}" | tee setup.log
+          if grep -q '^HTTPS_OK' setup.log; then echo "BASE=https://$DOMAIN" >> "$GITHUB_ENV"
+          elif grep -q '^HTTPS_FALLBACK_OK' setup.log; then echo "BASE=https://${HOST//./-}.sslip.io" >> "$GITHUB_ENV"
+          else echo "BASE=http://$HOST" >> "$GITHUB_ENV"; fi
 
       - name: Перезапуск
         if: inputs.action == 'restart'

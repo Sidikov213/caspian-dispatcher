@@ -4,7 +4,11 @@
 # Идемпотентно: повторный запуск ничего не ломает.
 #   server_setup.sh <домен> <upgrade: 0|1>
 set -euo pipefail
-DOMAIN="$1"
+# $1 — имена через запятую: основное первым, дальше www и запасной <ip>.sslip.io.
+HOSTS="$1"
+DOMAIN="${HOSTS%%,*}"            # основное имя: по нему проверка HTTPS
+FALLBACK="${HOSTS##*,}"          # запасное (sslip.io): если на основное сертификат не выдан
+SITE_ADDR="${HOSTS//,/, }"
 UPGRADE="${2:-0}"
 APP=/opt/caspian/backend
 WEB=/opt/caspian/website
@@ -86,9 +90,10 @@ done_
 # Caddy: / → статика сайта; /api /ws /docs /health и /tg/ (мини-приложение Telegram) → uvicorn.
 write_caddyfile() {
   local scheme_host="$1"
+  local addr="${2:-$SITE_ADDR}"
   if [ "$scheme_host" = "https" ]; then
     cat > /etc/caddy/Caddyfile <<CADDY
-$DOMAIN {
+$addr {
 	encode gzip
 
 	handle /api* {
@@ -159,7 +164,7 @@ CADDY
   fi
 }
 
-step "Caddy: https://$DOMAIN → сайт + /api + /ws"
+step "Caddy: https://$SITE_ADDR → сайт + /api + /ws"
 write_caddyfile https
 systemctl enable caddy >/dev/null 2>&1
 systemctl reload caddy || systemctl restart caddy
@@ -170,11 +175,23 @@ for i in $(seq 1 60); do
 done
 if [ "$OK_HTTPS" = 1 ]; then
   echo "HTTPS_OK https://$DOMAIN"
+  for h in ${HOSTS//,/ }; do
+    curl -sf --max-time 10 "https://$h/health" >/dev/null && echo "HTTPS_HOST_OK https://$h" || echo "HTTPS_HOST_FAIL https://$h"
+  done
 else
-  echo "HTTPS_FAILED: сертификат не выдан за 5 минут — оставляем HTTP на 80 порту"
-  journalctl -u caddy -n 20 --no-pager | grep -iE "error|acme|certificate" | tail -8 || true
-  write_caddyfile http
-  systemctl reload caddy || systemctl restart caddy
+  echo "HTTPS_FAILED: на $DOMAIN сертификат не выдан за 5 минут"
+  journalctl -u caddy -n 30 --no-pager | grep -iE "error|acme|certificate" | tail -8 || true
+  if [ "$FALLBACK" != "$DOMAIN" ]; then
+    echo "возвращаю запасной адрес https://$FALLBACK"
+    write_caddyfile https "$FALLBACK"
+    systemctl reload caddy || systemctl restart caddy
+    for i in $(seq 1 24); do curl -sf --max-time 5 "https://$FALLBACK/health" >/dev/null && { echo "HTTPS_FALLBACK_OK https://$FALLBACK"; OK_HTTPS=1; break; }; sleep 5; done
+  fi
+  if [ "$OK_HTTPS" != 1 ]; then
+    echo "оставляем HTTP на 80 порту"
+    write_caddyfile http
+    systemctl reload caddy || systemctl restart caddy
+  fi
 fi
 done_
 

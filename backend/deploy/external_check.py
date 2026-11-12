@@ -1,6 +1,6 @@
 """Проверки снаружи (раннер GitHub): главная сайта, /api/graph, вход, WebSocket /ws, /docs.
 
-    API_KEY=... python external_check.py https://129-101-122-103.sslip.io
+    API_KEY=... python external_check.py https://caspian-dispatcher.ru
 """
 import asyncio
 import json

@@ -96,9 +96,10 @@ Shipment  {id, title, cargo_type, weight_t, owner_tg_id, origin, destination,
            # display_status считает бэкенд: delivered → at_risk (risk_level=high)
            # → rerouted → in_transit → planned. Клиенты сами его не выводят.
 Position  {lat, lon, edge_id, mode: rail|road|sea, progress: 0..1, heading_deg, from_node, to_node,
-           eta_next_node, waiting: bool, waiting_reason?: sailing|border|transfer|blocked,
+           eta_next_node, waiting: bool, waiting_reason?: sailing|border|transfer|blocked|arrived,
            waiting_label?}
-           # считает сервер от sim_now по planned_start/planned_end этапов (те же, что для ETA),
+           # считает сервер от view_now (часы просмотра, = sim_now, пока просмотр не включали)
+           # по planned_start/planned_end этапов (те же, что для ETA),
            # точка — на линии ребра (узел → Edge.path → узел) на доле progress длины пути.
            # Стоит в узле (ждёт рейс, граница, перегрузка, участок закрыт) — точка в узле,
            # progress 0, edge_id и mode — следующего этапа, waiting: true, waiting_label —
@@ -106,6 +107,11 @@ Position  {lat, lon, edge_id, mode: rail|road|sea, progress: 0..1, heading_deg, 
            # eta_next_node = planned_end этапа + predicted_delay_h. heading_deg — курс по линии
            # ребра, от севера по часовой. Ещё не выехал (planned) или доставлен — null.
            # После перестроения сразу считается по новому маршруту. Клиент только сглаживает.
+           # Ускоренный просмотр (/demo/playback): view_now = sim_now + смещение, смещение растёт
+           # со скоростью ×60 / ×600. Двигает ТОЛЬКО position; статусы, риск, алерты, ETA и деньги — от
+           # sim_now. Груз в просмотре не проезжает ближайший узел смены статуса (порт, погранпереход,
+           # пересадка, рейс, ожидание между этапами) — доехал и стоит, waiting: true; в конце
+           # маршрута — waiting_reason arrived, «Конечный пункт».
 Sailing   {id, from, to, departure, cutoff, duration_h, capacity_t, booked_t,
            status: scheduled|cancelled|departed, cancel_reason}
 Decision  {id, alert_id, ts, accepted_via: web|telegram, accepted_by?: {name, role}, items: [{shipment_id,
@@ -200,6 +206,8 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | GET | `/demo/check` (только демо) | — | `{ok, sim_now, weather: {source, stale, updated_at}, checks: [{name, label, expected, actual, ok}], problems: [string]}`: проверка `forecast_quiet` — создал ли наблюдатель алерт на текущей погоде до сценария (не ошибка, `ok: true`, но в `actual` прямо: порт, волна, рейс); проверка «начальное состояние спокойное» (до сценария ни один груз не «Под риском», при провале — причина: груз, риск, волна в порту) и storm_north на копии исходного состояния, сверка с эталоном (риски 82/74/68% ±5 п. п. и порядок №01 > №02 > №03; точно: +18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, рекомендован `mkh`); `problems` — почему разошлось. Состояние не меняет |
 | GET | `/data-sources` | — | `{sources: [{id, title, provides, type: "real" \| "modeled" \| "synthetic", url, urls?, updated_at, note}], corridor_facts: [{text, source}], backtest: {...} \| null}` — откуда данные и насколько они настоящие; `backtest` — сводка ретроспективной симуляции на исторической погоде (`data/backtest.json`, `scripts/backtest.py`), `backtest.chart` — путь к графику на сайте |
 | GET | `/model` | — | `{summary, active: "catboost" \| "formula", requested, fallback_reason, synthetic: true, note, used_at_runtime: {miss_probability, departure_shift_and_delays, shift_regressor}, trained_at, seed, classifier: {auc, brier, n_train, n_test} \| null, regressor: {mae_h, n_train, n_test} \| null, feature_importance: [{name, label, importance}]}`: только чтение, метрики из `data/model_report.json`. `summary` — строка «Активен предиктор: …» (при откате — причина; та же строка в логе при старте, при откате — warning). На сервере работает только классификатор; сдвиг и задержки — расчёт; регрессор — только проверка |
+| GET | `/demo/playback` | — | `{speed: 0 \| 60 \| 600, offset_h, view_now}` — ускоренный просмотр движения; прав не нужно |
+| POST | `/demo/playback` | `{speed: 0 \| 60 \| 600}` | то же; право `run_scenario`; 0 — пауза (смещение сохраняется), `demo/reset` обнуляет смещение и ставит 0; сценарий и accept смещение не трогают. Событие WS `playback.updated` с тем же телом. Меняет только `Shipment.position` |
 | POST | `/demo/fail_next_pass` (только демо) | — | `{ok: true}`; следующий выпуск пропуска сорвётся → груз получает `pass_state: reissue_pending`, старый пропуск активен, повтор через `/shipments/{id}/pass/retry` |
 
 Аккаунты: `X-API-Key` по-прежнему обязателен на всех `/api/*`, включая `/auth/*`; Bearer-токен (JWT HS256 на 7 дней, ключ из `JWT_SECRET`) нужен для `/auth/me` (имя, роль, права); `user` в ответах входа и `/auth/me` — `{id, name, email, role, permissions}`, права логиста `["run_scenario", "reset_demo", "decide_alert"]`, экспедитора `[]`. Если запрос пришёл с этим Bearer, сервер проверяет права: `accept`, `reject`, `reroute` — `decide_alert`; `POST /scenarios` — `run_scenario`; все `/demo/*` — `reset_demo`; нет права — 403 `forbidden_role`, неверный токен — 401 `invalid_token`. Запросы только с `X-API-Key` работают как раньше. Сессия мини-приложения и кнопки бота — права логиста; имя пользователя Telegram попадает в `accepted_by`. Пароль хранится только как хэш scrypt с солью в `data/accounts.json` (не в git), аккаунты переживают `demo/reset` и перезапуск. Демо-аккаунты создаются при первом старте: `logist@demo.ru` и `expeditor@demo.ru`, пароль `demo123`.
@@ -207,7 +215,8 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | POST | `/tg/auth` (без `X-API-Key`) | `{init_data}` — `Telegram.WebApp.initData` | `{token, expires_at, user: {id, name, username}, company}`; подпись initData по токену бота, срок 24 ч; 401 `invalid_init_data` / `init_data_expired`, 503 — на сервере нет токена бота. Сессия на 24 ч |
 
 WebSocket `/ws?api_key=<ключ>` (или `/ws?token=<сессия мини-приложения>`; без них — 403), сообщения `{type, payload}`:
-`shipment.updated` (Shipment), `alert.created` (Alert), `alert.updated` (Alert), `ledger.appended` (Block), `stats.updated`, `weather.updated`, `demo.reset`.
+`shipment.updated` (Shipment), `alert.created` (Alert), `alert.updated` (Alert), `ledger.appended` (Block), `stats.updated`, `weather.updated`, `demo.reset`, `playback.updated` (`{speed, offset_h, view_now}`).
+При включённом просмотре (`speed > 0`) сайт опрашивает `/shipments` раз в 2 с: положение меняется без событий.
 У `demo.reset` payload `null`, приходит первым после `POST /demo/reset` — клиент сбрасывает всё локальное (выбор, открытые окна, кэш) и перезапрашивает состояние.
 У `weather.updated` payload `null` — клиент перезапрашивает `GET /weather`. При обрыве WS клиенты опрашивают `/shipments`, `/alerts`, `/stats` раз в 3 с.
 

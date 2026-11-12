@@ -36,6 +36,8 @@ interface Props {
   zoneHazard?: string | null;
   /** Алерты: исходный маршрут перестроенного груза берётся из принятого алерта (from_route). */
   alerts?: Alert[];
+  /** Скорость ускоренного просмотра движения: > 0 — подпись на карте и равномерный доезд значков. */
+  playback?: number;
   /** Прежняя SVG-схема — запасной вариант, если подложка не загрузилась. */
   stormZone?: React.ComponentProps<typeof CorridorMap>["stormZone"];
 }
@@ -103,6 +105,8 @@ const GLYPH: Record<Mode, string> = {
 };
 const LIVE_PX = 28;
 const ANIM_MS = 1500;
+/** При просмотре позиции приходят раз в 2 с: доезд чуть дольше и равномерно — без рывков и остановок. */
+const PLAY_ANIM_MS = 2200;
 /** Значки ближе этого (px на текущем масштабе) собираются в один со счётчиком. */
 const CLUSTER_PX = 22;
 const STATUS_RANK: Record<DisplayStatus, number> = { at_risk: 3, rerouted: 2, in_transit: 1, planned: 0, delivered: 0 };
@@ -137,6 +141,9 @@ interface Live {
   to: number;
   t0: number;
   html: string;
+  /** Длительность и плавность текущего доезда. */
+  dur: number;
+  linear: boolean;
 }
 
 export function RealMap(props: Props) {
@@ -150,7 +157,8 @@ export function RealMap(props: Props) {
   const liveLayer = useRef<LT.LayerGroup | null>(null);
   const lives = useRef<Map<string, Live>>(new Map());
   const clusters = useRef<LT.Marker[]>([]);
-  const raf = useRef<number | null>(null);
+  /** Запланированный кадр доезда: requestAnimationFrame и запасной таймер (кадры не рисуются в фоне). */
+  const raf = useRef<{ f: number; t: ReturnType<typeof setTimeout> } | null>(null);
   /** Груз, выбранный кликом по значку: карточка и подсветка маршрута. */
   const [picked, setPicked] = useState<string | null>(null);
   /** Несколько грузов в одной точке: список по клику на счётчик. */
@@ -238,7 +246,10 @@ export function RealMap(props: Props) {
       cancelled = true;
       clearTimeout(timer);
       resize?.disconnect();
-      if (raf.current) cancelAnimationFrame(raf.current);
+      if (raf.current) {
+        cancelAnimationFrame(raf.current.f);
+        clearTimeout(raf.current.t);
+      }
       liveMap.clear();
       map.current?.remove();
       map.current = null;
@@ -338,20 +349,24 @@ export function RealMap(props: Props) {
 
   // ---------- живые грузы: значок едет к точке сервера вдоль линии маршрута ----------
   const tick = useCallback(function step() {
+    if (raf.current) {
+      cancelAnimationFrame(raf.current.f);
+      clearTimeout(raf.current.t);
+    }
     raf.current = null;
     const now = performance.now();
     let more = false;
     for (const lv of lives.current.values()) {
       if (lv.s === null || lv.s === lv.to) continue;
-      const k = Math.min((now - lv.t0) / ANIM_MS, 1);
-      lv.s = k >= 1 ? lv.to : lv.from + (lv.to - lv.from) * ease(k);
+      const k = Math.min((now - lv.t0) / lv.dur, 1);
+      lv.s = k >= 1 ? lv.to : lv.from + (lv.to - lv.from) * (lv.linear ? k : ease(k));
       const { pt, heading } = trackPoint(lv.track, lv.s);
       lv.marker.setLatLng(pt);
       const rot = lv.marker.getElement()?.querySelector<SVGElement>(".rm-live-rot");
       if (rot && k < 1) rot.style.transform = `rotate(${heading}deg)`;
       if (k < 1) more = true;
     }
-    if (more) raf.current = requestAnimationFrame(step);
+    if (more) raf.current = { f: requestAnimationFrame(step), t: setTimeout(step, 100) };
   }, []);
 
   useEffect(() => {
@@ -377,7 +392,7 @@ export function RealMap(props: Props) {
           setPicked(s.id);
         });
         marker.addTo(g);
-        lives.current.set(s.id, { marker, track, key, s: at, from: at ?? 0, to: at ?? 0, t0: 0, html });
+        lives.current.set(s.id, { marker, track, key, s: at, from: at ?? 0, to: at ?? 0, t0: 0, html, dur: ANIM_MS, linear: false });
         continue;
       }
       if (lv.html !== html) {
@@ -387,6 +402,7 @@ export function RealMap(props: Props) {
       lv.marker.setZIndexOffset(picked === s.id ? 3000 : 1000);
       // маршрут сменился (перестроение): показанную точку переносим на новую линию по ребру и доле пути
       let cur = lv.s;
+      const rerouted = lv.key !== key;
       if (lv.key !== key) {
         const track = routeTrack(s.route, edges, nodes);
         if (cur !== null) {
@@ -407,6 +423,9 @@ export function RealMap(props: Props) {
         lv.from = cur;
         lv.to = target;
         lv.t0 = performance.now();
+        // при просмотре — равномерно, следующий шаг подхватывает с той же точки; смена маршрута — мягко
+        lv.linear = !!props.playback && !rerouted;
+        lv.dur = lv.linear ? PLAY_ANIM_MS : ANIM_MS;
       } else {
         lv.s = lv.from = lv.to = target;
         lv.marker.setLatLng([pos.lat, pos.lon]);
@@ -419,7 +438,7 @@ export function RealMap(props: Props) {
       lv.marker.remove();
       lives.current.delete(id);
     }
-    if (!raf.current) raf.current = requestAnimationFrame(tick);
+    if (!raf.current) raf.current = { f: requestAnimationFrame(tick), t: setTimeout(tick, 100) };
 
     // несколько грузов в одной точке — один значок со счётчиком (по точкам сервера, на текущем масштабе)
     for (const c of clusters.current) c.remove();
@@ -447,7 +466,7 @@ export function RealMap(props: Props) {
       clusters.current.push(c);
     }
     for (const [id, lv] of lives.current) lv.marker.setOpacity(used.has(id) && picked !== id ? 0 : 1);
-  }, [ready, shipments, edges, nodes, picked, focusId, zoomSeq, tick]);
+  }, [ready, shipments, edges, nodes, picked, focusId, zoomSeq, tick, props.playback]);
 
   // выбранный груз исчез (сброс демо, доставлен) — снять выделение
   const pickedShipment = picked ? (shipments.find((x) => x.id === picked && x.position) ?? null) : null;
@@ -522,6 +541,7 @@ export function RealMap(props: Props) {
           {freshness && <span className={freshness.stale ? "text-warn" : undefined}> · {freshness.text}</span>}
         </div>
         <div>Расписание и загрузка портов — демо-данные</div>
+        {!!props.playback && <div className="font-bold text-cyan">Ускоренный просмотр плана движения, ×{props.playback}</div>}
       </div>
     </div>
   );

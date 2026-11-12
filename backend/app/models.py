@@ -77,7 +77,7 @@ class Edge(Model):
                           "Только рисование: море по акватории, суша вдоль трасс")
 
 
-WaitingReason = Literal["blocked", "sailing", "border", "transfer"]
+WaitingReason = Literal["blocked", "sailing", "border", "transfer", "arrived"]
 
 
 class Position(Model):
@@ -93,7 +93,7 @@ class Position(Model):
     eta_next_node: datetime = Field(description="Прибытие в to_node: planned_end этапа + predicted_delay_h")
     waiting: bool = Field(False, description="Стоит в узле: ждёт рейс, граница, перегрузка, участок закрыт")
     waiting_reason: WaitingReason | None = None
-    waiting_label: str | None = Field(None, description="«Ждёт рейс», «Граница и таможня», «Перегрузка», «Участок закрыт»")
+    waiting_label: str | None = Field(None, description="«Ждёт рейс», «Граница и таможня», «Перегрузка», «Участок закрыт», «Конечный пункт»")
 
 
 class Leg(Model):
@@ -530,6 +530,16 @@ class StatsOut(Model):
 
 class OkOut(Model):
     ok: bool = True
+
+
+class PlaybackIn(Model):
+    speed: Literal[0, 60, 600] = Field(description="0 — пауза; 60 и 600 — во сколько раз быстрее идут часы просмотра")
+
+
+class PlaybackOut(Model):
+    speed: int = Field(description="Текущая скорость просмотра: 0 | 60 | 600")
+    offset_h: float = Field(description="На сколько часов view_now впереди sim_now")
+    view_now: datetime = Field(description="Часы просмотра: sim_now + смещение. Только для Shipment.position")
 
 
 class ErrorBody(Model):

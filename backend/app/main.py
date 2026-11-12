@@ -210,7 +210,7 @@ class Hub:
 
 hub = Hub()
 WS_TYPES = {"shipment.updated", "alert.created", "alert.updated", "ledger.appended", "stats.updated",
-            "weather.updated", "demo.reset"}
+            "weather.updated", "demo.reset", "playback.updated"}
 
 
 async def _to_ws(type_: str, payload) -> None:
@@ -500,6 +500,23 @@ async def get_data_sources():
     Плюс факты о коридоре и сводка ретроспективной симуляции на исторической погоде."""
     from .datasources import data_sources
     return data_sources(state)
+
+
+@api.get("/demo/playback", response_model=M.PlaybackOut, tags=["демо"])
+async def demo_playback_get():
+    """Ускоренный просмотр движения: текущая скорость и часы просмотра. Только чтение, прав не нужно."""
+    return state.playback_out()
+
+
+@api.post("/demo/playback", response_model=M.PlaybackOut, tags=["демо"])
+async def demo_playback_set(body: M.PlaybackIn, _=Depends(need("run_scenario"))):
+    """Скорость просмотра 0 | 60 | 600. Двигает только Shipment.position (view_now = sim_now + смещение);
+    статусы, риск, алерты, ETA и деньги — по-прежнему от sim_now. Пауза сохраняет смещение, reset обнуляет."""
+    async with state.lock:
+        out = state.set_playback(body.speed)
+    await hub.send("playback.updated", out)
+    log.info("Просмотр движения: ×%s, смещение %.1f ч", body.speed, out["offset_h"])
+    return out
 
 
 @api.get("/demo/check", response_model=M.DemoCheckOut, tags=["демо"])

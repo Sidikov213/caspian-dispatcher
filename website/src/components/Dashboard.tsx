@@ -229,6 +229,8 @@ export function Dashboard() {
           setDismissed(new Set());
           d.resetDemo();
         }}
+        playback={d.playback}
+        onPlayback={(speed) => d.setPlayback(speed)}
       />
       <div className="relative flex min-h-0 flex-1">
         <SideNav
@@ -294,6 +296,7 @@ export function Dashboard() {
               freshness={freshness}
               onSelect={(id) => go({ shipment: id, panel: null })}
               onNode={(id) => setNodeCard(id)}
+              playback={d.playback ?? 0}
             />
             {nodeCard && d.nodes.get(nodeCard) && (
               <NodeCard node={d.nodes.get(nodeCard)!} insetRight={panelOpen ? PANEL_W : 0} onClose={() => setNodeCard(null)} />

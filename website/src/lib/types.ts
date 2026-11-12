@@ -101,7 +101,7 @@ export interface ShipmentPosition {
   to_node: string;
   eta_next_node: string;
   waiting: boolean;
-  waiting_reason?: "sailing" | "border" | "transfer" | "blocked" | null;
+  waiting_reason?: "sailing" | "border" | "transfer" | "blocked" | "arrived" | null;
   waiting_label?: string | null;
 }
 
@@ -438,4 +438,13 @@ export interface DataSources {
   backtest: Backtest | null;
   /** Почему главный сценарий — лёд: факты, честная пометка об источнике, вывод ретроспективы. */
   ice?: { title: string; facts: { text: string; source: string | null }[]; note: string; conclusion: string | null } | null;
+}
+
+export type PlaybackSpeed = 0 | 60 | 600;
+
+/** GET/POST /api/demo/playback: ускоренный просмотр, двигает только Shipment.position. */
+export interface Playback {
+  speed: PlaybackSpeed;
+  offset_h: number;
+  view_now: string;
 }

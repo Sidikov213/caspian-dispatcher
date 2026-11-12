@@ -11,6 +11,7 @@ import type {
   GraphNode,
   LedgerVerify,
   Pass,
+  PlaybackSpeed,
   Sailing,
   Scenario,
   ScenarioPreset,
@@ -21,6 +22,7 @@ import type {
 } from "./types";
 
 const POLL_MS = 3000;
+export const PLAYBACK_POLL_MS = 2000;
 
 export interface Dashboard {
   graph: Graph | null;
@@ -51,6 +53,9 @@ export interface Dashboard {
   reject(alertId: string): Promise<boolean>;
   verifyLedger(): Promise<void>;
   tamperLedger(index: number): Promise<void>;
+  /** Скорость ускоренного просмотра движения; null — сервер не поддерживает (моки). */
+  playback: PlaybackSpeed | null;
+  setPlayback(speed: PlaybackSpeed): Promise<void>;
   /** Новый груз; ошибка проверки сервера пробрасывается вызывающему (форма показывает поля). */
   createShipment(body: ShipmentCreate): Promise<Shipment>;
 }
@@ -74,6 +79,7 @@ export function useDashboard(): Dashboard {
   const ledgerLenRef = useRef(-1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [playback, setPlaybackState] = useState<PlaybackSpeed | null>(null);
   const wsOpen = useRef(false);
 
   const fail = useCallback((e: unknown) => setError(e instanceof Error ? e.message : String(e)), []);
@@ -178,6 +184,7 @@ export function useDashboard(): Dashboard {
     alertsRef.current = [];
     ledgerLenRef.current = -1;
     setResetSeq((n) => n + 1);
+    setPlaybackState(api.getPlayback ? 0 : null);
     const [g, p] = await Promise.all([api.getGraph(), api.getScenarioPresets()]);
     setGraph(g);
     setPresets(p);
@@ -192,6 +199,7 @@ export function useDashboard(): Dashboard {
         if (cancelled) return;
         setGraph(g);
         setPresets(p);
+        api.getPlayback?.().then((pb) => !cancelled && setPlaybackState(pb.speed), () => undefined);
         await Promise.all([refreshLive(), refreshWeather()]);
       } catch (e) {
         if (!cancelled) fail(e);
@@ -249,6 +257,10 @@ export function useDashboard(): Dashboard {
           passCache.current.clear();
           reloadRef.current().catch(fail);
         } else if (msg.type === "weather.updated") refreshWeather().catch(fail);
+        else if (msg.type === "playback.updated") {
+          const sp = (msg.payload as { speed?: PlaybackSpeed } | null)?.speed;
+          if (sp !== undefined) setPlaybackState(sp);
+        }
         else {
           const pid = msg.type === "shipment.updated" ? msg.payload?.pass_id : null;
           if (pid) refreshPass(pid).catch(fail);
@@ -270,6 +282,29 @@ export function useDashboard(): Dashboard {
     }, POLL_MS);
     return () => clearInterval(t);
   }, [refreshLive, fail]);
+
+  // Ускоренный просмотр: положение грузов меняется без событий — опрос /shipments раз в 2 с.
+  useEffect(() => {
+    if (!playback) return;
+    const t = setInterval(() => {
+      api.getShipments().then(setShipments, () => undefined);
+    }, PLAYBACK_POLL_MS);
+    return () => clearInterval(t);
+  }, [playback]);
+
+  const setPlayback = useCallback(
+    async (speed: PlaybackSpeed) => {
+      if (!api.setPlayback) return;
+      try {
+        const pb = await api.setPlayback(speed);
+        setPlaybackState(pb.speed);
+        setShipments(await api.getShipments());
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [fail],
+  );
 
   const runScenario = useCallback(
     async (preset: string) => {
@@ -380,5 +415,7 @@ export function useDashboard(): Dashboard {
     verifyLedger,
     tamperLedger,
     createShipment,
+    playback,
+    setPlayback,
   };
 }

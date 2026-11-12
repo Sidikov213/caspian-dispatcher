@@ -12,6 +12,7 @@ import json
 import logging
 import math
 import re
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -80,17 +81,45 @@ class State:
         self.users_path = Path(users_path) if users_path else None
         self.users: dict[int, str] = self._load_users()
         self.lock = asyncio.Lock()
+        self.monotonic = time.monotonic   # в тестах подменяется
         self.reset()
 
     @property
     def sim_now(self):
         return self.clock.sim_now
 
+    # ---------------- ускоренный просмотр движения ----------------
+    # view_now = sim_now + смещение; смещение растёт со скоростью speed (×600: 1 с = 10 мин пути).
+    # Только для Shipment.position — статусы, риск, алерты, ETA и деньги считаются от sim_now.
+
+    PLAYBACK_SPEEDS = (0, 60, 600)
+
+    def view_offset_s(self) -> float:
+        pb = self.playback
+        return pb["base_s"] + (self.monotonic() - pb["t0"]) * pb["speed"]
+
+    def view_now(self):
+        return self.sim_now + timedelta(seconds=self.view_offset_s())
+
+    def set_playback(self, speed: int) -> dict:
+        self.playback = {"speed": speed, "base_s": self.view_offset_s(), "t0": self.monotonic()}
+        return self.playback_out()
+
+    def playback_out(self) -> dict:
+        return {"speed": self.playback["speed"], "offset_h": round(self.view_offset_s() / 3600, 3),
+                "view_now": self.view_now().isoformat().replace("+00:00", "Z")}
+
+    def with_view(self, sh: dict) -> dict:
+        """Копия груза: положение — на view_now (остальное — как есть, от sim_now)."""
+        sh["position"] = D.live_position(self, sh)
+        return sh
+
     # ---------------- сброс ----------------
 
     def reset(self) -> None:
         seed = json.loads(self.seed_path.read_text(encoding="utf-8"))
         self.clock.reset()
+        self.playback = {"speed": 0, "base_s": 0.0, "t0": self.monotonic()}   # reset выключает просмотр
         anchor = parse(seed["meta"].get("now", SCENARIO_ANCHOR))
         seed = shift_times(seed, self.sim_now - anchor)   # сценарий всегда от sim_now: шторм +36 ч, паром А +44 ч
         remap = rehash_chain(seed["ledger"]) if self.sim_now != anchor else {}
@@ -148,7 +177,10 @@ class State:
                    self.sim_now)
 
     def emit(self, type_: str, payload) -> None:
-        self.events.append((type_, copy.deepcopy(payload)))
+        payload = copy.deepcopy(payload)
+        if type_ == "shipment.updated":
+            self.with_view(payload)
+        self.events.append((type_, payload))
 
     def drain_events(self) -> list[tuple[str, object]]:
         out, self.events = self.events, []
@@ -166,11 +198,11 @@ class State:
         return self.graph.to_api()
 
     def shipments_list(self, owner_tg_id: int | None = None):
-        return [copy.deepcopy(s) for s in self.shipments.values()
+        return [self.with_view(copy.deepcopy(s)) for s in self.shipments.values()
                 if owner_tg_id is None or s["owner_tg_id"] == owner_tg_id]
 
     def shipment(self, sid: str):
-        return copy.deepcopy(self.get_shipment(sid))
+        return self.with_view(copy.deepcopy(self.get_shipment(sid)))
 
     def alternatives(self, sid: str):
         return D.alternatives(self, sid)

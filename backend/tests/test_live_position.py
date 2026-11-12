@@ -77,7 +77,7 @@ def test_after_accept_point_is_on_new_route(st):
     # через несколько часов груз идёт по новому участку, которого в старом маршруте не было
     fresh = next(leg for leg in new["legs"] if leg["edge_id"] not in {x["edge_id"] for x in old["legs"]})
     t = parse(fresh["planned_start"]) + (parse(fresh["planned_end"]) - parse(fresh["planned_start"])) / 2
-    pos = live_position(st, sh, t)
+    pos = live_position(st, sh, t, cap=False)
     assert pos["edge_id"] == fresh["edge_id"] and not pos["waiting"]
     assert on_line(pos, edge_line(st.graph, fresh["edge_id"], fresh["from"]))
 
@@ -86,7 +86,7 @@ def test_delivered_and_planned_have_no_position(st):
     assert st.shipments["sh-05"]["stage"] == "planned" and st.shipments["sh-05"]["position"] is None
     sh = st.shipments["sh-01"]
     after = parse(sh["route"]["legs"][-1]["planned_end"]) + H(1)
-    assert live_position(st, sh, after) is None
+    assert live_position(st, sh, after, cap=False) is None
     done = copy.deepcopy(sh)
     done["stage"] = "delivered"
     assert live_position(st, done) is None

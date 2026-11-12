@@ -7,6 +7,11 @@ storm_north — стресс-тест (за 12 месяцев волна у Ас
 в Астрахани и Оле в том же окне, пик 3,4 м; те же очередь и таможня.
 storm_full — шторм на всём море: закрыты все паромные рёбра, обход только по суше (западная ветка).
 congestion_astrakhan — затор в порту Астрахань без погоды: загрузка 95%, таможня 6 ч.
+ice_north_tight — отдельный пресет «Лёд, мест мало»: тот же лёд, но на пароме М из Махачкалы свободно
+только 80 т (sailing_free_t), а грузов на 120 т. Включает согласование с цифровыми моделями участников
+(negotiate) и срок решения Alert.decide_by. Главный сценарий ice_north и его числа не трогает.
+Грузу, которому места не хватило, система ищет лучший из оставшихся обходов (leftover: "best", по умолчанию);
+leftover: "wait" — он ждёт свой следующий рейс.
 """
 import copy
 
@@ -62,9 +67,19 @@ PRESETS = {
     },
 }
 
+# Тот же лёд, что в ice_north (окно, порты, очередь, таможня, зона), плюс дефицит места на пароме М.
+TIGHT_FREE_T = 80
+TIGHT_NOTE = "На пароме из Махачкалы свободно 80 т, грузов на 120 т: согласование с цифровыми моделями участников"
+PRESETS["ice_north_tight"] = {
+    **copy.deepcopy(PRESETS["ice_north"]),
+    "id": "scn-ice-north-tight", "preset_title": "Лёд, мест мало", "preset_note": TIGHT_NOTE,
+    "sailing_free_t": {"sl-mkh-anz-1115": TIGHT_FREE_T}, "negotiate": True,
+}
+
 MAIN_PRESET = "ice_north"
-PRESET_LIST = [{"key": k, "title": v["title"], "hazard": v["hazard"], "main": k == MAIN_PRESET,
-                "note": note_of(v["hazard"])} for k, v in PRESETS.items()]
+PRESET_LIST = [{"key": k, "title": v.get("preset_title", v["title"]), "hazard": v["hazard"],
+                "main": k == MAIN_PRESET, "note": v.get("preset_note") or note_of(v["hazard"])}
+               for k, v in PRESETS.items()]
 
 
 def make_scenario(key: str, sim_now) -> dict:
@@ -77,7 +92,9 @@ def make_scenario(key: str, sim_now) -> dict:
             "starts_in_h": p["start_h"],
             "params": p["params"], "zone": p.get("zone"),
             "_preset": key, "_overlay": p["overlay"], "_congestion": p["congestion"],
-            "_customs_h": p["customs_h"], "_ice": p.get("ice")}
+            "_customs_h": p["customs_h"], "_ice": p.get("ice"),
+            "_sailing_free_t": p.get("sailing_free_t") or {}, "_negotiate": bool(p.get("negotiate")),
+            "_leftover": p.get("leftover", "best")}
 
 
 def public(scenario: dict) -> dict:

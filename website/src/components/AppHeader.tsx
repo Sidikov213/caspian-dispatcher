@@ -6,6 +6,7 @@ import type { WeatherSummary } from "@/lib/derive";
 import { formatDecimal, formatInt, formatRub, formatSignedPct } from "@/lib/format";
 import { ROLE_LABEL, can, clearSession, useSessionUser } from "@/lib/session";
 import { setSiteTheme, useSiteTheme } from "@/lib/theme";
+import { DemoBadge } from "./DemoBadge";
 import type { PlaybackSpeed, ScenarioPreset, Stats } from "@/lib/types";
 import { ChevronDownIcon, ClockIcon, CloseIcon, HazardIcon, LeafIcon, LogoWordmark, RouteIcon, StormIcon, WavesIcon } from "./icons";
 
@@ -120,6 +121,10 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
 
   return (
     <header className="relative z-30 flex h-20 shrink-0 items-center border-b border-line bg-panel pr-[21px] pl-5">
+      {/* Плашка висит на верхней кромке шапки: место в ряду не занимает, счётчики не сдвигает. */}
+      <div className="absolute top-0 left-1/2 z-10 -translate-x-1/2">
+        <DemoBadge hanging />
+      </div>
       <div className="flex w-[200px] items-center gap-[10px]" title="Коридор «Север–Юг»">
         <LogoWordmark height={40} />
 

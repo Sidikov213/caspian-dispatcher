@@ -26,6 +26,7 @@ from .errors import ApiError
 from .graph import KIND_FERRY
 from .predictor import PredictContext, PredictorResult
 from . import hazards as HZ
+from . import negotiation as N
 from .card import build_card
 from .hazards import note_of
 from .livepos import live_position
@@ -290,7 +291,7 @@ def threats(st) -> dict[tuple, dict]:
 
 
 def _changed(old: dict, new: dict) -> bool:
-    if old["_source"] != new["_source"]:
+    if old["_source"] != new["_source"] or old.get("_preset") != new.get("_preset"):
         return True
     (a0, a1), (b0, b1) = old["_window"], new["_window"]
     return (abs(hours(a0, b0)) >= CHANGE_H or abs(hours(a1, b1)) >= CHANGE_H
@@ -369,6 +370,10 @@ def run_scenario(st, key: str) -> dict:
         return {"scenario": public(sc), "alert": copy.deepcopy(alert)}
     sc = make_scenario(key, st.sim_now)
     st.scenarios[key] = sc
+    for sid, free in sc["_sailing_free_t"].items():   # сценарий «мест мало»: на рейсе свободно только free т
+        s = st.sailings.get(sid)
+        if s:
+            s["booked_t"] = max(s["booked_t"], s["capacity_t"] - free)
     st.weather = st.make_weather()
     st.emit("weather.updated", None)
     created = watch(st)
@@ -430,6 +435,27 @@ def option_title(st, items: list[dict]) -> str:
     return title
 
 
+def plan_groups(st, items: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Грузы рекомендованного плана по направлениям: [(«Через Махачкалу», [позиции]), …]."""
+    groups: dict[str, list[dict]] = {}
+    for i in items:
+        if i["action"] == "reroute":
+            groups.setdefault(via_title(st, i["to_route"]), []).append(i)
+    return list(groups.items())
+
+
+def plan_title(st, items: list[dict]) -> str:
+    """«Через Махачкалу — №01 и №03, по западной ветке через Самур и Астару — №02»."""
+    parts = [f"{via} — {N.nums([i['shipment_id'] for i in its])}" for via, its in plan_groups(st, items)]
+    waits = [i for i in items if i["action"] == "wait"]
+    if waits:
+        flights = {i["sailing_id"] for i in waits}
+        what = _flight(st, waits[0]["sailing_id"]) if len(flights) == 1 else "следующий рейс"
+        parts.append(f"ждать {what} — {N.nums([i['shipment_id'] for i in waits])}")
+    title = ", ".join(p[:1].lower() + p[1:] for p in parts)
+    return title[:1].upper() + title[1:]
+
+
 def _option(st, oid: str, title: str, items: list[dict], recommended: bool) -> dict:
     rer = [i for i in items if i["action"] == "reroute"]
     route = rer[0]["to_route"] if rer else (items[0]["from_route"] if items else None)
@@ -484,8 +510,13 @@ def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
     options: dict[str, dict] = {}
     rec_items, rec_risks = [], {}
     tags_seen: list[str] = []
-    for base in bases:
+    # места на рейсе обхода не хватает всем — сначала считаются грузы, которым оно досталось (N.allocate)
+    alloc = N.allocate(st, bases, banned) if sc.get("_negotiate") else None
+    order = bases if not alloc else sorted(bases, key=lambda b: b["sh"]["id"] not in alloc["selected"])
+    for base in order:
         cand = _pick(st, base, ctx, banned, None)
+        if alloc and sc.get("_leftover") == "wait" and base["sh"]["id"] in alloc["left"]:
+            cand = None   # настройка пресета: кому не хватило места, ждёт свой рейс, а не едет другим обходом
         item, risk, alt_cost = _item(st, base, cand, ctx)
         rec_items.append(item)
         rec_risks[base["sh"]["id"]] = risk
@@ -493,6 +524,9 @@ def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
         for c in candidates(st, base["sh"], st.ctx(), banned):
             if c["tag"] not in tags_seen and route_end(c["route"]) < base["dn_end"]:
                 tags_seen.append(c["tag"])
+    if alloc:
+        pos = {b["sh"]["id"]: n for n, b in enumerate(bases)}
+        rec_items.sort(key=lambda i: pos[i["shipment_id"]])
     rec_tags = {i["to_route"]["id"].rsplit("-", 1)[-1] if i["to_route"] else None for i in rec_items}
     rer_tags = {next((c["tag"] for c in candidates(st, b["sh"], st.ctx(), banned)
                       if c["route"]["id"] == i["to_route"]["id"]), None)
@@ -502,7 +536,7 @@ def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
         rec_id = next(iter(rer_tags)) if len(rer_tags) == 1 and None not in rec_tags else "best"
         options[rec_id] = {"items": rec_items, "risks": rec_risks,
                            "title": option_title(st, rec_items) if rec_id != "best"
-                           else "Лучший обход для каждого груза"}
+                           else (plan_title(st, rec_items) if alloc else "Лучший обход для каждого груза")}
         for tag in tags_seen:
             if len(options) >= MAX_OPTIONS - 1 or tag in options:
                 continue
@@ -517,7 +551,9 @@ def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
             if [i["to_route"] and i["to_route"]["id"] for i in items] == \
                     [i["to_route"] and i["to_route"]["id"] for i in rec_items]:
                 continue
-            options[tag] = {"items": items, "risks": risks, "title": option_title(st, items)}
+            mixed = alloc and any(i["action"] == "wait" for i in items)
+            options[tag] = {"items": items, "risks": risks,
+                            "title": plan_title(st, items) if mixed else option_title(st, items)}
     if bases:
         wait_items = [_item(st, b, None, ctx)[0] for b in bases]
         options["wait"] = {"items": wait_items, "risks": {}, "title": option_title(st, wait_items)}
@@ -547,6 +583,10 @@ def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
         "source": sc.get("_source", "scenario"), "status_note": None,
         "hazard": hazard_of(sc),
     }
+    if sc.get("_negotiate") and has_reroute:
+        st.alert_alloc[aid] = alloc
+        alert["negotiation"] = N.negotiate(st, alert, alloc)
+        N.set_deadlines(st, alert, options)
     alert["text"] = alert_text(st, sc, alert, internal)
     ids = {b["sh"]["id"] for b in bases}
     # новая угроза по тем же грузам заменяет прежний алерт: груз входит только в один активный алерт
@@ -574,7 +614,11 @@ def port_load(st, rer: list[dict]) -> dict | None:
         return None
     node = first["legs"][fi]["from"]
     before = congestion(st, node)
-    total = sum(st.shipments[i["shipment_id"]]["weight_t"] for i in rer)
+    def via_node(r: dict) -> bool:   # в смешанном плане считаются только грузы, идущие через этот порт
+        f = first_ferry(st, r)
+        return f is not None and r["legs"][f]["from"] == node
+
+    total = sum(st.shipments[i["shipment_id"]]["weight_t"] for i in rer if via_node(i["to_route"]))
     return {"node_id": node, "before": before,
             "after": round(min(before + total / st.meta["port_capacity_t_per_day"], 1), 2)}
 
@@ -646,14 +690,31 @@ def alert_text(st, sc: dict, alert: dict, internal: dict, html: bool = False) ->
     if rer:
         lines.append(f"Ничего не делать: {wait} — прибытие {B0}+{num(dn['delay_hours'])} ч{B1}, "
                      f"задержка обойдётся в {k_rub(dn['loss_rub'])} по {cargo_dative_words(n)}.")
-        r = rer[0]["to_route"]
-        sid = rer[0]["sailing_id"]
-        via = via_title(st, r)
-        if sid:
-            via += f" ({_label(st, sid)}, {day_time(st.sailings[sid]['departure'])})"
-        alt_cost = sum(internal[i["shipment_id"]]["alt_cost"] for i in rer)
-        lines.append(f"{via}: прибытие {B0}+{num(max(i['delay_vs_plan_h'] for i in rer))} ч{B1} к плану, "
-                     f"{k_rub(alt_cost)}.")
+        alloc = st.alert_alloc.get(alert["id"])
+        if alloc:   # места на рейсе обхода хватило не всем: кто едет, решено по правилу N.allocate
+            lines.append(f"На {_label(st, alloc['sailing_id'], 'пароме').replace('паром ', 'пароме ')} свободно "
+                         f"{num(alloc['free_t'])} т из нужных {num(alloc['requested_t'])} т: место получают "
+                         f"{N.nums(alloc['selected'])} — так спасено больше груз-часов.")
+            for via, its in plan_groups(st, items):
+                sid = its[0]["sailing_id"]
+                if sid:
+                    via += f" ({_label(st, sid)}, {day_time(st.sailings[sid]['departure'])})"
+                lines.append(f"{via}: {N.nums([i['shipment_id'] for i in its])}, прибытие "
+                             f"{B0}+{num(max(i['delay_vs_plan_h'] for i in its))} ч{B1} к плану.")
+            waits = [i for i in items if i["action"] == "wait"]
+            if waits:
+                lines.append(f"Ждать {_flight(st, waits[0]['sailing_id'])}: "
+                             f"{N.nums([i['shipment_id'] for i in waits])}, прибытие "
+                             f"{B0}+{num(max(i['delay_vs_plan_h'] for i in waits))} ч{B1} к плану.")
+        else:
+            r = rer[0]["to_route"]
+            sid = rer[0]["sailing_id"]
+            via = via_title(st, r)
+            if sid:
+                via += f" ({_label(st, sid)}, {day_time(st.sailings[sid]['departure'])})"
+            alt_cost = sum(internal[i["shipment_id"]]["alt_cost"] for i in rer)
+            lines.append(f"{via}: прибытие {B0}+{num(max(i['delay_vs_plan_h'] for i in rer))} ч{B1} к плану, "
+                         f"{k_rub(alt_cost)}.")
         t = alert["totals"]
         lines += ["", f"{B0}Расчётная экономия по {cargo_dative(len(rer))}: {num(t['saved_hours'])} груз-часов, "
                       f"{k_rub(t['saved_rub'])}, {signed(t['co2_delta_kg'] / 1000)} т CO₂ "
@@ -662,11 +723,25 @@ def alert_text(st, sc: dict, alert: dict, internal: dict, html: bool = False) ->
         if pl:
             lines.append(f"Загрузка порта {st.graph.nodes[pl['node_id']]['name']} после переноса: "
                          f"{round(pl['before'] * 100)}% → {round(pl['after'] * 100)}%.")
+        steps = alert.get("negotiation")
+        if steps:
+            lines.append(("Согласовано с цифровыми моделями участников" if N.agreed(steps)
+                          else "Согласование с цифровыми моделями участников не завершено")
+                         + f" за {len(steps)} {_steps_word(len(steps))}"
+                         + (f". Решение можно принять до {day_time(alert['decide_by'])}."
+                            if alert.get("decide_by") else "."))
     else:
         lines.append(f"Обхода нет: допустимого маршрута не нашлось, лучший вариант — "
                      f"{wait.split(', ')[-1]}, "
                      f"прибытие {B0}+{num(dn['delay_hours'])} ч{B1}.")
     return render("\n".join(lines), html)
+
+
+def _steps_word(n: int) -> str:
+    """«за 7 шагов», «за 1 шаг», «за 3 шага»."""
+    if n % 10 == 1 and n % 100 != 11:
+        return "шаг"
+    return "шага" if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else "шагов"
 
 
 # ---------------- принятие, повтор, ручная смена маршрута ----------------
@@ -704,6 +779,13 @@ def accept(st, alert_id: str, via: str, option_id: str | None = None, by: dict |
         raise ApiError(422, "use_reject", "«Ждать» — это отклонение предложения: POST /alerts/{id}/reject")
     chosen = opts[oid]
     rer = [i for i in chosen["items"] if i["action"] == "reroute"]
+    pub = next((o for o in alert.get("options", []) if o["id"] == oid), {})
+    if pub.get("decide_by") and st.clock.event_ts() > parse(pub["decide_by"]):
+        if N.refresh_availability(st, alert):
+            st.emit("alert.updated", alert)
+        raise ApiError(409, "decide_by_passed",
+                       f"Окно решения закрыто {day_time(pub['decide_by'])}: вариант «{pub['title']}» недоступен, "
+                       f"грузы уже не успевают на паром")
 
     # 0. алерт считали от маршрутов, которые с тех пор могли смениться (другое решение, ручная смена)
     for it in chosen["items"]:

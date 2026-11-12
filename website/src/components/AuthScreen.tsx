@@ -7,6 +7,7 @@ import { setSession } from "@/lib/session";
 import type { AuthOut, AuthRole } from "@/lib/types";
 import { LoginMap } from "./LoginMap";
 import { LogoWordmark } from "./icons";
+import { DemoBadge } from "./DemoBadge";
 
 type Mode = "login" | "register";
 
@@ -117,6 +118,9 @@ export function AuthScreen() {
             })}
           </div>
 
+          <div className="mb-4">
+            <DemoBadge withHint />
+          </div>
           <h1 className="text-[28px] leading-[34px] font-bold tracking-[-0.01em]">
             {mode === "login" ? "Вход в диспетчер" : "Создать аккаунт"}
           </h1>

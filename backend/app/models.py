@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_serializer, model_validator
 
 
 class Model(BaseModel):
@@ -30,11 +30,21 @@ AlertStatus = Literal["new", "accepted", "rejected", "superseded"]
 AlertAction = Literal["reroute", "wait"]
 ScenarioType = Literal["ice", "storm", "congestion", "customs"]
 Hazard = Literal["ice", "storm", "congestion", "customs"]
-ScenarioPreset = Literal["ice_north", "storm_north", "storm_full", "congestion_astrakhan"]
+ScenarioPreset = Literal["ice_north", "storm_north", "storm_full", "congestion_astrakhan", "ice_north_tight"]
 DocType = Literal["invoice", "cmr", "packing_list"]
 DocStatus = Literal["draft", "confirmed"]
 PassStatus = Literal["active", "reissued", "revoked"]
-BlockEvent = Literal["issued", "reissued", "verified"]
+BlockEvent = Literal["issued", "reissued", "verified", "negotiation"]
+NegotiationActor = Literal["port", "ferry", "customs", "rail"]
+NegotiationResult = Literal["ok", "reject", "counter"]
+
+
+def _omit_none(data: dict, keys: tuple[str, ...]) -> dict:
+    """Новые необязательные поля не попадают в JSON, пока пусты: ответы прежних сценариев не меняются."""
+    for k in keys:
+        if data.get(k) is None:
+            data.pop(k, None)
+    return data
 
 
 def display_status_of(stage: str, risk_level: str, rerouted: bool) -> str:
@@ -263,6 +273,22 @@ class AlertOption(Model):
     saved_rub: float
     co2_delta_kg: float
     recommended: bool
+    decide_by: datetime | None = Field(None, description="Срок решения варианта; после него accept → 409 decide_by_passed")
+    available: bool | None = Field(None, description="false — срок решения прошёл, вариант недоступен")
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _omit_none(handler(self), ("decide_by", "available"))
+
+
+class NegotiationStep(Model):
+    """Шаг согласования с цифровой моделью участника. Каждый шаг — запись журнала block_index."""
+    actor: NegotiationActor
+    action: str
+    result: NegotiationResult
+    detail: str
+    ts: datetime
+    block_index: int | None = None
 
 
 class CardMetric(Model):
@@ -329,6 +355,14 @@ class Alert(Model):
     accepted_by: AcceptedBy | None = None
     hazard: Hazard | None = Field(None, description="Тип угрозы: ice | storm | congestion | customs")
     card: AlertCard | None = Field(None, description="Компактная карточка: готовые строки, клиент рисует как есть")
+    negotiation: list[NegotiationStep] | None = Field(
+        None, description="Шаги согласования с цифровыми моделями участников (только пресет ice_north_tight)")
+    decide_by: datetime | None = Field(
+        None, description="До какого момента можно принять рекомендованный вариант («окно спасения»)")
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _omit_none(handler(self), ("negotiation", "decide_by"))
 
 
 class DocumentFields(Model):
@@ -380,6 +414,15 @@ class Block(Model):
     doc_hash: str
     prev_hash: str
     hash: str
+    # только у записей согласования (event = negotiation); всё это покрыто doc_hash записи
+    alert_id: str | None = None
+    actor: NegotiationActor | None = None
+    result: NegotiationResult | None = None
+    action: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _omit_none(handler(self), ("alert_id", "actor", "result", "action"))
 
 
 # ---------- Запросы ----------

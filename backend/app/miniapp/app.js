@@ -18,7 +18,7 @@
   };
   const LEVEL = { low: "низкий", medium: "средний", high: "высокий" };
   const CARGO = { grain: "Зерно", metal: "Металл", equipment: "Оборудование", textile: "Текстиль", fertilizer: "Удобрения" };
-  const BLOCK_EVENT = { issued: "Пропуск выдан", reissued: "Пропуск переоформлен", verified: "Пропуск проверен" };
+  const BLOCK_EVENT = { issued: "Пропуск выдан", reissued: "Пропуск переоформлен", verified: "Пропуск проверен", negotiation: "Согласование" };
   const PASS_STATUS = { active: "действует", reissued: "переоформлен", revoked: "отозван" };
   const VIA = { web: "с сайта", telegram: "из Telegram" };
   const MODE_ICON = { rail: "i-rail", sea: "i-sea", road: "i-road" };

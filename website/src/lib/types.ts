@@ -215,6 +215,20 @@ export interface AlertOption {
   saved_rub: number;
   co2_delta_kg: number;
   recommended: boolean;
+  /** Срок решения варианта («окно спасения»); после него accept → 409 decide_by_passed. */
+  decide_by?: string | null;
+  /** false — срок решения прошёл, вариант недоступен. */
+  available?: boolean | null;
+}
+
+/** Шаг согласования с цифровой моделью участника; block_index — запись в журнале. */
+export interface NegotiationStep {
+  actor: "port" | "ferry" | "customs" | "rail";
+  action: string;
+  result: "ok" | "reject" | "counter";
+  detail: string;
+  ts: string;
+  block_index?: number | null;
 }
 
 export interface Alert {
@@ -243,6 +257,10 @@ export interface Alert {
   hazard?: Hazard | null;
   /** Компактная карточка: готовые строки с сервера, рисуем как есть. */
   card?: AlertCard | null;
+  /** Шаги согласования с цифровыми моделями участников (пресет ice_north_tight). */
+  negotiation?: NegotiationStep[] | null;
+  /** До какого момента можно принять рекомендованный вариант. */
+  decide_by?: string | null;
 }
 
 export interface AlertCard {
@@ -308,12 +326,17 @@ export interface AcceptResult {
 export interface Block {
   index: number;
   ts: string;
-  event: "issued" | "reissued" | "verified";
+  event: "issued" | "reissued" | "verified" | "negotiation";
   shipment_id: string;
   checkpoint_node: string;
   doc_hash: string;
   prev_hash: string;
   hash: string;
+  /** Только у записей согласования (event = negotiation). */
+  alert_id?: string | null;
+  actor?: NegotiationStep["actor"] | null;
+  result?: NegotiationStep["result"] | null;
+  action?: string | null;
 }
 
 export interface LedgerVerify {

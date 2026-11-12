@@ -26,7 +26,11 @@ const EVENT_LABEL: Record<Block["event"], string> = {
   issued: "Пропуск выдан",
   reissued: "Пропуск переоформлен",
   verified: "Пропуск проверен",
+  negotiation: "Согласование",
 };
+
+const ACTOR_LABEL: Record<string, string> = { ferry: "паром", port: "порт", customs: "таможня", rail: "ж/д" };
+const RESULT_LABEL: Record<string, string> = { ok: "подтверждено", reject: "отказ", counter: "встречное" };
 
 /** «c271…9e16» */
 function shortHash(h: string) {
@@ -137,8 +141,22 @@ export function LedgerView({ blocks, check, verifying, shipments, nodes, onVerif
                   {!last && <span className="absolute top-[43px] left-[28.5px] h-[34px] w-px bg-line-strong" />}
                   {!last && <span className="absolute right-0 bottom-0 left-[49px] h-px bg-line" />}
                   <span className="tnum truncate pr-2 text-muted">{formatDateTime(b.ts)}</span>
-                  <span className={`truncate pr-2 text-[13px] font-bold ${reissued ? "text-ok" : ""}`}>{EVENT_LABEL[b.event]}</span>
-                  <span className="truncate pr-2">{ship ? `${shipmentNumber(ship.id)} ${ship.title}` : shipmentNumber(b.shipment_id)}</span>
+                  <span className={`truncate pr-2 text-[13px] font-bold ${reissued ? "text-ok" : ""}`} title={b.action ?? undefined}>
+                    {EVENT_LABEL[b.event] ?? b.event}
+                    {b.event === "negotiation" && b.actor && (
+                      <span className={`font-medium ${b.result === "reject" ? "text-risk-text" : b.result === "counter" ? "text-warn-text" : "text-muted"}`}>
+                        {" · "}
+                        {ACTOR_LABEL[b.actor] ?? b.actor}: {RESULT_LABEL[b.result ?? ""] ?? b.result}
+                      </span>
+                    )}
+                  </span>
+                  <span className="truncate pr-2" title={b.action ?? undefined}>
+                    {b.event === "negotiation" && b.action
+                      ? b.action
+                      : ship
+                        ? `${shipmentNumber(ship.id)} ${ship.title}`
+                        : shipmentNumber(b.shipment_id)}
+                  </span>
                   <span className="truncate pr-2">{node ? shortNodeName(node.name) : b.checkpoint_node}</span>
                   <span className="tnum truncate pr-4 text-[11.5px] text-transit-text" title={b.hash}>
                     {shortHash(b.hash)}

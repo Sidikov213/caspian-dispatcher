@@ -1,4 +1,4 @@
-# Выкатка бэкенда на продакшен-сервер одной командой (через GitHub Actions, workflow deploy.yml).
+﻿# Выкатка бэкенда на продакшен-сервер одной командой (через GitHub Actions, workflow deploy.yml).
 #   powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1            # выкатить main
 #   powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 logs       # журнал сервиса
 #   powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 restart    # перезапуск

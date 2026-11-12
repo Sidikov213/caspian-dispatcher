@@ -24,7 +24,7 @@ EXPECTED_TEXT = (  # тексты из DEMO_SCENARIO.md, раздел «Текс
     "задержка обойдётся в 720 тыс ₽ по трём грузам.\n"
     "Через Махачкалу (паром М, 15 ноя, 06:00): прибытие +6 ч к плану, 123 тыс ₽.\n\n"
     "Расчётная экономия по 3 грузам: 126 груз-часов, 597 тыс ₽, −1,8 т CO₂ (−6,9%).\n"
-    "Загрузка порта Махачкала после переноса: 55% → 61%."
+    "Загрузка порта Махачкала после переноса: 64% → 70%."
 )
 
 
@@ -50,7 +50,7 @@ def test_risk_and_two_step_forecast(st):
         assert [f["impact_hours"] for f in r["factors"]] == [11, 5, 2]
         assert st.shipments[sid]["display_status"] == "at_risk"
     assert {i["sailing_id"] for i in alert["items"]} == {FERRY_M}
-    assert alert["port_load"] == {"node_id": "makhachkala", "before": 0.55, "after": 0.61}
+    assert alert["port_load"] == {"node_id": "makhachkala", "before": 0.64, "after": 0.7}
     assert alert["text"] == EXPECTED_TEXT
 
 

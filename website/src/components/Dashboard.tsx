@@ -18,7 +18,9 @@ import { can, useSessionUser } from "@/lib/session";
 import type { Alternative, Route } from "@/lib/types";
 import { useDashboard } from "@/lib/useDashboard";
 import { DecisionsSection } from "./sections/DecisionsSection";
+import { DataSection } from "./sections/DataSection";
 import { ModelSection } from "./sections/ModelSection";
+import { NodeCard } from "./NodeCard";
 import { PassesTable } from "./sections/PassesTable";
 import { SailingsSection } from "./sections/SailingsSection";
 import { ShipmentsSection } from "./sections/ShipmentsSection";
@@ -81,6 +83,7 @@ export function Dashboard() {
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [hoverRoute, setHoverRoute] = useState<Route | null>(null);
+  const [nodeCard, setNodeCard] = useState<string | null>(null);
 
   const go = useCallback(
     (patch: { shipment?: string | null; panel?: string | null; s?: string | null }) => {
@@ -249,6 +252,7 @@ export function Dashboard() {
         {section === "sailings" && <SailingsSection sailings={d.sailings} nodes={d.nodes} shipments={d.shipments} />}
         {section === "decisions" && <DecisionsSection alerts={d.alerts} />}
         {section === "model" && <ModelSection />}
+        {section === "data" && <DataSection />}
         {section === "journal" && (
           <LedgerView
             blocks={d.ledger}
@@ -288,7 +292,11 @@ export function Dashboard() {
               insetRight={panelOpen ? PANEL_W : 0}
               freshness={freshness}
               onSelect={(id) => go({ shipment: id, panel: null })}
+              onNode={(id) => setNodeCard(id)}
             />
+            {nodeCard && d.nodes.get(nodeCard) && (
+              <NodeCard node={d.nodes.get(nodeCard)!} insetRight={panelOpen ? PANEL_W : 0} onClose={() => setNodeCard(null)} />
+            )}
             {selected && panel === "twin" && (
               <TwinPanel
                 shipment={selected}

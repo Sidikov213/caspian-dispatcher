@@ -78,7 +78,8 @@ Tools LLM-агента в боте: `get_shipments(tg_id)`, `get_shipment(id)`, 
 ## 4. Модель данных
 
 ```
-Node      {id, name, country, type: port|station|border|city, lat, lon, congestion: 0..1}
+Node      {id, name, country, type: port|station|border|city, lat, lon, congestion: 0..1,
+           facts?: [string], sources?: [url]}   # проверенные факты о порте и ссылки (Махачкала, Астрахань)
 Edge      {id, from, to, mode: rail|sea|road, branch: west|transcaspian|east,
            distance_km, base_hours, cost_rub_per_t, co2_g_per_tkm,
            path?: [[lat, lon]]}   # промежуточные точки для карты (без узлов): море по акватории,
@@ -175,6 +176,7 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | GET | `/auth/me` | заголовок `Authorization: Bearer <token>` | `user` (с `permissions`); 401 `invalid_token` |
 | POST | `/demo/reset` | — | `{ok: true}` |
 | GET | `/demo/check` (только демо) | — | `{ok, sim_now, weather: {source, stale, updated_at}, checks: [{name, label, expected, actual, ok}], problems: [string]}`: проверка `forecast_quiet` — создал ли наблюдатель алерт на текущей погоде до сценария (не ошибка, `ok: true`, но в `actual` прямо: порт, волна, рейс); проверка «начальное состояние спокойное» (до сценария ни один груз не «Под риском», при провале — причина: груз, риск, волна в порту) и storm_north на копии исходного состояния, сверка с эталоном (риски 82/74/68% ±5 п. п. и порядок №01 > №02 > №03; точно: +18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, рекомендован `mkh`); `problems` — почему разошлось. Состояние не меняет |
+| GET | `/data-sources` | — | `{sources: [{id, title, provides, type: "real" \| "modeled" \| "synthetic", url, urls?, updated_at, note}], corridor_facts: [{text, source}], backtest: {...} \| null}` — откуда данные и насколько они настоящие; `backtest` — сводка ретроспективной симуляции на исторической погоде (`data/backtest.json`, `scripts/backtest.py`), `backtest.chart` — путь к графику на сайте |
 | GET | `/model` | — | `{summary, active: "catboost" \| "formula", requested, fallback_reason, synthetic: true, note, used_at_runtime: {miss_probability, departure_shift_and_delays, shift_regressor}, trained_at, seed, classifier: {auc, brier, n_train, n_test} \| null, regressor: {mae_h, n_train, n_test} \| null, feature_importance: [{name, label, importance}]}`: только чтение, метрики из `data/model_report.json`. `summary` — строка «Активен предиктор: …» (при откате — причина; та же строка в логе при старте, при откате — warning). На сервере работает только классификатор; сдвиг и задержки — расчёт; регрессор — только проверка |
 | POST | `/demo/fail_next_pass` (только демо) | — | `{ok: true}`; следующий выпуск пропуска сорвётся → груз получает `pass_state: reissue_pending`, старый пропуск активен, повтор через `/shipments/{id}/pass/retry` |
 
@@ -200,7 +202,8 @@ WebSocket `/ws?api_key=<ключ>` (или `/ws?token=<сессия мини-п�
 
 ```
 backend/  app/{main,models,state,graph,predictor,dispatcher,documents,ledger,weather}.py
-          app/bot/  data/{seed.json,history.csv,model.cbm,model_shift.cbm,model_report.json}  scripts/{gen_history,train}.py
+          app/bot/  data/{seed.json,history.csv,model.cbm,model_shift.cbm,model_report.json,wave_history.json,backtest.json}
+          scripts/{gen_history,train,gen_mocks,backtest}.py
           app/miniapp/ (Telegram Mini App)  deploy/ (настройка VPS, проверки)  scripts/{deploy.ps1,gen_mocks}
 website/  mobile/   docs/{PLAN.md,DEMO_SCENARIO.md,FLUTTER_CONTRACT.md,design/,pitch/}   CLAUDE.md
 .github/workflows/deploy.yml

@@ -57,6 +57,8 @@ class Node(Model):
     lat: float
     lon: float
     congestion: float = Field(ge=0, le=1)
+    facts: list[str] | None = Field(None, description="Проверенные факты о пункте (порт): короткие строки")
+    sources: list[str] | None = Field(None, description="Ссылки на источники фактов")
 
 
 class Edge(Model):
@@ -595,3 +597,29 @@ class TgAuthOut(Model):
     expires_at: str
     user: TgUser
     company: str = Field(description="Демо-кабинет, напр. «Каспий Логистик»")
+
+
+# ---------- Источники данных (GET /api/data-sources) ----------
+
+class DataSource(Model):
+    id: str
+    title: str
+    provides: str = Field(description="Что даёт системе")
+    type: Literal["real", "modeled", "synthetic"]
+    url: str | None = None
+    urls: list[str] | None = Field(None, description="Все ссылки, если их несколько")
+    updated_at: str | None = Field(None, description="Когда обновлено: ISO-время или дата публикации")
+    note: str | None = None
+
+
+class CorridorFact(Model):
+    text: str
+    source: str
+
+
+class DataSourcesOut(Model):
+    sources: list[DataSource]
+    corridor_facts: list[CorridorFact]
+    backtest: dict | None = Field(
+        None, description="Ретроспективная симуляция на исторической погоде (data/backtest.json, сводка); "
+                          "chart — путь к графику на сайте")

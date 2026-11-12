@@ -244,3 +244,25 @@ def test_passes_list_newest_first(client):
     every = client.get("/api/passes").json()
     assert len(every) == len({p["id"] for p in every}) and {p["shipment_id"] for p in every} >= {"sh-01", "sh-04"}
     assert client.get("/api/passes", params={"shipment_id": "sh-99"}).json() == []
+
+
+# ---------------- Данные: источники, факты портов, ретроспективная симуляция ----------------
+
+def test_data_sources(client):
+    out = client.get("/api/data-sources").json()
+    types = {s["id"]: s["type"] for s in out["sources"]}
+    assert types == {"forecast": "real", "geography": "real", "ports": "real", "sailings": "modeled",
+                     "positions": "modeled", "history": "synthetic", "wave_history": "real"}
+    assert any("21,5 млн т" in f["text"] for f in out["corridor_facts"])
+    bt = out["backtest"]
+    assert bt["title"] == "Ретроспективная симуляция на исторической погоде"
+    assert set(bt["ports"]) == {"astrakhan", "olya", "makhachkala"} and "window_list" not in bt["ports"]["olya"]
+    assert bt["sailings"]["departures"] > 100
+
+
+def test_port_facts_in_graph(client):
+    nodes = {n["id"]: n for n in client.get("/api/graph").json()["nodes"]}
+    mkh = nodes["makhachkala"]
+    assert mkh["congestion"] == 0.64 and any("3,22 млн т" in f for f in mkh["facts"]) and mkh["sources"]
+    assert any("замерзающий" in f.lower() for f in nodes["astrakhan"]["facts"])
+    assert nodes["baku"].get("facts") is None

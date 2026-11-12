@@ -54,7 +54,25 @@
       "astara": "Астару"
     },
     "pass_valid_until": "2026-11-29T21:00:00Z",
-    "owner_tg_id": 100000001
+    "owner_tg_id": 100000001,
+    "corridor_facts": [
+      {
+        "text": "Перевезено по МТК «Север–Юг» за 2025 год — около 21,5 млн т (предварительные данные)",
+        "source": "https://www.alta.ru/logistics_news/126536/"
+      },
+      {
+        "text": "Западный маршрут — 13,5 млн т",
+        "source": "https://www.alta.ru/logistics_news/126536/"
+      },
+      {
+        "text": "Транскаспийский маршрут — более 7,5 млн т",
+        "source": "https://www.alta.ru/logistics_news/126536/"
+      },
+      {
+        "text": "Восточный маршрут — чуть более 0,5 млн т",
+        "source": "https://www.alta.ru/logistics_news/126536/"
+      }
+    ]
   },
   "nodes": [
     {
@@ -91,7 +109,15 @@
       "type": "port",
       "lat": 46.35,
       "lon": 48.04,
-      "congestion": 0.62
+      "congestion": 0.62,
+      "facts": [
+        "Замерзающий порт: зимой ледокольная проводка судов",
+        "Выход в море — по Волго-Каспийскому морскому судоходному каналу, 101,5 мили (≈188 км)"
+      ],
+      "sources": [
+        "https://mintrans.gov.ru/file/396731",
+        "https://expert.ru/news/na-uchastke-volgo-kaspiyskogo-kanala-priostanovili-dvizhenie-sudov"
+      ]
     },
     {
       "id": "olya",
@@ -109,7 +135,17 @@
       "type": "port",
       "lat": 42.98,
       "lon": 47.5,
-      "congestion": 0.55
+      "congestion": 0.64,
+      "facts": [
+        "Незамерзающий, глубоководный — единственный такой порт России на Каспии",
+        "Осадка судов до 4,5 м в сухогрузной гавани",
+        "Грузооборот 2025 года — 3,22 млн т",
+        "Загрузка мощностей — 64%"
+      ],
+      "sources": [
+        "https://www.alta.ru/logistics_news/128638/",
+        "https://www.kommersant.ru/doc/8513260"
+      ]
     },
     {
       "id": "samur",
@@ -280,9 +316,9 @@
       "to": "astrakhan",
       "mode": "rail",
       "branch": "transcaspian",
-      "distance_km": 560,
+      "distance_km": 706,
       "base_hours": 16,
-      "cost_rub_per_t": 1232.0,
+      "cost_rub_per_t": 1553.2,
       "co2_g_per_tkm": 20,
       "path": [
         [
@@ -705,9 +741,9 @@
       "to": "samur",
       "mode": "rail",
       "branch": "west",
-      "distance_km": 200,
+      "distance_km": 170,
       "base_hours": 6,
-      "cost_rub_per_t": 440.0,
+      "cost_rub_per_t": 374.0,
       "co2_g_per_tkm": 20,
       "path": [
         [
@@ -759,9 +795,9 @@
       "to": "astara",
       "mode": "rail",
       "branch": "west",
-      "distance_km": 320,
+      "distance_km": 191,
       "base_hours": 10,
-      "cost_rub_per_t": 704.0,
+      "cost_rub_per_t": 420.2,
       "co2_g_per_tkm": 20,
       "path": [
         [
@@ -850,9 +886,9 @@
       "to": "incheh",
       "mode": "rail",
       "branch": "east",
-      "distance_km": 1200,
+      "distance_km": 860,
       "base_hours": 34,
-      "cost_rub_per_t": 2640.0,
+      "cost_rub_per_t": 1892.0,
       "co2_g_per_tkm": 20,
       "path": [
         [
@@ -879,9 +915,9 @@
       "to": "tehran",
       "mode": "rail",
       "branch": "east",
-      "distance_km": 650,
+      "distance_km": 514,
       "base_hours": 18,
-      "cost_rub_per_t": 1430.0,
+      "cost_rub_per_t": 1130.8,
       "co2_g_per_tkm": 20,
       "path": [
         [
@@ -1324,8 +1360,8 @@
           }
         ],
         "total_hours": 214.0,
-        "total_cost_rub": 200440,
-        "total_co2_kg": 4194.0,
+        "total_cost_rub": 206864,
+        "total_co2_kg": 4252.4,
         "branch": "transcaspian"
       },
       "planned_eta": "2026-11-21T07:00:00Z",
@@ -1438,8 +1474,8 @@
           }
         ],
         "total_hours": 145.0,
-        "total_cost_rub": 204350,
-        "total_co2_kg": 3928.8,
+        "total_cost_rub": 197255,
+        "total_co2_kg": 3864.2,
         "branch": "west"
       },
       "planned_eta": "2026-11-18T06:00:00Z",

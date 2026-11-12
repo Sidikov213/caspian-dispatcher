@@ -95,7 +95,7 @@
         "branch": "transcaspian"
       },
       "risk": {
-        "miss_probability": 0.04,
+        "miss_probability": 0.06,
         "level": "low",
         "departure_shift_h": 0.0,
         "arrival_delay_h": 0.0,
@@ -107,8 +107,8 @@
           },
           {
             "name": "port_congestion",
-            "label": "Загрузка порта 55%",
-            "impact_hours": 0.0
+            "label": "Загрузка порта 64%",
+            "impact_hours": 1.0
           },
           {
             "name": "customs_queue",
@@ -239,8 +239,8 @@
           }
         ],
         "total_hours": 235.0,
-        "total_cost_rub": 794040.0,
-        "total_co2_kg": 12189.0,
+        "total_cost_rub": 773052.0,
+        "total_co2_kg": 11998.2,
         "branch": "west"
       },
       "risk": {
@@ -264,8 +264,8 @@
       },
       "delta": {
         "hours": 13.0,
-        "rub": 81840.0,
-        "co2_kg": -1401.0
+        "rub": 60852.0,
+        "co2_kg": -1591.8
       },
       "recommended": false
     }
@@ -366,7 +366,7 @@
         "branch": "transcaspian"
       },
       "risk": {
-        "miss_probability": 0.04,
+        "miss_probability": 0.06,
         "level": "low",
         "departure_shift_h": 0.0,
         "arrival_delay_h": 0.0,
@@ -378,8 +378,8 @@
           },
           {
             "name": "port_congestion",
-            "label": "Загрузка порта 55%",
-            "impact_hours": 0.0
+            "label": "Загрузка порта 64%",
+            "impact_hours": 1.0
           },
           {
             "name": "customs_queue",
@@ -510,8 +510,8 @@
           }
         ],
         "total_hours": 230.0,
-        "total_cost_rub": 494160.0,
-        "total_co2_kg": 7806.0,
+        "total_cost_rub": 480168.0,
+        "total_co2_kg": 7678.8,
         "branch": "west"
       },
       "risk": {
@@ -535,8 +535,8 @@
       },
       "delta": {
         "hours": 13.0,
-        "rub": 54560.0,
-        "co2_kg": -934.0
+        "rub": 40568.0,
+        "co2_kg": -1061.2
       },
       "recommended": false
     }
@@ -632,12 +632,12 @@
           }
         ],
         "total_hours": 220.0,
-        "total_cost_rub": 206000.0,
-        "total_co2_kg": 3890.0,
+        "total_cost_rub": 212424.0,
+        "total_co2_kg": 3948.4,
         "branch": "transcaspian"
       },
       "risk": {
-        "miss_probability": 0.04,
+        "miss_probability": 0.06,
         "level": "low",
         "departure_shift_h": 0.0,
         "arrival_delay_h": 0.0,
@@ -649,8 +649,8 @@
           },
           {
             "name": "port_congestion",
-            "label": "Загрузка порта 55%",
-            "impact_hours": 0.0
+            "label": "Загрузка порта 64%",
+            "impact_hours": 1.0
           },
           {
             "name": "customs_queue",
@@ -781,8 +781,8 @@
           }
         ],
         "total_hours": 227.0,
-        "total_cost_rub": 227720.0,
-        "total_co2_kg": 3727.0,
+        "total_cost_rub": 227148.0,
+        "total_co2_kg": 3721.8,
         "branch": "west"
       },
       "risk": {
@@ -806,8 +806,8 @@
       },
       "delta": {
         "hours": 13.0,
-        "rub": 27280.0,
-        "co2_kg": -467.0
+        "rub": 20284.0,
+        "co2_kg": -530.6
       },
       "recommended": false
     }
@@ -879,8 +879,8 @@
           }
         ],
         "total_hours": 145.0,
-        "total_cost_rub": 204350.0,
-        "total_co2_kg": 3928.8,
+        "total_cost_rub": 197255.0,
+        "total_co2_kg": 3864.2,
         "branch": "west"
       },
       "risk": {
@@ -999,7 +999,7 @@
         "branch": "transcaspian"
       },
       "risk": {
-        "miss_probability": 0.03,
+        "miss_probability": 0.04,
         "level": "low",
         "departure_shift_h": 0.0,
         "arrival_delay_h": 0.0,
@@ -1011,8 +1011,8 @@
           },
           {
             "name": "port_congestion",
-            "label": "Загрузка порта 55%",
-            "impact_hours": 0.0
+            "label": "Загрузка порта 64%",
+            "impact_hours": 1.0
           },
           {
             "name": "customs_queue",

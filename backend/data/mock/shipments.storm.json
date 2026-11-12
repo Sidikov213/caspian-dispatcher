@@ -349,8 +349,8 @@
         }
       ],
       "total_hours": 214.0,
-      "total_cost_rub": 200440.0,
-      "total_co2_kg": 4194.0,
+      "total_cost_rub": 206864.0,
+      "total_co2_kg": 4252.4,
       "branch": "transcaspian"
     },
     "planned_eta": "2026-11-21T07:00:00Z",
@@ -465,8 +465,8 @@
         }
       ],
       "total_hours": 145.0,
-      "total_cost_rub": 204350.0,
-      "total_co2_kg": 3928.8,
+      "total_cost_rub": 197255.0,
+      "total_co2_kg": 3864.2,
       "branch": "west"
     },
     "planned_eta": "2026-11-18T06:00:00Z",

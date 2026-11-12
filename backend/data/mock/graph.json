@@ -7,7 +7,9 @@
       "type": "city",
       "lat": 55.75,
       "lon": 37.62,
-      "congestion": 0.4
+      "congestion": 0.4,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "samara",
@@ -16,7 +18,9 @@
       "type": "station",
       "lat": 53.2,
       "lon": 50.15,
-      "congestion": 0.35
+      "congestion": 0.35,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "saratov",
@@ -25,7 +29,9 @@
       "type": "station",
       "lat": 51.53,
       "lon": 46.03,
-      "congestion": 0.35
+      "congestion": 0.35,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "astrakhan",
@@ -34,7 +40,15 @@
       "type": "port",
       "lat": 46.35,
       "lon": 48.04,
-      "congestion": 0.62
+      "congestion": 0.62,
+      "facts": [
+        "Замерзающий порт: зимой ледокольная проводка судов",
+        "Выход в море — по Волго-Каспийскому морскому судоходному каналу, 101,5 мили (≈188 км)"
+      ],
+      "sources": [
+        "https://mintrans.gov.ru/file/396731",
+        "https://expert.ru/news/na-uchastke-volgo-kaspiyskogo-kanala-priostanovili-dvizhenie-sudov"
+      ]
     },
     {
       "id": "olya",
@@ -43,7 +57,9 @@
       "type": "port",
       "lat": 45.78,
       "lon": 47.55,
-      "congestion": 0.5
+      "congestion": 0.5,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "makhachkala",
@@ -52,7 +68,17 @@
       "type": "port",
       "lat": 42.98,
       "lon": 47.5,
-      "congestion": 0.55
+      "congestion": 0.64,
+      "facts": [
+        "Незамерзающий, глубоководный — единственный такой порт России на Каспии",
+        "Осадка судов до 4,5 м в сухогрузной гавани",
+        "Грузооборот 2025 года — 3,22 млн т",
+        "Загрузка мощностей — 64%"
+      ],
+      "sources": [
+        "https://www.alta.ru/logistics_news/128638/",
+        "https://www.kommersant.ru/doc/8513260"
+      ]
     },
     {
       "id": "samur",
@@ -61,7 +87,9 @@
       "type": "border",
       "lat": 41.63,
       "lon": 48.43,
-      "congestion": 0.45
+      "congestion": 0.45,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "baku",
@@ -70,7 +98,9 @@
       "type": "port",
       "lat": 39.95,
       "lon": 49.41,
-      "congestion": 0.5
+      "congestion": 0.5,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "astara",
@@ -79,7 +109,9 @@
       "type": "border",
       "lat": 38.43,
       "lon": 48.87,
-      "congestion": 0.55
+      "congestion": 0.55,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "rasht",
@@ -88,7 +120,9 @@
       "type": "station",
       "lat": 37.28,
       "lon": 49.58,
-      "congestion": 0.4
+      "congestion": 0.4,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "anzali",
@@ -97,7 +131,9 @@
       "type": "port",
       "lat": 37.47,
       "lon": 49.46,
-      "congestion": 0.58
+      "congestion": 0.58,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "amirabad",
@@ -106,7 +142,9 @@
       "type": "port",
       "lat": 36.85,
       "lon": 53.37,
-      "congestion": 0.45
+      "congestion": 0.45,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "aktau",
@@ -115,7 +153,9 @@
       "type": "port",
       "lat": 43.65,
       "lon": 51.16,
-      "congestion": 0.5
+      "congestion": 0.5,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "incheh",
@@ -124,7 +164,9 @@
       "type": "border",
       "lat": 37.45,
       "lon": 54.72,
-      "congestion": 0.4
+      "congestion": 0.4,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "tehran",
@@ -133,7 +175,9 @@
       "type": "city",
       "lat": 35.69,
       "lon": 51.39,
-      "congestion": 0.5
+      "congestion": 0.5,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "bandar_abbas",
@@ -142,7 +186,9 @@
       "type": "port",
       "lat": 27.18,
       "lon": 56.27,
-      "congestion": 0.6
+      "congestion": 0.6,
+      "facts": null,
+      "sources": null
     },
     {
       "id": "mumbai",
@@ -151,7 +197,9 @@
       "type": "port",
       "lat": 18.95,
       "lon": 72.95,
-      "congestion": 0.55
+      "congestion": 0.55,
+      "facts": null,
+      "sources": null
     }
   ],
   "edges": [
@@ -223,9 +271,9 @@
       "to": "astrakhan",
       "mode": "rail",
       "branch": "transcaspian",
-      "distance_km": 560.0,
+      "distance_km": 706.0,
       "base_hours": 16.0,
-      "cost_rub_per_t": 1232.0,
+      "cost_rub_per_t": 1553.2,
       "co2_g_per_tkm": 20.0,
       "path": [
         [
@@ -648,9 +696,9 @@
       "to": "samur",
       "mode": "rail",
       "branch": "west",
-      "distance_km": 200.0,
+      "distance_km": 170.0,
       "base_hours": 6.0,
-      "cost_rub_per_t": 440.0,
+      "cost_rub_per_t": 374.0,
       "co2_g_per_tkm": 20.0,
       "path": [
         [
@@ -702,9 +750,9 @@
       "to": "astara",
       "mode": "rail",
       "branch": "west",
-      "distance_km": 320.0,
+      "distance_km": 191.0,
       "base_hours": 10.0,
-      "cost_rub_per_t": 704.0,
+      "cost_rub_per_t": 420.2,
       "co2_g_per_tkm": 20.0,
       "path": [
         [
@@ -793,9 +841,9 @@
       "to": "incheh",
       "mode": "rail",
       "branch": "east",
-      "distance_km": 1200.0,
+      "distance_km": 860.0,
       "base_hours": 34.0,
-      "cost_rub_per_t": 2640.0,
+      "cost_rub_per_t": 1892.0,
       "co2_g_per_tkm": 20.0,
       "path": [
         [
@@ -822,9 +870,9 @@
       "to": "tehran",
       "mode": "rail",
       "branch": "east",
-      "distance_km": 650.0,
+      "distance_km": 514.0,
       "base_hours": 18.0,
-      "cost_rub_per_t": 1430.0,
+      "cost_rub_per_t": 1130.8,
       "co2_g_per_tkm": 20.0,
       "path": [
         [

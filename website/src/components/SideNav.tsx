@@ -1,10 +1,10 @@
 "use client";
 
-import { BoxIcon, FileIcon, LayersIcon, MapIcon, RouteIcon, SeaIcon } from "./icons";
+import { BoxIcon, FileIcon, LayersIcon, MapIcon, RouteIcon, SeaIcon, WavesIcon } from "./icons";
 
-export type Section = "pult" | "shipments" | "sailings" | "decisions" | "journal" | "model";
+export type Section = "pult" | "shipments" | "sailings" | "decisions" | "journal" | "model" | "data";
 
-export const SECTIONS: readonly Section[] = ["pult", "shipments", "sailings", "decisions", "journal", "model"];
+export const SECTIONS: readonly Section[] = ["pult", "shipments", "sailings", "decisions", "journal", "model", "data"];
 
 const ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: "pult", label: "Пульт", icon: <MapIcon size={16} /> },
@@ -13,6 +13,7 @@ const ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: "decisions", label: "Решения", icon: <RouteIcon size={16} /> },
   { id: "journal", label: "Документы и журнал", icon: <FileIcon size={16} /> },
   { id: "model", label: "Модель", icon: <LayersIcon size={16} /> },
+  { id: "data", label: "Данные", icon: <WavesIcon size={16} /> },
 ];
 
 export function SideNav({ active, badges, onSelect }: {

@@ -834,14 +834,19 @@ def plan_new_shipment(st, body: dict) -> dict:
     ctx = st.ctx()
     st.seq["shipment"] += 1
     sid = f"sh-{st.seq['shipment']:02d}"
+    # из допустимых путей — с самым ранним прибытием по расписанию (не по сумме базовых часов:
+    # иначе паромный маршрут проигрывает суше даже тогда, когда рейс уходит раньше)
+    best = None
     for path in g.paths(body["origin"], body["destination"], banned_edges(st)):
         legs, problems = build_legs(ctx, path, st.sim_now, None, body["weight_t"], body["cargo_type"])
         if not problems:
-            break
-    else:
+            r = make_route(ctx, f"r-{sid}-plan", legs, body["weight_t"])
+            if best is None or route_end(r) < route_end(best):
+                best = r
+    if best is None:
         st.seq["shipment"] -= 1
         raise ApiError(422, "no_route", "Допустимого маршрута по расписанию нет")
-    route = make_route(ctx, f"r-{sid}-plan", legs, body["weight_t"])
+    route = best
     sh = {"id": sid, "title": body["title"], "cargo_type": body["cargo_type"], "weight_t": body["weight_t"],
           "owner_tg_id": st.meta.get("owner_tg_id"), "origin": body["origin"],
           "destination": body["destination"], "stage": "planned", "risk_level": "low", "rerouted": False,
@@ -849,7 +854,11 @@ def plan_new_shipment(st, body: dict) -> dict:
           "planned_eta": iso(route_end(route)), "eta": iso(route_end(route)),
           "risk": {"miss_probability": 0, "level": "low", "departure_shift_h": 0, "arrival_delay_h": 0,
                    "factors": []},
-          "pass_id": None, "pass_state": "none"}
+          "pass_id": None, "pass_state": "none", "manual": True}
+    # место на паромах маршрута бронируется сразу: иначе сценарий переполнит рейс
+    for leg in route["legs"]:
+        if leg.get("sailing_id"):
+            st.sailings[leg["sailing_id"]]["booked_t"] += body["weight_t"]
     st.shipments[sid] = sh
     st.plan_routes[sid] = copy.deepcopy(route)
     refresh_shipment(st, sh)

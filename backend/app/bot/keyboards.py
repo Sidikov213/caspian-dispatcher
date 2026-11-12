@@ -1,6 +1,9 @@
 """Клавиатуры. В callback_data — номер прогона демо (state.epoch): после reset старые кнопки не сработают
 на новые алерты с теми же id. Формат: «действие:прогон:аргумент[:вариант]», не длиннее 64 байт."""
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import (InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup,
+                           WebAppInfo)
+
+from .. import config
 
 from .texts import BTN_SHIPMENTS, BTN_WEATHER
 
@@ -23,14 +26,17 @@ def parse_cb(data: str) -> tuple[str, int, str, str | None]:
 
 def alert_kb(epoch: int, alert: dict) -> InlineKeyboardMarkup:
     has_route = any(o["id"] != "wait" for o in alert.get("options", []))
+    # «Открыть пульт» — мини-приложение на вкладке «Решения»; только если задан PUBLIC_URL
+    pult = ([[InlineKeyboardButton(text="📱 Открыть пульт", web_app=WebAppInfo(url=f"{config.PUBLIC_URL}/tg/?tab=decisions"))]]
+            if config.PUBLIC_URL else [])
     if not has_route:  # предложения нет — только подтвердить, что увидели
         return InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Понятно, ждём рейс", callback_data=cb(ACCEPT, epoch, alert["id"]))]])
+            InlineKeyboardButton(text="✅ Понятно, ждём рейс", callback_data=cb(ACCEPT, epoch, alert["id"]))]] + pult)
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Принять", callback_data=cb(ACCEPT, epoch, alert["id"]))],
         [InlineKeyboardButton(text="🔀 Другие варианты", callback_data=cb(OPTIONS, epoch, alert["id"])),
          InlineKeyboardButton(text="✖️ Отклонить", callback_data=cb(REJECT, epoch, alert["id"]))],
-    ])
+    ] + pult)
 
 
 def options_kb(epoch: int, alert: dict) -> InlineKeyboardMarkup:

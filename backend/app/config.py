@@ -44,3 +44,10 @@ MODEL_REPORT_PATH = DATA_DIR / "model_report.json"
 
 # Аккаунты логиста и экспедитора (регистрация и вход). Не в git; переживают demo/reset и перезапуск.
 ACCOUNTS_PATH = Path(os.getenv("ACCOUNTS_PATH", "").strip() or DATA_DIR / "accounts.json")
+
+# Telegram: токен бота (бот и проверка initData мини-приложения), публичный адрес (кнопка меню и
+# «Открыть пульт» в боте ведут на PUBLIC_URL/tg/), название демо-кабинета в приветствии и шапке.
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+PUBLIC_URL = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
+DEMO_COMPANY = os.getenv("DEMO_COMPANY", "").strip() or "Каспий Логистик"
+MINIAPP_DIR = BASE_DIR / "app" / "miniapp"

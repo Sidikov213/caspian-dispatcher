@@ -14,7 +14,8 @@ from fastapi import (APIRouter, Depends, FastAPI, File, Form, Query, Request, Up
                      WebSocket, WebSocketDisconnect)
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -22,10 +23,11 @@ from . import events
 from . import models as M
 from .bot import start_bot, stop_bot
 from .auth import Accounts
-from .config import ACCOUNTS_PATH, API_KEY, WEATHER_MODE
+from .config import ACCOUNTS_PATH, API_KEY, MINIAPP_DIR, WEATHER_MODE
 from .democheck import log_check, run_check
 from .modelinfo import log_active, model_info
 from .state import ApiError, state
+from .tgauth import issue_session, session_ok, verify_init_data
 
 log = logging.getLogger("caspian")
 for _name in ("caspian", "aiogram"):  # uvicorn настраивает только свои логгеры; боту нужен свой вывод
@@ -130,11 +132,20 @@ def key_ok(key: str | None) -> bool:
     return bool(API_KEY) and key is not None and secrets.compare_digest(key, API_KEY)
 
 
-async def require_key(key: str | None = Depends(api_key_header)):
+tg_bearer = HTTPBearer(auto_error=False)
+
+
+async def require_key(key: str | None = Depends(api_key_header),
+                      cred: HTTPAuthorizationCredentials | None = Depends(tg_bearer)):
+    """Доступ к /api/*: X-API-Key (сайт, приложение, бот, тесты) или сессия мини-приложения Telegram
+    (Authorization: Bearer <токен из POST /api/tg/auth>). Токен входа сайта (/api/auth) доступа не даёт."""
+    if key_ok(key):
+        return
+    if cred and session_ok(cred.credentials):
+        return
     if not API_KEY:
         raise ApiError(500, "server_misconfigured", "API_KEY не задан в backend/.env")
-    if not key_ok(key):
-        raise ApiError(401, "unauthorized", "Нужен заголовок X-API-Key")
+    raise ApiError(401, "unauthorized", "Нужен заголовок X-API-Key")
 
 
 # ---------- WebSocket /ws?api_key=... ----------
@@ -168,8 +179,8 @@ events.subscribe(_to_ws)
 
 
 @app.websocket("/ws")
-async def ws_endpoint(ws: WebSocket, api_key: str | None = None):
-    if not key_ok(api_key or ws.headers.get("x-api-key")):
+async def ws_endpoint(ws: WebSocket, api_key: str | None = None, token: str | None = None):
+    if not (key_ok(api_key or ws.headers.get("x-api-key")) or session_ok(token)):
         await ws.close(code=1008)
         return
     await ws.accept()
@@ -356,6 +367,21 @@ async def demo_reset():
     return {"ok": True}
 
 
+# ---------- Telegram Mini App: вход по initData (без X-API-Key) и статика /tg/ ----------
+
+@app.post("/api/tg/auth", response_model=M.TgAuthOut, tags=["мини-приложение"],
+          responses={401: {"model": M.ErrorOut}, 503: {"model": M.ErrorOut}})
+async def tg_auth(body: M.TgAuthIn):
+    """Проверка подписи initData по токену бота (срок 24 ч) → сессионный токен на 24 ч. Токен принимается
+    на всех /api/* в заголовке Authorization: Bearer и в WebSocket /ws?token=."""
+    return issue_session(verify_init_data(body.init_data))
+
+
+@app.get("/tg", include_in_schema=False)
+async def tg_root():
+    return RedirectResponse("/tg/")
+
+
 # ---------- аккаунты: только имя и роль для клиента; доступ к API по-прежнему по X-API-Key ----------
 
 bearer = HTTPBearer(auto_error=False)
@@ -401,3 +427,7 @@ async def demo_fail_next_pass():
 
 
 app.include_router(api)
+
+
+# Мини-приложение Telegram — статика без сборки. Монтируется последним, после всех роутов.
+app.mount("/tg", StaticFiles(directory=MINIAPP_DIR, html=True, check_dir=False), name="miniapp")

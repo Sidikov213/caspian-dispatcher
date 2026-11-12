@@ -1,7 +1,7 @@
 # Выкатка бэкенда + сайта на VPS. Запуск вручную или scripts/deploy.ps1.
 # Раннер GitHub ходит на VPS по SSH: с ноутбука тимлида сервер недоступен.
 # Секреты: VPS_HOST, VPS_SSH_KEY, API_KEY, JWT_SECRET, BOT_TOKEN.
-# PUBLIC_URL: https://129-101-122-103.sslip.io — сайт на /, API /api, WS /ws, /tg/ зарезервирован.
+# PUBLIC_URL: https://129-101-122-103.sslip.io — сайт на /, API /api, WS /ws, мини-приложение /tg/.
 name: deploy
 
 on:

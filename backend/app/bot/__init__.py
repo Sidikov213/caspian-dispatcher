@@ -24,6 +24,20 @@ class BotRuntime:
     notifier: Notifier
 
 
+async def set_menu_button(bot) -> None:
+    """Кнопка меню чата открывает пульт (мини-приложение). Без PUBLIC_URL — обычное меню команд."""
+    from ..config import PUBLIC_URL
+    if not PUBLIC_URL:
+        return
+    from aiogram.types import MenuButtonWebApp, WebAppInfo
+    try:
+        await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="Пульт",
+                                                                    web_app=WebAppInfo(url=f"{PUBLIC_URL}/tg/")))
+        log.info("Бот: кнопка меню «Пульт» → %s/tg/", PUBLIC_URL)
+    except Exception:
+        log.exception("не поставил кнопку меню мини-приложения")
+
+
 async def start_bot(st) -> BotRuntime | None:
     settings = load()
     if not settings.bot_token:
@@ -49,6 +63,7 @@ async def start_bot(st) -> BotRuntime | None:
     async def run():
         try:
             await bot.delete_webhook(drop_pending_updates=True)
+            await set_menu_button(bot)
             await dp.start_polling(bot, handle_signals=False)
         except asyncio.CancelledError:
             raise

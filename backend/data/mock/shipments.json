@@ -124,7 +124,8 @@
       "probability_drivers": null
     },
     "pass_id": "pass-01",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   },
   {
     "id": "sh-02",
@@ -251,7 +252,8 @@
       "probability_drivers": null
     },
     "pass_id": "pass-02",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   },
   {
     "id": "sh-03",
@@ -378,7 +380,8 @@
       "probability_drivers": null
     },
     "pass_id": "pass-03",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   },
   {
     "id": "sh-04",
@@ -488,7 +491,8 @@
       "probability_drivers": null
     },
     "pass_id": "pass-04",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   },
   {
     "id": "sh-05",
@@ -555,6 +559,7 @@
       "probability_drivers": null
     },
     "pass_id": null,
-    "pass_state": "none"
+    "pass_state": "none",
+    "manual": false
   }
 ]

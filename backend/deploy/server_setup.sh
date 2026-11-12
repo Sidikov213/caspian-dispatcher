@@ -83,7 +83,7 @@ fi
 echo "файлов: $(find "$WEB" -type f | wc -l), index: $(wc -c < "$WEB/index.html") байт"
 done_
 
-# Caddy: / → статика сайта; /api /ws /docs /health → uvicorn; /tg/ зарезервирован под мини-приложение.
+# Caddy: / → статика сайта; /api /ws /docs /health и /tg/ (мини-приложение Telegram) → uvicorn.
 write_caddyfile() {
   local scheme_host="$1"
   if [ "$scheme_host" = "https" ]; then
@@ -110,8 +110,8 @@ $DOMAIN {
 		reverse_proxy 127.0.0.1:8000
 	}
 
-	handle /tg/* {
-		respond "Telegram mini-app: скоро" 200
+	handle /tg* {
+		reverse_proxy 127.0.0.1:8000
 	}
 
 	handle {
@@ -145,8 +145,8 @@ CADDY
 		reverse_proxy 127.0.0.1:8000
 	}
 
-	handle /tg/* {
-		respond "Telegram mini-app: скоро" 200
+	handle /tg* {
+		reverse_proxy 127.0.0.1:8000
 	}
 
 	handle {

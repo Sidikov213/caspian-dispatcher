@@ -43,7 +43,9 @@ def node_name(st, nid: str) -> str:
 # ---------------- приветствие ----------------
 
 def welcome(name: str) -> str:
-    return (f"👋 {escape(name)}, это <b>Каспийский диспетчер</b>.\n\n"
+    from ..config import DEMO_COMPANY
+    return (f"👋 {escape(name)}, это <b>Каспийский диспетчер</b>.\n"
+            f"<i>Демо-кабинет компании „{escape(DEMO_COMPANY)}“</i>\n\n"
             "Я вижу угрозы на 48 часов вперёд: шторм, затор в порту, очередь на таможне. Если у груза "
             "сорвётся стыковка с паромом, пришлю готовое решение с часами, рублями и CO₂. "
             "Решение принимаете вы — кнопкой «Принять».\n\n"
@@ -227,8 +229,12 @@ def weather_message(st) -> str:
         nxt = pt["forecast"][:48]
         peak = max(nxt, key=lambda f: f["wave_height_m"])
         flag = "🔴" if peak["wave_height_m"] >= limit else "🟢"
-        lines.append(f"{flag} <b>{node_name(st, pt['node_id'])}</b>: сейчас {signed(pt['wave_height_m'])} м, "
-                     f"за 48 ч до {signed(peak['wave_height_m'])} м ({day_time(peak['ts'])})")
+        now_w = pt["wave_height_m"]
+        if peak["wave_height_m"] <= now_w:   # максимум за 48 ч — уже сейчас: дальше только спад
+            trend = "волна спадает"
+        else:
+            trend = f"за 48 ч до {signed(peak['wave_height_m'])} м ({day_time(peak['ts'])})"
+        lines.append(f"{flag} <b>{node_name(st, pt['node_id'])}</b>: сейчас {signed(now_w)} м, {trend}")
     stale = " ⚠️" if w["stale"] or age > 60 else ""
     lines += ["", f"Погода обновлена {age} мин назад{stale}", FOOTER]
     return "\n".join(lines)

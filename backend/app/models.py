@@ -141,6 +141,7 @@ class Shipment(Model):
     risk: Risk
     pass_id: str | None = None
     pass_state: PassState
+    manual: bool = Field(False, description="Груз создан вручную (POST /shipments); при demo/reset исчезает")
 
 
 class Sailing(Model):
@@ -543,3 +544,23 @@ class AuthUser(Model):
 class AuthOut(Model):
     token: str = Field(description="JWT на 7 дней: заголовок Authorization: Bearer <token> для /api/auth/me")
     user: AuthUser
+
+
+
+# ---------- Telegram Mini App (POST /api/tg/auth) ----------
+
+class TgAuthIn(Model):
+    init_data: str = Field(description="Telegram.WebApp.initData как есть")
+
+
+class TgUser(Model):
+    id: int
+    name: str
+    username: str | None = None
+
+
+class TgAuthOut(Model):
+    token: str = Field(description="Сессия на 24 ч: Authorization: Bearer на /api/*, ?token= на /ws")
+    expires_at: str
+    user: TgUser
+    company: str = Field(description="Демо-кабинет, напр. «Каспий Логистик»")

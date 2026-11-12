@@ -91,6 +91,15 @@ with httpx.Client(timeout=30, follow_redirects=True) as c:
         report("POST /api/auth/login", False, repr(e))
 
     try:
+        t = c.get(f"{BASE}/tg/")
+        fake = c.post(f"{BASE}/api/tg/auth", json={"init_data": "auth_date=1&user=%7B%7D&hash=00"})
+        report("GET /tg/ (мини-приложение)",
+               t.status_code == 200 and "Откройте через бота" in t.text and fake.status_code == 401,
+               f"{t.status_code}, вход с поддельной подписью → {fake.status_code} (503 — нет BOT_TOKEN на сервере)")
+    except Exception as e:
+        report("GET /tg/ (мини-приложение)", False, repr(e))
+
+    try:
         d = c.get(f"{BASE}/docs")
         report(
             "GET /docs",

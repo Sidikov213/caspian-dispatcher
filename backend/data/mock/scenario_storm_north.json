@@ -952,6 +952,7 @@
     "source": "scenario",
     "status_note": null,
     "accepted_at": null,
-    "accepted_via": null
+    "accepted_via": null,
+    "accepted_by": null
   }
 }

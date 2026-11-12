@@ -42,16 +42,18 @@ class BotService:
             return None, T.already(a)
         return a, None
 
-    async def accept(self, epoch: int, aid: str, option_id: str | None = None) -> str:
+    async def accept(self, epoch: int, aid: str, option_id: str | None = None, by: str | None = None) -> str:
+        """by — имя пользователя Telegram: попадает в Alert.accepted_by и Decision.accepted_by."""
         a, msg = self._alert(epoch, aid)
         if a is None:
             return msg
         try:
-            out = await self.st.accept(aid, "telegram", option_id)
+            out = await self.st.accept(aid, "telegram", option_id,
+                                       {"name": by, "role": "logist"} if by else None)
         except ApiError as e:
             await self.flush()
             if e.code == "superseded":
-                return "Предложение устарело: места уже нет. Пересчитал — новое сообщение ниже"
+                return "Предложение устарело. Пересчитал — новое сообщение ниже"
             return e.message
         await self.flush()
         if out["already_accepted"]:

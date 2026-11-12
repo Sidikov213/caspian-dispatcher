@@ -26,6 +26,16 @@
       "note": "Вес 30 000 кг совпадает с заявкой (30 т)"
     },
     {
+      "name": "value_positive",
+      "ok": true,
+      "note": "Стоимость указана"
+    },
+    {
+      "name": "currency",
+      "ok": true,
+      "note": "Валюта USD"
+    },
+    {
       "name": "hs_code",
       "ok": true,
       "note": "Код ТН ВЭД 3102 10"

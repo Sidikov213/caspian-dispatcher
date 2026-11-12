@@ -1,7 +1,8 @@
 """Регистрация и вход: аккаунты логиста и экспедитора.
 
-Только чтобы клиент знал имя и роль. Доступ к /api/* по-прежнему даёт X-API-Key; Bearer-токен нужен
-лишь для GET /api/auth/me, ограничений по ролям нет.
+Доступ к /api/* по-прежнему даёт X-API-Key. Bearer-токен входа сайта говорит, кто работает: GET /api/auth/me
+отдаёт имя, роль и права; если токен пришёл вместе с запросом, сервер проверяет права (403 forbidden_role)
+и записывает, кто принял решение (accepted_by).
 
 - Хранение: data/accounts.json (не в git), отдельно от состояния демо — переживает demo/reset и
   перезапуск сервера.
@@ -60,8 +61,14 @@ def check_password(password: str, stored: str) -> bool:
         return False
 
 
+# Права по роли. Сервер проверяет их, только если запрос пришёл с Bearer-токеном входа сайта;
+# запросы с одним X-API-Key (бот, приложение, тесты) работают как раньше. Мини-приложение — логист.
+PERMISSIONS = {"logist": ["run_scenario", "reset_demo", "decide_alert"], "expeditor": []}
+
+
 def public(acc: dict) -> dict:
-    return {k: acc[k] for k in ("id", "name", "email", "role")}
+    return {**{k: acc[k] for k in ("id", "name", "email", "role")},
+            "permissions": list(PERMISSIONS.get(acc["role"], []))}
 
 
 class Accounts:

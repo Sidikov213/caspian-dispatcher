@@ -898,6 +898,43 @@
     "status_note": null,
     "accepted_at": null,
     "accepted_via": null,
-    "accepted_by": null
+    "accepted_by": null,
+    "hazard": "storm",
+    "card": {
+      "kind": "storm",
+      "headline": "Шторм на Северном Каспии",
+      "subtitle": "3 груза под риском",
+      "period": "14 ноя, 02:00–21:00",
+      "metrics": [
+        {
+          "key": "wave",
+          "label": "Волна",
+          "value": "до 3,4 м"
+        },
+        {
+          "key": "wave_limit",
+          "label": "Предел парома",
+          "value": "2,5 м"
+        },
+        {
+          "key": "closure_h",
+          "label": "Закрытие порта",
+          "value": "11 ч"
+        }
+      ],
+      "route": {
+        "sailing_label": "Паром А",
+        "from": "Астрахань",
+        "to": "Энзели",
+        "departure": "14 ноя, 10:00"
+      },
+      "impact": {
+        "shipments": 3,
+        "weight_t": 120.0,
+        "max_risk_pct": 82
+      },
+      "note": "Стресс-тест: за 12 месяцев волна у Астрахани не превышала 1,44 м",
+      "decision": null
+    }
   }
 ]

@@ -247,6 +247,36 @@ class Weather:
         hb = min(int(math.floor(hours(self.sim_now, b))), HORIZON_H - 1)
         return max(row[ha:hb + 1] or [self.wave(node, a)])
 
+    def iced(self, node: str, ts) -> bool:
+        """Лёд сценария держит порт закрытым в момент ts (живого источника льда нет)."""
+        t = parse(ts)
+        return any(sc.get("_ice") and node in sc["_ice"]["nodes"] and parse(sc["start"]) <= t < parse(sc["end"])
+                   for sc in self.scenarios)
+
+    def iced_between(self, node: str, a, b) -> bool:
+        """Был ли лёд сценария в порту хоть в один час из [a, b]."""
+        a, b = parse(a), parse(b)
+        return any(sc.get("_ice") and node in sc["_ice"]["nodes"]
+                   and parse(sc["start"]) <= b and a < parse(sc["end"]) for sc in self.scenarios)
+
+    def closure(self, node: str, ts, limit: float) -> str | None:
+        """Порт закрыт в момент ts: 'ice' — лёд сценария, 'storm' — волна не ниже предела, None — открыт."""
+        if self.iced(node, ts):
+            return "ice"
+        if self.wave(node, ts) >= limit:
+            return "storm"
+        return None
+
+    def first_open(self, node: str, ts, limit: float):
+        """Первый час ≥ ts, когда порт открыт (ни льда, ни волны выше предела). None — не в горизонте."""
+        t = ts
+        end = self.sim_now + H(HORIZON_H)
+        while t < end:
+            if self.closure(node, t, limit) is None:
+                return t
+            t = t + timedelta(hours=1)
+        return None
+
     def first_calm(self, node: str, ts, limit: float):
         """Первый час ≥ ts, когда волна ниже предела (порт открыт). None — не открылся в горизонте."""
         t = ts

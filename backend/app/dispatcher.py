@@ -25,6 +25,9 @@ from . import models as M
 from .errors import ApiError
 from .graph import KIND_FERRY
 from .predictor import PredictContext, PredictorResult
+from . import hazards as HZ
+from .card import build_card
+from .hazards import note_of
 from .scenarios import make_scenario, public
 from .schedule import Ctx, build_legs, make_route, route_end
 from .weather import HORIZON_H
@@ -276,14 +279,15 @@ def threats(st) -> dict[tuple, dict]:
             else:
                 name = st.graph.nodes[port]["name"].split(" (")[0].split(" /")[0]
                 out[key] = {
-                    "id": f"fc-{port}-{s['id']}", "type": "storm", "title": f"Шторм у порта {name}",
+                    "id": f"fc-{port}-{s['id']}", "type": "storm", "hazard": "storm",
+                    "note": note_of("storm"), "title": f"Шторм у порта {name}",
                     "blocked_edges": [e for e in st.meta["ferry_edges"] if st.graph.edges[e]["from"] == port],
                     "affected_nodes": [port], "start": iso(start), "end": iso(end),
                     "starts_in_h": round(hours(st.sim_now, start)),
                     "params": {"wave_height_m": round(peak, 1), "wind_ms": st.weather.wind(port, dep)},
                     "_key": key, "_sailing": s["id"], "_source": "forecast",
                     "_window": (iso(start), iso(end)), "_peak": peak}
-        for sc in scen:   # затор и таможня: прогноза у них нет, угрозу задаёт сценарий
+        for sc in scen:   # лёд, затор и таможня: прогноза у них нет, угрозу задаёт сценарий
             if sc["type"] != "storm" and port in sc["affected_nodes"] \
                     and parse(sc["start"]) <= dep <= parse(sc["end"]):
                 key = (sc["type"], port, s["id"])
@@ -302,10 +306,16 @@ def _changed(old: dict, new: dict) -> bool:
 NOTE_DECIDED = "по этим грузам решение уже принято"
 
 
+def hazard_of(sc: dict) -> str:
+    """Тип угрозы: из сценария (hazard), у старых угроз — по type."""
+    return sc.get("hazard") or ("storm" if sc.get("type") == "storm" else sc.get("type", "storm"))
+
+
 def close_alert(st, alert: dict, note: str, keep: set[str] = frozenset()) -> None:
     """Алерт больше не актуален: superseded с пометкой; грузы, оставшиеся на плане, — к обычному прогнозу.
     keep — грузы, которые уже взял новый алерт: их маршрут и риск не трогаем."""
     alert["status"], alert["status_note"] = "superseded", note
+    alert["card"] = build_card(st, alert)
     internal = st.alert_internal.get(alert["id"], {})
     for it in alert["items"]:
         if it["shipment_id"] in keep:
@@ -541,6 +551,7 @@ def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
         "options": [_option(st, k, o["title"], o["items"], k == rec_key) for k, o in options.items()],
         "status": "new", "accepted_at": None, "accepted_via": None, "accepted_by": None,
         "source": sc.get("_source", "scenario"), "status_note": None,
+        "hazard": hazard_of(sc),
     }
     alert["text"] = alert_text(st, sc, alert, internal)
     ids = {b["sh"]["id"] for b in bases}
@@ -552,6 +563,7 @@ def build_alert(st, sc: dict, quiet_if_empty: bool = False) -> dict | None:
     st.alert_internal[aid] = internal
     st.alert_options[aid] = options
     st.alert_threat[aid] = {k: v for k, v in sc.items()}
+    alert["card"] = build_card(st, alert)
     st.emit("alert.created", alert)
     for sid in touched:
         st.emit("shipment.updated", st.shipments[sid])
@@ -616,12 +628,9 @@ def alert_text(st, sc: dict, alert: dict, internal: dict, html: bool = False) ->
     span = (f"{day_only(s)} {time_only(s)}–{time_only(e)}" if day_only(s) == day_only(e)
             else f"{day_only(s)} {time_only(s)} – {day_only(e)} {time_only(e)}")
     lead = "" if html else f"⚠️ {sc['title']}: "
-    if sc["type"] == "storm":
-        head = f"{lead}{span}, волна до {ru(sc['params']['wave_height_m'])} м (предел парома {ru(lim)} м)."
-    else:
-        node = sc["affected_nodes"][0]
-        head = (f"{lead}{span}, загрузка порта {round(congestion(st, node) * 100)}%, "
-                f"таможня до {num(customs_h(st, node))} ч.")
+    node = sc["affected_nodes"][0]
+    head = HZ.alert_head(sc, span, lead, wave_limit=lim, port_load=round(congestion(st, node) * 100),
+                         customs_h=customs_h(st, node))
     items = alert["items"]
     if not items:
         return render(head + "\nГрузов, у которых сорвётся стыковка, нет.", html)
@@ -721,9 +730,9 @@ def accept(st, alert_id: str, via: str, option_id: str | None = None, by: dict |
             _supersede(st, alert, f"рейс {sid} {s['status']}")
         if ctx.free_t(sid) < t:
             _supersede(st, alert, f"на рейсе {sid} свободно {ctx.free_t(sid):g} т из нужных {t:g}")
-        if st.weather.wave(s["from"], s["departure"]) >= st.meta["wave_limit_m"] or \
+        if st.weather.closure(s["from"], s["departure"], st.meta["wave_limit_m"]) or \
                 ctx.edge_blocked_at(f"e-{s['from']}-{s['to']}", s["departure"]):
-            _supersede(st, alert, f"рейс {sid} закрыт погодой")
+            _supersede(st, alert, f"рейс {sid} закрыт")
     ts = iso(st.clock.event_ts())
     for it in rer:
         w = st.shipments[it["shipment_id"]]["weight_t"]
@@ -759,6 +768,7 @@ def accept(st, alert_id: str, via: str, option_id: str | None = None, by: dict |
         for o in alert["options"]:
             o["recommended"] = o["id"] == oid
     alert.update(status="accepted", accepted_at=ts, accepted_via=via, accepted_by=copy.deepcopy(by))
+    alert["card"] = build_card(st, alert)
     close_overlapping(st, alert_shipments(alert), NOTE_DECIDED, skip=alert_id)
 
     out = {"alert": copy.deepcopy(alert),

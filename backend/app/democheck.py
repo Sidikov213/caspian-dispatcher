@@ -1,6 +1,6 @@
 """Проверка перед показом (GET /api/demo/check, лог при старте и reset).
 
-Прогоняет storm_north на копии исходного состояния (как сразу после reset, тот же sim_now и тот же
+Прогоняет главный сценарий ice_north на копии исходного состояния (как сразу после reset, тот же sim_now и тот же
 прогноз погоды), живое состояние не трогает. Сверяет ключевые числа с эталоном DEMO_SCENARIO.md
 (вероятности — с допуском ±5 п. п. и порядком №01 > №02 > №03, остальное точно), проверяет, что до
 сценария ни один груз не «Под риском» (начальное состояние спокойное), и,
@@ -16,7 +16,12 @@ log = logging.getLogger("caspian")
 
 SAILING_A = "sl-ast-anz-1114"
 SAILING_M = "sl-mkh-anz-1115"
-EXPECTED_RISK = {"sh-01": 82, "sh-02": 74, "sh-03": 68}
+SCENARIO = "ice_north"
+# Вероятности даёт модель — эталон свой у каждого предиктора. Лёд подаётся флагом ice=1 от сценария,
+# волна реальная; модель не переобучалась. Шторм (стресс-тест) — 82/77/68 CatBoost, 82/74/68 формула.
+EXPECTED_RISK_BY = {"catboost": {"sh-01": 99, "sh-02": 90, "sh-03": 64},
+                    "formula": {"sh-01": 82, "sh-02": 74, "sh-03": 68}}
+EXPECTED_RISK = EXPECTED_RISK_BY["formula"]
 RISK_TOLERANCE_PP = 5   # вероятность даёт модель: допуск ±5 п. п. и порядок №01 > №02 > №03
 EXPECTED = {"departure_shift_h": 18, "do_nothing_h": 48, "mkh_delay_h": 6,
             "saved_hours": 126, "saved_rub": 596640, "recommended": "mkh"}
@@ -80,18 +85,19 @@ def run_check(st) -> dict:
     cp = State(st.seed_path, clock=FixedClock(st.sim_now), predictor=st.predictor, forecast=st.forecast)
     calm, calm_problems = calm_start(cp)
     quiet = forecast_quiet(cp)
-    out = D.run_scenario(cp, "storm_north")
+    out = D.run_scenario(cp, SCENARIO)
+    expected_risk = EXPECTED_RISK_BY.get(cp.predictor.name, EXPECTED_RISK)
     alert, sc = out["alert"], out["scenario"]
     items = {i["shipment_id"]: i for i in alert["items"]}
     rec = next((o for o in alert["options"] if o["recommended"]), None)
     mkh = next((o for o in alert["options"] if o["id"] == "mkh"), None)
 
     checks = [quiet, calm]
-    pct = {sid: round(cp.shipments[sid]["risk"]["miss_probability"] * 100) for sid in EXPECTED_RISK}
-    for sid, want in EXPECTED_RISK.items():
+    pct = {sid: round(cp.shipments[sid]["risk"]["miss_probability"] * 100) for sid in expected_risk}
+    for sid, want in expected_risk.items():
         checks.append(_check(f"risk_{sid}", f"Риск №{sid[3:]}, % (±{RISK_TOLERANCE_PP} п. п.)", want, pct[sid],
                              RISK_TOLERANCE_PP))
-    order = " > ".join(str(pct[s]) for s in EXPECTED_RISK)
+    order = " > ".join(str(pct[s]) for s in expected_risk)
     checks.append({"name": "risk_order", "label": "Порядок рисков №01 > №02 > №03", "expected": "№01 > №02 > №03",
                    "actual": order, "ok": pct["sh-01"] > pct["sh-02"] > pct["sh-03"]})
     checks += [
@@ -131,11 +137,11 @@ def explain(cp, sc: dict, checks: list[dict], items: dict) -> list[str]:
             out.append(f"паром М в статусе {m['status']}")
     if bad & {"departure_shift_h", "do_nothing_h", "saved_hours", "saved_rub"}:
         end = parse(sc["end"])
-        calm = cp.weather.first_calm("astrakhan", end, lim)
-        if calm is None or calm != end:
-            when = day_time(calm) if calm else "не в горизонте прогноза"
-            out.append(f"волна в Астрахани после шторма {ru(cp.weather.base_wave('astrakhan', end))} м: "
-                       f"порт открывается {when} вместо {day_time(end)}")
+        opened = cp.weather.first_open("astrakhan", end, lim)
+        if opened is None or opened != end:
+            when = day_time(opened) if opened else "не в горизонте прогноза"
+            out.append(f"после окна угрозы порт Астрахань открывается {when} вместо {day_time(end)}: "
+                       f"волна в порту {ru(cp.weather.base_wave('astrakhan', end))} м")
         a = cp.sailings.get(SAILING_A)
         if a and hours(cp.sim_now, a["departure"]) != 44:
             out.append(f"паром А уходит через {hours(cp.sim_now, a['departure']):g} ч вместо 44 ч")
@@ -148,7 +154,7 @@ def explain(cp, sc: dict, checks: list[dict], items: dict) -> list[str]:
         if c["name"] == "risk_order" and not c["ok"]:
             out.append(f"порядок рисков нарушен: {c['actual']} (предиктор {cp.predictor.name})")
     if not out:
-        out.append("причина не определена: смотрите алерт после POST /api/scenarios storm_north")
+        out.append(f"причина не определена: смотрите алерт после POST /api/scenarios {SCENARIO}")
     return out
 
 
@@ -165,8 +171,8 @@ def log_check(st, when: str) -> dict:
     if res["ok"]:
         risk = "/".join(str(c["actual"]) for c in res["checks"] if c["name"].startswith("risk_sh"))
         calm = next(c["actual"] for c in res["checks"] if c["name"] == "calm_start")
-        log.info("Проверка демо (%s): начальное состояние спокойное — %s; числа сценария сходятся — риск %s%% (%s), "
-                 "+18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, через Махачкалу (%s)", when, calm, risk,
+        log.info("Проверка демо (%s): начальное состояние спокойное — %s; числа сценария %s сходятся — риск %s%% (%s), "
+                 "+18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, через Махачкалу (%s)", when, calm, SCENARIO, risk,
                  st.predictor.name, src)
     else:
         diff = "; ".join(f"{c['label']}: {c['actual']} вместо {c['expected']}" for c in res["checks"] if not c["ok"])

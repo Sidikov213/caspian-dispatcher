@@ -28,8 +28,9 @@ SailingStatus = Literal["scheduled", "cancelled", "departed"]
 Via = Literal["web", "telegram"]
 AlertStatus = Literal["new", "accepted", "rejected", "superseded"]
 AlertAction = Literal["reroute", "wait"]
-ScenarioType = Literal["storm", "congestion", "customs"]
-ScenarioPreset = Literal["storm_north", "storm_full", "congestion_astrakhan"]
+ScenarioType = Literal["ice", "storm", "congestion", "customs"]
+Hazard = Literal["ice", "storm", "congestion", "customs"]
+ScenarioPreset = Literal["ice_north", "storm_north", "storm_full", "congestion_astrakhan"]
 DocType = Literal["invoice", "cmr", "packing_list"]
 DocStatus = Literal["draft", "confirmed"]
 PassStatus = Literal["active", "reissued", "revoked"]
@@ -203,6 +204,8 @@ class Scenario(Model):
     params: ScenarioParams
     zone: list[list[float]] | None = Field(
         None, description="Необязательно: зона угрозы для карты — полигон из точек [lat, lon]")
+    hazard: Hazard | None = Field(None, description="Тип угрозы: ice | storm | congestion | customs")
+    note: str | None = Field(None, description="Подпись сценария (у шторма — «Стресс-тест: …»)")
 
 
 class AlertItem(Model):
@@ -248,6 +251,47 @@ class AlertOption(Model):
     recommended: bool
 
 
+class CardMetric(Model):
+    key: str
+    label: str
+    value: str
+
+
+class CardRoute(Model):
+    sailing_label: str
+    from_: str = Field(alias="from")
+    to: str
+    departure: str
+
+
+class CardImpact(Model):
+    shipments: int
+    weight_t: float
+    max_risk_pct: int
+
+
+class CardDecision(Model):
+    status: Literal["accepted", "rejected"]
+    title: str
+    detail: str = Field(description="«+6 ч к плану»")
+    via: Via | None = None
+    via_label: str | None = None
+    accepted_by_name: str | None = None
+
+
+class AlertCard(Model):
+    """Собирается кодом из тех же данных, что text / items / options / accepted_*. Без LLM."""
+    kind: Hazard
+    headline: str
+    subtitle: str
+    period: str | None = None
+    metrics: list[CardMetric]
+    route: CardRoute | None = None
+    impact: CardImpact
+    note: str | None = None
+    decision: CardDecision | None = None
+
+
 class Alert(Model):
     """Все деньги и часы до наступления события — расчётные."""
     id: str
@@ -269,6 +313,8 @@ class Alert(Model):
     accepted_at: datetime | None = None
     accepted_via: Via | None = None
     accepted_by: AcceptedBy | None = None
+    hazard: Hazard | None = Field(None, description="Тип угрозы: ice | storm | congestion | customs")
+    card: AlertCard | None = Field(None, description="Компактная карточка: готовые строки, клиент рисует как есть")
 
 
 class DocumentFields(Model):
@@ -416,6 +462,9 @@ class WeatherOut(Model):
 class PresetOut(Model):
     key: ScenarioPreset
     title: str
+    hazard: Hazard | None = None
+    main: bool = Field(False, description="Главный сценарий демо (ice_north)")
+    note: str | None = Field(None, description="У шторма — «Стресс-тест: …»")
 
 
 class ScenarioCreateOut(Model):
@@ -617,9 +666,22 @@ class CorridorFact(Model):
     source: str
 
 
+class IceFact(Model):
+    text: str
+    source: str | None = None
+
+
+class IceBlock(Model):
+    title: str
+    facts: list[IceFact]
+    note: str = Field(description="Честная пометка: живого источника ледовой обстановки нет")
+    conclusion: str | None = Field(None, description="Вывод ретроспективы по волне — почему лёд, а не шторм")
+
+
 class DataSourcesOut(Model):
     sources: list[DataSource]
     corridor_facts: list[CorridorFact]
+    ice: IceBlock | None = None
     backtest: dict | None = Field(
         None, description="Ретроспективная симуляция на исторической погоде (data/backtest.json, сводка); "
                           "chart — путь к графику на сайте")

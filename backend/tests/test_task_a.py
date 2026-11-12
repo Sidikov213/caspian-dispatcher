@@ -251,7 +251,7 @@ def test_passes_list_newest_first(client):
 def test_data_sources(client):
     out = client.get("/api/data-sources").json()
     types = {s["id"]: s["type"] for s in out["sources"]}
-    assert types == {"forecast": "real", "geography": "real", "ports": "real", "sailings": "modeled",
+    assert types == {"forecast": "real", "geography": "real", "ports": "real", "ice": "modeled", "sailings": "modeled",
                      "positions": "modeled", "history": "synthetic", "wave_history": "real"}
     assert any("21,5 млн т" in f["text"] for f in out["corridor_facts"])
     bt = out["backtest"]

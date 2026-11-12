@@ -1,14 +1,30 @@
 [
   {
+    "key": "ice_north",
+    "title": "Лёд на Северном Каспии",
+    "hazard": "ice",
+    "main": true,
+    "note": null
+  },
+  {
     "key": "storm_north",
-    "title": "Шторм на Северном Каспии"
+    "title": "Шторм на Северном Каспии",
+    "hazard": "storm",
+    "main": false,
+    "note": "Стресс-тест: за 12 месяцев волна у Астрахани не превышала 1,44 м"
   },
   {
     "key": "storm_full",
-    "title": "Шторм на всём Каспии"
+    "title": "Шторм на всём Каспии",
+    "hazard": "storm",
+    "main": false,
+    "note": "Стресс-тест: за 12 месяцев волна у Астрахани не превышала 1,44 м"
   },
   {
     "key": "congestion_astrakhan",
-    "title": "Затор в порту Астрахань"
+    "title": "Затор в порту Астрахань",
+    "hazard": "congestion",
+    "main": false,
+    "note": null
   }
 ]

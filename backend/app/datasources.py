@@ -52,6 +52,11 @@ def data_sources(st) -> dict:
                      "Астрахань: замерзающий, выход по Волго-Каспийскому каналу ≈188 км",
          "type": "real", "url": port_sources[0] if port_sources else None, "urls": port_sources,
          "updated_at": "2026-06-09", "note": "загрузка остальных портов — оценка для демо"},
+        {"id": "ice", "title": "Ледовая обстановка",
+         "provides": "Главный сценарий ice_north: лёд на Волго-Каспийском канале, Астрахань и Оля закрыты "
+                     "для отправления паромов; флаг льда идёт в модель (признак ice) и в расчёт закрытия порта",
+         "type": "modeled", "url": "https://mintrans.gov.ru/file/396731", "updated_at": None,
+         "note": ICE_NOTE},
         {"id": "sailings", "title": "Расписание и вместимость рейсов",
          "provides": "Паромы Астрахань и Махачкала → Энзели раз в 48 ч, вместимость и бронь",
          "type": "modeled", "url": None, "updated_at": None,
@@ -72,4 +77,31 @@ def data_sources(st) -> dict:
          "type": "real", "url": "https://open-meteo.com/en/docs/marine-weather-api",
          "updated_at": bt["fetched_at"] if bt else None, "note": None if bt else "симуляция ещё не запускалась"},
     ]
-    return {"sources": sources, "corridor_facts": meta.get("corridor_facts", []), "backtest": bt}
+    return {"sources": sources, "corridor_facts": meta.get("corridor_facts", []), "backtest": bt,
+            "ice": ice_block(bt)}
+
+
+ICE_NOTE = ("Сценарий задан вручную по историческим срокам ледокольных проводок, "
+            "живого источника ледовой обстановки нет")
+SRC_MINTRANS = "https://mintrans.gov.ru/file/396731"
+SRC_MKH = "https://www.alta.ru/logistics_news/128638/"
+
+
+def ice_block(bt: dict | None) -> dict:
+    """Почему главный сценарий — лёд: факты о северном Каспии и вывод ретроспективы по волне."""
+    facts = [
+        {"text": "Астрахань — замерзающий порт: зимой ледокольная проводка судов", "source": SRC_MINTRANS},
+        {"text": "Выход в море — по Волго-Каспийскому морскому каналу, 101,5 мили (≈188 км)", "source": SRC_MINTRANS},
+        {"text": "Ледокольные проводки сезона 2022/23: с 6 декабря 2022 по 7 марта 2023, 690 судов",
+         "source": None},
+        {"text": "Махачкала — единственный незамерзающий глубоководный порт России на Каспии", "source": SRC_MKH},
+    ]
+    conclusion = None
+    if bt:
+        p = bt["ports"]
+        conclusion = (f"За 12 месяцев ({bt['period']['start']} — {bt['period']['end']}) волна от "
+                      f"{str(bt['wave_limit_m']).replace('.', ',')} м не была ни в одном порту: максимум у Астрахани "
+                      f"{str(p['astrakhan']['max_wave_m']).replace('.', ',')} м, у Махачкалы "
+                      f"{str(p['makhachkala']['max_wave_m']).replace('.', ',')} м. Реальный риск северного Каспия — "
+                      "лёд, поэтому главный сценарий — лёд, а шторм — стресс-тест.")
+    return {"title": "Почему главный сценарий — лёд", "facts": facts, "note": ICE_NOTE, "conclusion": conclusion}

@@ -1,17 +1,32 @@
 """Пресеты сценариев. Время — часы от sim_now, чтобы сценарий жил вместе с DEMO_NOW.
 
-storm_north — согласованный сценарий DEMO_SCENARIO.md: волна выше 2,5 м в Астрахани и Оле
-с 14 ноя 02:00 до 21:00 (через 36 ч), пик 3,4 м; после шторма очередь судов (загрузка 85%) и таможня 2 ч.
+ice_north — главный сценарий DEMO_SCENARIO.md: лёд на Волго-Каспийском канале, Астрахань и Оля не
+отправляют паромы с +36 ч до +55 ч (рейс А через 44 ч ждёт открытия 11 ч); после — очередь судов
+(загрузка 85%) и таможня 2 ч. Погоду не трогает: волна остаётся реальной, закрытие порта — флаг льда.
+storm_north — стресс-тест (за 12 месяцев волна у Астрахани не превышала 1,44 м): волна выше 2,5 м
+в Астрахани и Оле в том же окне, пик 3,4 м; те же очередь и таможня.
 storm_full — шторм на всём море: закрыты все паромные рёбра, обход только по суше (западная ветка).
 congestion_astrakhan — затор в порту Астрахань без погоды: загрузка 95%, таможня 6 ч.
 """
 import copy
 
+from .hazards import note_of
 from .util import H, iso
 
 PRESETS = {
+    "ice_north": {
+        "id": "scn-ice-north", "type": "ice", "hazard": "ice", "title": "Лёд на Северном Каспии",
+        "blocked_edges": ["e-astrakhan-anzali", "e-olya-anzali", "e-olya-amirabad"],
+        "affected_nodes": ["astrakhan", "olya"],
+        "start_h": 36, "end_h": 55, "params": {"wave_height_m": None, "wind_ms": None},
+        "overlay": None, "ice": {"nodes": ["astrakhan", "olya"]},
+        "congestion": {"astrakhan": 0.85}, "customs_h": {"astrakhan": 2},
+        # Волго-Каспийский канал (от Астрахани по Бахтемиру к морю) и северная акватория до Оли
+        "zone": [[46.5, 47.85], [46.45, 48.3], [46.05, 48.25], [45.75, 48.75], [45.45, 49.6],
+                 [44.95, 49.4], [45.0, 48.4], [45.55, 47.6], [46.1, 47.55]],
+    },
     "storm_north": {
-        "id": "scn-storm-north", "type": "storm", "title": "Шторм на Северном Каспии",
+        "id": "scn-storm-north", "type": "storm", "hazard": "storm", "title": "Шторм на Северном Каспии",
         "blocked_edges": ["e-astrakhan-anzali", "e-olya-anzali", "e-olya-amirabad"],
         "affected_nodes": ["astrakhan", "olya"],
         "start_h": 36, "end_h": 55, "params": {"wave_height_m": 3.4, "wind_ms": 18},
@@ -23,7 +38,7 @@ PRESETS = {
                  [44.55, 48.4], [45.3, 47.3], [46.1, 47.15]],
     },
     "storm_full": {
-        "id": "scn-storm-full", "type": "storm", "title": "Шторм на всём Каспии",
+        "id": "scn-storm-full", "type": "storm", "hazard": "storm", "title": "Шторм на всём Каспии",
         "blocked_edges": ["e-astrakhan-anzali", "e-olya-anzali", "e-olya-amirabad",
                           "e-makhachkala-anzali", "e-aktau-baku"],
         "affected_nodes": ["astrakhan", "olya", "makhachkala", "aktau", "baku"],
@@ -37,7 +52,8 @@ PRESETS = {
                  [40.4, 49.5], [41.6, 48.4], [43.0, 47.2], [44.6, 46.7]],
     },
     "congestion_astrakhan": {
-        "id": "scn-congestion-astrakhan", "type": "congestion", "title": "Затор в порту Астрахань",
+        "id": "scn-congestion-astrakhan", "type": "congestion", "hazard": "congestion",
+        "title": "Затор в порту Астрахань",
         "blocked_edges": [], "affected_nodes": ["astrakhan"],
         "start_h": 18, "end_h": 48, "params": {"wave_height_m": None, "wind_ms": None},
         "overlay": None,
@@ -46,19 +62,22 @@ PRESETS = {
     },
 }
 
-PRESET_LIST = [{"key": k, "title": v["title"]} for k, v in PRESETS.items()]
+MAIN_PRESET = "ice_north"
+PRESET_LIST = [{"key": k, "title": v["title"], "hazard": v["hazard"], "main": k == MAIN_PRESET,
+                "note": note_of(v["hazard"])} for k, v in PRESETS.items()]
 
 
 def make_scenario(key: str, sim_now) -> dict:
     """Сценарий в форме контракта + служебные поля с подчёркиванием (в ответ не попадают)."""
     p = copy.deepcopy(PRESETS[key])
-    return {"id": p["id"], "type": p["type"], "title": p["title"],
+    return {"id": p["id"], "type": p["type"], "hazard": p["hazard"], "note": note_of(p["hazard"]),
+            "title": p["title"],
             "blocked_edges": p["blocked_edges"], "affected_nodes": p["affected_nodes"],
             "start": iso(sim_now + H(p["start_h"])), "end": iso(sim_now + H(p["end_h"])),
             "starts_in_h": p["start_h"],
             "params": p["params"], "zone": p.get("zone"),
             "_preset": key, "_overlay": p["overlay"], "_congestion": p["congestion"],
-            "_customs_h": p["customs_h"]}
+            "_customs_h": p["customs_h"], "_ice": p.get("ice")}
 
 
 def public(scenario: dict) -> dict:

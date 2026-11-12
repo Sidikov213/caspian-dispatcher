@@ -5,6 +5,7 @@
 from html import escape
 
 from .. import dispatcher as D
+from .. import hazards as HZ
 
 from ..util import cargo_dative, cargo_word, day_time, hours, k_rub, num, parse, signed, time_only
 
@@ -46,7 +47,7 @@ def welcome(name: str) -> str:
     from ..config import DEMO_COMPANY
     return (f"👋 {escape(name)}, это <b>Каспийский диспетчер</b>.\n"
             f"<i>Демо-кабинет компании „{escape(DEMO_COMPANY)}“</i>\n\n"
-            "Я вижу угрозы на 48 часов вперёд: шторм, затор в порту, очередь на таможне. Если у груза "
+            "Я вижу угрозы на 48 часов вперёд: лёд в канале, шторм, затор в порту, очередь на таможне. Если у груза "
             "сорвётся стыковка с паромом, пришлю готовое решение с часами, рублями и CO₂. "
             "Решение принимаете вы — кнопкой «Принять».\n\n"
             "Внизу кнопки «Мои грузы» и «Погода на Каспии».")
@@ -61,7 +62,8 @@ def hint() -> str:
 
 def alert_message(st, alert: dict) -> str:
     """Заголовок отдельной строкой, текст — тот же шаблон движка, что и Alert.text, но с разметкой."""
-    icon = "🔴" if alert["severity"] == "high" else "🟠"
+    hz = alert.get("hazard")
+    icon = HZ.ICON["ice"] if hz == "ice" else ("🔴" if alert["severity"] == "high" else "🟠")
     sc = st.alert_threat.get(alert["id"])   # угроза, по которой создан алерт: прогноз или сценарий
     internal = st.alert_internal.get(alert["id"])
     body = (D.alert_text(st, sc, alert, internal, html=True) if sc is not None and internal is not None

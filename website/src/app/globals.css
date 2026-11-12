@@ -1,7 +1,52 @@
 @import "tailwindcss";
 
-/* Светлая тема: бриф логотипа и DEMO_SCENARIO (белый интерфейс, синий + бирюза). */
+/*
+ * Две темы на CSS-переменных. Тёмная — по умолчанию (дизайн-стандарт, docs/FLUTTER_CONTRACT.md, раздел Б),
+ * светлая — по переключателю в шапке: он ставит document.documentElement.dataset.theme и запоминает выбор.
+ * Бирюза (--color-cyan) — только линии и прогресс.
+ */
 @theme {
+  --color-bg: #0b1220;
+  --color-panel: #131c2e;
+  --color-field: #0f1828;
+  --color-tile: #1a2438;
+  --color-line: #24304a;
+  --color-line-strong: #33415e;
+  --color-text: #e6edf7;
+  --color-muted: #8a97ad;
+  --color-faint: #64728a;
+  --color-action: #2f80ed;
+  --color-action-hover: #2670d6;
+  --color-brand: #2f80ed;
+  --color-transit: #3b82f6;
+  --color-transit-text: #60a5fa;
+  --color-risk: #ef4444;
+  --color-risk-text: #f87171;
+  --color-risk-soft: rgba(239, 68, 68, 0.12);
+  --color-risk-line: rgba(239, 68, 68, 0.4);
+  --color-rerouted: #22c55e;
+  --color-rerouted-text: #4ade80;
+  --color-rerouted-soft: rgba(34, 197, 94, 0.12);
+  --color-warn: #f59e0b;
+  --color-warn-text: #fbbf24;
+  --color-warn-soft: rgba(245, 158, 11, 0.12);
+  --color-warn-line: rgba(245, 158, 11, 0.4);
+  --color-ok: #22c55e;
+  --color-ok-soft: rgba(34, 197, 94, 0.12);
+  --color-ok-line: rgba(34, 197, 94, 0.4);
+  --color-cyan: #3fe0c5;
+  --color-info-soft: rgba(47, 128, 237, 0.14);
+  --color-map-sea: #0f1a2b;
+  --color-map-land: #1a2438;
+  --color-shadow: rgba(0, 0, 0, 0.45);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 12px;
+  --radius-btn: 8px;
+}
+
+/* Светлая тема: прежние цвета сайта. */
+:root[data-theme="light"] {
   --color-bg: #f5f7fb;
   --color-panel: #ffffff;
   --color-field: #ffffff;
@@ -19,22 +64,29 @@
   --color-risk: #dc2626;
   --color-risk-text: #dc2626;
   --color-risk-soft: #fef2f2;
+  --color-risk-line: #fecaca;
   --color-rerouted: #15803d;
   --color-rerouted-text: #15803d;
   --color-rerouted-soft: #f0fdf4;
   --color-warn: #b45309;
   --color-warn-text: #b45309;
   --color-warn-soft: #fffbeb;
+  --color-warn-line: #fde68a;
   --color-ok: #15803d;
   --color-ok-soft: #f0fdf4;
+  --color-ok-line: #bbf7d0;
   --color-cyan: #087f8c;
   --color-info-soft: #eff6ff;
   --color-map-sea: #e8eef6;
   --color-map-land: #d7e0ec;
+  --color-shadow: rgba(18, 48, 74, 0.14);
+}
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --radius-card: 12px;
-  --radius-btn: 8px;
+:root {
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 html,

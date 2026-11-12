@@ -1,4 +1,7 @@
-import type { AuthUser } from "./types";
+import { useEffect, useState } from "react";
+import type { AuthUser, Permission } from "./types";
+
+const SESSION_EVENT = "caspian:session";
 
 const TOKEN_KEY = "caspian.auth.token";
 const USER_KEY = "caspian.auth.user";
@@ -21,6 +24,29 @@ export function getStoredUser(): AuthUser | null {
 export function setSession(token: string, user: AuthUser) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
+
+/** Право из /api/auth/me. Клиент права из роли не выводит: нет в списке — нет права. */
+export function can(user: AuthUser | null, permission: Permission): boolean {
+  return !!user?.permissions?.includes(permission);
+}
+
+export const ROLE_LABEL: Record<AuthUser["role"], string> = { logist: "Логист", expeditor: "Экспедитор" };
+
+/** Текущий пользователь; обновляется, когда AuthGate получил свежий /auth/me. */
+export function useSessionUser(): AuthUser | null {
+  const [user, setUser] = useState<AuthUser | null>(() => getStoredUser());
+  useEffect(() => {
+    const update = () => setUser(getStoredUser());
+    window.addEventListener(SESSION_EVENT, update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener(SESSION_EVENT, update);
+      window.removeEventListener("storage", update);
+    };
+  }, []);
+  return user;
 }
 
 export function clearSession() {

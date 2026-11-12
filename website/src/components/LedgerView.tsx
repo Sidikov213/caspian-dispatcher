@@ -12,6 +12,9 @@ interface Props {
   nodes: Map<string, GraphNode>;
   onVerify(): void;
   onTamper(index: number): void;
+  /** Кнопка «Подделать запись» — только демо и только с правом reset_demo. */
+  canTamper?: boolean;
+  children?: React.ReactNode;
 }
 
 const VISIBLE = 7;
@@ -35,8 +38,8 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 function Banner({ check, lastTs }: { check: Props["check"]; lastTs: string | null }) {
   const broken = check ? !check.valid : false;
   const tone = broken
-    ? { bg: "#FEF2F2", border: "#FECACA", tile: "#FEE2E2", text: "#DC2626" }
-    : { bg: "#F0FDF4", border: "#BBF7D0", tile: "#DCFCE7", text: "#15803D" };
+    ? { bg: "var(--color-risk-soft)", border: "var(--color-risk-line)", tile: "var(--color-risk-soft)", text: "var(--color-risk)" }
+    : { bg: "var(--color-ok-soft)", border: "var(--color-ok-line)", tile: "var(--color-ok-soft)", text: "var(--color-rerouted)" };
   const title = !check ? "Проверяем цепочку…" : broken ? `Нарушение в записи №${(check.broken_at ?? 0) + 1}` : "Цепочка цела";
   const sub = !check
     ? "Сверяем хэши записей"
@@ -67,7 +70,7 @@ function plural(n: number) {
   return "записей";
 }
 
-export function LedgerView({ blocks, check, verifying, shipments, nodes, onVerify, onTamper }: Props) {
+export function LedgerView({ blocks, check, verifying, shipments, nodes, onVerify, onTamper, canTamper = true, children }: Props) {
   const rows = [...blocks].sort((a, b) => b.index - a.index).slice(0, VISIBLE);
   const byId = new Map(shipments.map((s) => [s.id, s]));
   const lastTs = blocks.length ? blocks[blocks.length - 1].ts : null;
@@ -78,7 +81,7 @@ export function LedgerView({ blocks, check, verifying, shipments, nodes, onVerif
     <div className="scroll-thin relative min-w-0 flex-1 overflow-y-auto bg-bg px-5 pb-8 md:px-8">
       <div className="flex flex-wrap items-start justify-between gap-4 pt-[28px]">
         <div className="min-w-0">
-          <div className="caps text-[10px] leading-[12px] font-bold text-cyan">Документы &nbsp;/&nbsp; Портовые пропуска</div>
+          <div className="caps text-[10px] leading-[12px] font-bold text-muted">Документы и журнал &nbsp;/&nbsp; Реестр</div>
           <h1 className="mt-[14px] text-[28px] leading-[34px] font-bold md:text-[34px] md:leading-[40px]">Реестр пропусков</h1>
           <p className="mt-[6px] text-[12.5px] leading-[16px] text-muted">Выдача, переоформление и проверка целостности</p>
         </div>
@@ -117,15 +120,15 @@ export function LedgerView({ blocks, check, verifying, shipments, nodes, onVerif
                 <div
                   key={b.index}
                   className={`relative grid h-[60px] items-center text-[12px] ${COLS}`}
-                  style={broken ? { background: "#FEF2F2" } : undefined}
+                  style={broken ? { background: "var(--color-risk-soft)" } : undefined}
                 >
                   <span className="relative z-10 pl-[16px]">
                     <span
                       className="tnum flex size-[26px] items-center justify-center rounded-[7px] border text-[10.5px] font-bold"
                       style={{
-                        background: broken ? "#FEE2E2" : "#EEF2F7",
-                        borderColor: broken ? "#FECACA" : "#DFE6EF",
-                        color: broken ? "#DC2626" : reissued ? "#15803D" : "#245BDB",
+                        background: broken ? "var(--color-risk-soft)" : "var(--color-tile)",
+                        borderColor: broken ? "var(--color-risk-line)" : "var(--color-line)",
+                        color: broken ? "var(--color-risk)" : reissued ? "var(--color-rerouted)" : "var(--color-transit)",
                       }}
                     >
                       {pad2(b.index + 1)}
@@ -151,7 +154,7 @@ export function LedgerView({ blocks, check, verifying, shipments, nodes, onVerif
         <span className="text-[11px] leading-[14px] text-muted">
           Показаны последние {rows.length} из {blocks.length} {plural(blocks.length)}
         </span>
-        <button
+        {canTamper && <button
           type="button"
           disabled={target === null}
           onClick={() => target !== null && onTamper(target)}
@@ -159,8 +162,9 @@ export function LedgerView({ blocks, check, verifying, shipments, nodes, onVerif
         >
           <TriangleAlertIcon size={14} className="text-transit-text" />
           Подделать запись
-        </button>
+        </button>}
       </div>
+      {children}
     </div>
   );
 }

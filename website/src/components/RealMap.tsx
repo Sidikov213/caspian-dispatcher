@@ -75,11 +75,11 @@ function corridorBounds(nodes: Map<string, GraphNode>): LatLng[] {
 
 // ---------- стиль линий ----------
 const STATUS_COLOR: Record<DisplayStatus, string> = {
-  in_transit: "#245BDB",
-  at_risk: "#DC2626",
-  rerouted: "#15803D",
-  planned: "#64748B",
-  delivered: "#64748B",
+  in_transit: "var(--color-transit)",
+  at_risk: "var(--color-risk)",
+  rerouted: "var(--color-rerouted)",
+  planned: "var(--color-muted)",
+  delivered: "var(--color-muted)",
 };
 const DASH: Record<Mode, string | undefined> = { rail: undefined, sea: "12 10", road: "1 10" };
 
@@ -207,7 +207,7 @@ export function RealMap(props: Props) {
 
     // 1. зона угрозы — из Scenario.zone
     if (zone && zone.length >= 3) {
-      lib.polygon(zone, { color: "#DC2626", weight: 2, dashArray: "6 6", fillColor: "#DC2626", fillOpacity: 0.14, interactive: false }).addTo(g);
+      lib.polygon(zone, { color: "var(--color-risk)", weight: 2, dashArray: "6 6", fillColor: "var(--color-risk)", fillOpacity: 0.14, interactive: false }).addTo(g);
     }
 
     // 2. вся сеть коридора: тонко и приглушённо, стиль по виду транспорта
@@ -233,14 +233,14 @@ export function RealMap(props: Props) {
         if (old) drawRoute(old, theme === "dark" ? "#CBD5E1" : "#475569", 5, 0.95, "4 10");
       }
       drawRoute(focus.route, STATUS_COLOR[focus.display_status], 7);
-      if (preview) drawRoute(preview, "#245BDB", 6, 0.9, "10 8");
+      if (preview) drawRoute(preview, "var(--color-transit)", 6, 0.9, "10 8");
     }
 
     // 4. узлы и подписи (не меньше 14 px, с подложкой под текстом)
     for (const n of nodes.values()) {
       const dot = lib.circleMarker([n.lat, n.lon], {
-        radius: n.type === "border" ? 4 : 6, color: theme === "dark" ? "#E6EDF7" : "#12304A", weight: 2,
-        fillColor: theme === "dark" ? "#0B1220" : "#FFFFFF", fillOpacity: 1,
+        radius: n.type === "border" ? 4 : 6, color: theme === "dark" ? "#E6EDF7" : "var(--color-text)", weight: 2,
+        fillColor: theme === "dark" ? "#0B1220" : "var(--color-panel)", fillOpacity: 1,
       }).addTo(g);
       if (n.type !== "border") {
         dot.bindTooltip(shortNodeName(n.name), { permanent: true, direction: "auto", className: "rm-node", offset: [8, 0] });
@@ -248,7 +248,7 @@ export function RealMap(props: Props) {
     }
     if (checkpointNode) {
       const c = nodes.get(checkpointNode);
-      if (c) lib.circleMarker([c.lat, c.lon], { radius: 10, color: "#15803D", weight: 3, fillColor: "#22C55E", fillOpacity: 0.9 }).addTo(g);
+      if (c) lib.circleMarker([c.lat, c.lon], { radius: 10, color: "var(--color-rerouted)", weight: 3, fillColor: "#22C55E", fillOpacity: 0.9 }).addTo(g);
     }
 
     // 5. волна у всех портов из /api/weather; красным выше предела

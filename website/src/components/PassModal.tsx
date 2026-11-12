@@ -82,7 +82,7 @@ export function PassModal({ pass, shipment, nodes, onClose }: {
           {shipmentNumber(shipment.id)} {shipment.title}
         </h2>
 
-        <div className="mt-4 flex justify-center rounded-[12px] bg-white p-4">
+        <div className="mt-4 flex justify-center rounded-[12px] bg-panel p-4">
           <QrCode value={pass.token} size={240} />
         </div>
 

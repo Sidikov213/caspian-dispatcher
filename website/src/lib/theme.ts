@@ -4,24 +4,28 @@ import { useEffect, useState } from "react";
 
 export type SiteTheme = "light" | "dark";
 
+export const THEME_KEY = "caspian.theme";
+
+/** Скрипт в <head>: ставит тему до отрисовки, чтобы не мигало. Тёмная — по умолчанию. */
+export const THEME_BOOT = `try{var t=localStorage.getItem("${"caspian.theme"}");document.documentElement.dataset.theme=t==="light"?"light":"dark"}catch(e){document.documentElement.dataset.theme="dark"}`;
+
 /**
  * Тема сайта — один вход для всех компонентов, которым она нужна в JS (подложка карты).
- *
- * Источник, по порядку:
- *  1. атрибут `data-theme="dark|light"` на <html> — его ставит переключатель темы сайта;
- *  2. класс `dark` / `light` на <html> — если переключатель работает классом;
- *  3. пока переключателя нет — системная тема (`prefers-color-scheme`).
- * Чтобы подключить переключатель, достаточно, чтобы он ставил `document.documentElement.dataset.theme`:
- * хук следит за атрибутом и классом на <html> и перерисовывает подписчиков.
+ * Источник — атрибут `data-theme="dark|light"` на <html>; его ставит переключатель в шапке (и скрипт
+ * в <head> при загрузке). Без атрибута — тёмная.
  */
 export function readSiteTheme(): SiteTheme {
   if (typeof document === "undefined") return "dark";
-  const root = document.documentElement;
-  const attr = root.dataset.theme;
-  if (attr === "dark" || attr === "light") return attr;
-  if (root.classList.contains("dark")) return "dark";
-  if (root.classList.contains("light")) return "light";
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
+export function setSiteTheme(theme: SiteTheme) {
+  document.documentElement.dataset.theme = theme;
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // приватный режим — выбор живёт до перезагрузки
+  }
 }
 
 export function useSiteTheme(): SiteTheme {
@@ -29,14 +33,9 @@ export function useSiteTheme(): SiteTheme {
   useEffect(() => {
     const update = () => setTheme(readSiteTheme());
     const obs = new MutationObserver(update);
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
-    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-    mq?.addEventListener("change", update);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     update();
-    return () => {
-      obs.disconnect();
-      mq?.removeEventListener("change", update);
-    };
+    return () => obs.disconnect();
   }, []);
   return theme;
 }

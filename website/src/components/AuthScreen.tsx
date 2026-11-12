@@ -4,19 +4,19 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ApiError, api } from "@/lib/api";
 import { setSession } from "@/lib/session";
-import type { AuthRole } from "@/lib/types";
-import { AuthMap } from "./AuthMap";
+import type { AuthOut, AuthRole } from "@/lib/types";
+import { LoginMap } from "./LoginMap";
 import { LogoWordmark } from "./icons";
 
 type Mode = "login" | "register";
 
 const ROLE_TABS: { id: AuthRole; label: string }[] = [
   { id: "logist", label: "Логист" },
-  { id: "expeditor", label: "Экспедист" },
+  { id: "expeditor", label: "Экспедитор" },
 ];
 
 const fieldClass =
-  "h-11 w-full rounded-[8px] border border-line bg-panel px-3.5 text-[14px] text-text outline-none transition-[border-color,box-shadow] placeholder:text-faint focus:border-action focus:shadow-[0_0_0_3px_rgba(36,91,219,0.12)]";
+  "h-11 w-full rounded-[8px] border border-line bg-panel px-3.5 text-[14px] text-text outline-none transition-[border-color,box-shadow] placeholder:text-faint focus:border-action focus:shadow-[0_0_0_3px_var(--color-info-soft)]";
 
 function authErrorMessage(e: unknown) {
   if (!(e instanceof ApiError)) return "Не удалось выполнить запрос";
@@ -46,17 +46,17 @@ export function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
+  /** Экспедитор после входа попадает в раздел с грузами и пропусками, логист — на пульт. */
+  function enter(out: AuthOut) {
+    setSession(out.token, out.user);
+    router.replace(out.user.role === "expeditor" ? "/?s=shipments" : "/");
+  }
+
+  async function run(fn: () => Promise<AuthOut>) {
     setBusy(true);
     setError(null);
     try {
-      const out =
-        mode === "login"
-          ? await api.login({ email, password })
-          : await api.register({ name, email, password, role });
-      setSession(out.token, out.user);
-      router.replace("/");
+      enter(await fn());
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -64,19 +64,24 @@ export function AuthScreen() {
     }
   }
 
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    run(() => (mode === "login" ? api.login({ email, password }) : api.register({ name, email, password, role })));
+  }
+
+  const demo = (who: "logist" | "expeditor") => run(() => api.login({ email: `${who}@demo.ru`, password: "demo123" }));
+
   return (
     <div className="flex h-full min-h-[720px] bg-bg">
       <aside className="relative hidden min-w-0 flex-1 overflow-hidden border-r border-line lg:block">
-        <AuthMap />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-bg/10 via-transparent to-bg/40" />
-        <div className="absolute top-8 left-8 z-10 max-w-[360px] rounded-[12px] border border-line bg-panel/95 px-5 py-4 shadow-[0_16px_40px_rgba(18,48,74,0.12)] backdrop-blur-sm">
+        <div className="absolute inset-0 flex">
+          <LoginMap />
+        </div>
+        <div className="absolute top-[72px] left-4 z-[1000] max-w-[360px] rounded-[12px] border border-line bg-panel/95 px-5 py-4 shadow-[0_16px_40px_var(--color-shadow)] backdrop-blur-sm">
           <LogoWordmark height={36} />
           <p className="mt-3 text-[14px] leading-[20px] text-muted">
             Окно логиста коридора «Север–Юг»: карта, цифровые двойники и прогноз стыковок на 48 часов вперёд.
           </p>
-        </div>
-        <div className="absolute bottom-8 left-8 z-10 rounded-[8px] border border-line bg-panel/90 px-3 py-2 text-[11px] text-muted backdrop-blur-sm">
-          Схема маршрутов · демо-данные
         </div>
       </aside>
 
@@ -103,7 +108,7 @@ export function AuthScreen() {
                     setError(null);
                   }}
                   className={`flex h-[34px] flex-1 items-center justify-center rounded-[8px] text-[13px] font-bold transition-colors ${
-                    active ? "bg-panel text-text shadow-[0_1px_2px_rgba(18,48,74,0.08)]" : "text-muted hover:text-text"
+                    active ? "bg-panel text-text shadow-[0_1px_2px_var(--color-shadow)]" : "text-muted hover:text-text"
                   }`}
                 >
                   {label}
@@ -118,7 +123,7 @@ export function AuthScreen() {
           <p className="mt-2 text-[13px] leading-[18px] text-muted">
             {mode === "login"
               ? "Демо: logist@demo.ru или expeditor@demo.ru, пароль demo123"
-              : "ФИО, email, пароль и роль — логист или экспедист"}
+              : "ФИО, email, пароль и роль — логист или экспедитор"}
           </p>
 
           <form onSubmit={submit} className="mt-7 space-y-4">
@@ -187,7 +192,7 @@ export function AuthScreen() {
             </Field>
 
             {error && (
-              <div className="rounded-[8px] border border-[#FECACA] bg-risk-soft px-3 py-2.5 text-[12.5px] font-semibold text-risk-text">
+              <div className="rounded-[8px] border border-[var(--color-risk-line)] bg-risk-soft px-3 py-2.5 text-[12.5px] font-semibold text-risk-text">
                 {error}
               </div>
             )}
@@ -200,6 +205,30 @@ export function AuthScreen() {
               {busy ? "Отправляем…" : mode === "login" ? "Войти" : "Зарегистрироваться"}
             </button>
           </form>
+
+          {mode === "login" && (
+            <div className="mt-6 border-t border-line pt-6">
+              <div className="mb-3 text-[12px] font-bold text-muted">Демо-вход · пароль demo123</div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => demo("logist")}
+                  className="h-[46px] flex-1 rounded-[8px] border border-line-strong bg-panel text-[14px] font-bold transition-colors hover:bg-tile disabled:opacity-60"
+                >
+                  Демо-вход: логист
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => demo("expeditor")}
+                  className="h-[46px] flex-1 rounded-[8px] border border-line-strong bg-panel text-[14px] font-bold transition-colors hover:bg-tile disabled:opacity-60"
+                >
+                  Экспедитор
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

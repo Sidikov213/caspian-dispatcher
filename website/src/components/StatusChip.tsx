@@ -3,11 +3,11 @@ import type { DisplayStatus } from "@/lib/types";
 
 /** Светлые подложки статусов: бриф (красная / жёлтая / зелёная / синяя). */
 const TONE: Record<DisplayStatus, { bg: string; dot: string; text: string }> = {
-  planned: { bg: "#F1F5F9", dot: "#64748B", text: "#64748B" },
-  in_transit: { bg: "#EFF6FF", dot: "#245BDB", text: "#245BDB" },
-  at_risk: { bg: "#FEF2F2", dot: "#DC2626", text: "#DC2626" },
-  rerouted: { bg: "#F0FDF4", dot: "#15803D", text: "#15803D" },
-  delivered: { bg: "#F1F5F9", dot: "#64748B", text: "#64748B" },
+  planned: { bg: "var(--color-tile)", dot: "var(--color-muted)", text: "var(--color-muted)" },
+  in_transit: { bg: "var(--color-info-soft)", dot: "var(--color-transit)", text: "var(--color-transit)" },
+  at_risk: { bg: "var(--color-risk-soft)", dot: "var(--color-risk)", text: "var(--color-risk)" },
+  rerouted: { bg: "var(--color-ok-soft)", dot: "var(--color-rerouted)", text: "var(--color-rerouted)" },
+  delivered: { bg: "var(--color-tile)", dot: "var(--color-muted)", text: "var(--color-muted)" },
 };
 
 export function StatusChip({ status }: { status: DisplayStatus }) {

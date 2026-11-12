@@ -203,10 +203,21 @@ export interface Alert {
   status: "new" | "accepted" | "rejected" | "superseded";
   accepted_at: string | null;
   accepted_via: "web" | "telegram" | null;
+  /** Кто принял; нет — показываем «через сайт / через Telegram». */
+  accepted_by?: AcceptedBy | null;
+  /** Откуда угроза: наблюдатель нашёл в прогнозе или сценарий демо. */
+  source?: "forecast" | "scenario" | null;
+  /** Почему алерт закрыт: «угроза снята», «заменён алертом …», «по этим грузам решение уже принято». */
+  status_note?: string | null;
+}
+
+export interface AcceptedBy {
+  name: string;
+  role: AuthRole;
 }
 
 export interface ApiErrorBody {
-  error: { code: string; message: string };
+  error: { code: string; message: string; fields?: string[] };
 }
 
 export interface Alternative {
@@ -229,6 +240,7 @@ export interface Decision {
   alert_id: string;
   ts: string;
   accepted_via: "web" | "telegram";
+  accepted_by?: AcceptedBy | null;
   items: DecisionItem[];
 }
 
@@ -267,14 +279,57 @@ export interface PassVerify {
 /** Аккаунты — POST /api/auth/register|login, GET /api/auth/me. */
 export type AuthRole = "logist" | "expeditor";
 
+export type Permission = "run_scenario" | "reset_demo" | "decide_alert";
+
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   role: AuthRole;
+  /** Права из /api/auth/me. Логист: run_scenario, reset_demo, decide_alert; экспедитор — пусто. */
+  permissions?: Permission[];
 }
 
 export interface AuthOut {
   token: string;
   user: AuthUser;
+}
+
+/** GET /api/sailings */
+export interface Sailing {
+  id: string;
+  from: string;
+  to: string;
+  departure: string;
+  cutoff: string;
+  duration_h: number;
+  capacity_t: number;
+  booked_t: number;
+  status: "scheduled" | "cancelled" | "departed";
+  cancel_reason: string | null;
+}
+
+/** POST /api/shipments */
+export interface ShipmentCreate {
+  title: string;
+  cargo_type: string;
+  weight_t: number;
+  origin: string;
+  destination: string;
+}
+
+/** GET /api/model */
+export interface ModelInfo {
+  summary: string;
+  active: "catboost" | "formula";
+  requested: string;
+  fallback_reason: string | null;
+  synthetic: boolean;
+  note: string;
+  used_at_runtime?: Record<string, string> | null;
+  trained_at: string | null;
+  seed: number | null;
+  classifier: { auc: number; brier: number; n_train: number; n_test: number } | null;
+  regressor: { mae_h: number; n_train: number; n_test: number } | null;
+  feature_importance: { name: string; label: string; importance: number }[];
 }

@@ -1,7 +1,6 @@
 import { addHours } from "./format";
 import type {
   Alert,
-  AlertOption,
   Alternative,
   DisplayStatus,
   Edge,
@@ -201,19 +200,6 @@ export function newAlertFor(alerts: Alert[], shipmentId: string): Alert | null {
 /** Маршрут «ничего не делать»: плановый, с заблокированным этапом. */
 export function isWaitRoute(route: Route): boolean {
   return route.legs.some((l) => l.status === "blocked");
-}
-
-/** Вариант алерта для альтернативы груза: id маршрута кончается тегом варианта (`r-sh-01-mkh` ↔ `mkh`). */
-export function optionFor(alt: Alternative, alert: Alert | null): AlertOption | null {
-  if (!alert) return null;
-  if (isWaitRoute(alt.route)) return alert.options.find((o) => o.id === "wait") ?? null;
-  return alert.options.find((o) => o.id !== "wait" && alt.route.id.endsWith(`-${o.id}`)) ?? null;
-}
-
-/** «Через Махачкалу (паром М, 15 ноя, 06:00)» → «Через Махачкалу». */
-export function optionTitle(option: AlertOption | null, alt: Alternative): string {
-  if (option) return option.title.replace(/\s*\(.*\)\s*$/, "");
-  return isWaitRoute(alt.route) ? "Ждать следующий рейс" : "Обходной маршрут";
 }
 
 /** Порядок карточек: рекомендованный, потом по задержке, «ждать» последним. */

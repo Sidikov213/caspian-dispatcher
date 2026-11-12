@@ -14,8 +14,15 @@ import {
   weatherSummary,
 } from "@/lib/derive";
 import { minutesAgo } from "@/lib/format";
-import type { Alternative } from "@/lib/types";
+import { can, useSessionUser } from "@/lib/session";
+import type { Alternative, Route } from "@/lib/types";
 import { useDashboard } from "@/lib/useDashboard";
+import { DecisionsSection } from "./sections/DecisionsSection";
+import { ModelSection } from "./sections/ModelSection";
+import { PassesTable } from "./sections/PassesTable";
+import { SailingsSection } from "./sections/SailingsSection";
+import { ShipmentsSection } from "./sections/ShipmentsSection";
+import { SECTIONS, SideNav, type Section } from "./SideNav";
 import { AlertModal } from "./AlertModal";
 import { AlternativesPanel } from "./AlternativesPanel";
 import { AppHeader } from "./AppHeader";
@@ -60,18 +67,23 @@ export function Dashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const user = useSessionUser();
+  const canDecide = can(user, "decide_alert");
   const selectedId = params.get("shipment");
   const panel = params.get("panel") === "alternatives" ? "alternatives" : "twin";
-  const view = params.get("view") === "ledger" ? "ledger" : "map";
+  // Раздел в адресе (?s=): статический экспорт без отдельных страниц. Экспедитор по умолчанию — «Грузы».
+  const sParam = params.get("s") as Section | null;
+  const section: Section = sParam && SECTIONS.includes(sParam) ? sParam : user?.role === "expeditor" ? "shipments" : "pult";
+  const view = section === "pult" ? "map" : "other";
   const now = useNow(60_000);
   const secondNow = useNow(1000);
 
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [hoverRoute, setHoverRoute] = useState<string | null>(null);
+  const [hoverRoute, setHoverRoute] = useState<Route | null>(null);
 
   const go = useCallback(
-    (patch: { shipment?: string | null; panel?: string | null; view?: string | null }) => {
+    (patch: { shipment?: string | null; panel?: string | null; s?: string | null }) => {
       const next = new URLSearchParams(params.toString());
       for (const [k, v] of Object.entries(patch)) {
         if (v) next.set(k, v);
@@ -94,15 +106,39 @@ export function Dashboard() {
   const newAlert = d.alerts.find((a) => a.status === "new") ?? null;
   const showModal = !!newAlert && !dismissed.has(newAlert.id) && !selected && view === "map";
   const selectedAlert = selected ? newAlertFor(d.alerts, selected.id) : null;
+  const closedAlert = useMemo(() => {
+    if (!selected) return null;
+    const mine = d.alerts.filter((a) => a.status !== "new" && a.items.some((i) => i.shipment_id === selected.id));
+    return mine.sort((a, b) => Date.parse(b.accepted_at ?? b.created_at) - Date.parse(a.accepted_at ?? a.created_at))[0] ?? null;
+  }, [d.alerts, selected]);
   const alertsVersion = d.alerts.map((a) => `${a.id}:${a.status}`).join(",");
   const alternatives = useAlternatives(selected && panel === "alternatives" ? selected.id : null, alertsVersion);
 
   const sortedAlts = useMemo(() => sortAlternatives(alternatives ?? []), [alternatives]);
   const previewRoute = useMemo(() => {
     if (panel !== "alternatives" || !selected) return null;
-    const hovered = sortedAlts.find((a) => a.route.id === hoverRoute);
-    return (hovered ?? sortedAlts.find((a) => !isWaitRoute(a.route)))?.route ?? null;
-  }, [panel, selected, sortedAlts, hoverRoute]);
+    if (hoverRoute) return hoverRoute;
+    // С алертом — рекомендованный вариант из Alert.options; без него — первый маршрут груза.
+    if (selectedAlert) return selectedAlert.options.find((o) => o.recommended && o.id !== "wait")?.route ?? null;
+    return sortedAlts.find((a) => !isWaitRoute(a.route) && !a.recommended)?.route ?? null;
+  }, [panel, selected, sortedAlts, hoverRoute, selectedAlert]);
+
+  // Сброс демо (свой или demo.reset из WebSocket): закрыть двойник, варианты и окна, показать алерты заново.
+  const [seenReset, setSeenReset] = useState(d.resetSeq);
+  if (seenReset !== d.resetSeq) {
+    setSeenReset(d.resetSeq);
+    setDismissed(new Set());
+    setHoverRoute(null);
+  }
+  useEffect(() => {
+    if (d.resetSeq === 0) return;
+    const next = new URLSearchParams(window.location.search);
+    if (!next.has("shipment") && !next.has("panel")) return;
+    next.delete("shipment");
+    next.delete("panel");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [d.resetSeq, pathname, router]);
 
   const focus = pickFocus(d.shipments, selected?.id ?? null);
   const checkpointNode = useMemo(() => {
@@ -174,43 +210,68 @@ export function Dashboard() {
   const panelOpen = !!selected && view === "map";
 
   return (
-    <div className="flex h-full min-h-[640px] min-w-[1180px] flex-col">
+    <div className="flex h-full min-h-[640px] min-w-[1280px] flex-col">
       <AppHeader
         stats={d.stats}
         co2Pct={co2Pct}
         weather={weather}
         presets={d.presets}
         onScenario={(preset) => {
-          go({ shipment: null, panel: null, view: null });
+          go({ shipment: null, panel: null, s: "pult" });
           setDismissed(new Set());
           d.runScenario(preset);
         }}
         onReset={() => {
-          go({ shipment: null, panel: null, view: null });
+          go({ shipment: null, panel: null });
           setDismissed(new Set());
           d.resetDemo();
         }}
       />
       <div className="relative flex min-h-0 flex-1">
-        <ShipmentList
-          shipments={d.shipments}
-          nodes={d.nodes}
-          selectedId={view === "map" ? (selected?.id ?? null) : null}
-          view={view}
-          onSelect={(id) => go({ shipment: id, panel: null, view: null })}
-          onView={(v) => go({ view: v === "ledger" ? "ledger" : null, shipment: null, panel: null })}
+        <SideNav
+          active={section}
+          badges={{
+            pult: { value: d.alerts.filter((a) => a.status === "new").length, tone: "risk" },
+            shipments: { value: d.stats?.at_risk ?? 0, tone: "risk" },
+          }}
+          onSelect={(id) => go({ s: id === "pult" && user?.role !== "expeditor" ? null : id, shipment: null, panel: null })}
         />
-        {view === "ledger" ? (
+        {section === "shipments" && (
+          <ShipmentsSection
+            shipments={d.shipments}
+            nodes={d.nodes}
+            passes={d.passes}
+            canCreate
+            onOpen={(id) => go({ s: "pult", shipment: id, panel: null })}
+            onCreate={d.createShipment}
+          />
+        )}
+        {section === "sailings" && <SailingsSection sailings={d.sailings} nodes={d.nodes} shipments={d.shipments} />}
+        {section === "decisions" && <DecisionsSection alerts={d.alerts} />}
+        {section === "model" && <ModelSection />}
+        {section === "journal" && (
           <LedgerView
             blocks={d.ledger}
             check={d.ledgerCheck}
             verifying={d.verifying}
             shipments={d.shipments}
             nodes={d.nodes}
+            canTamper={can(user, "reset_demo")}
             onVerify={() => d.verifyLedger()}
             onTamper={(index) => d.tamperLedger(index)}
+          >
+            <PassesTable version={`${d.ledger.length}:${d.resetSeq}`} shipments={d.shipments} nodes={d.nodes} />
+          </LedgerView>
+        )}
+        {section === "pult" && (
+          <ShipmentList
+            shipments={d.shipments}
+            nodes={d.nodes}
+            selectedId={selected?.id ?? null}
+            onSelect={(id) => go({ shipment: id, panel: null })}
           />
-        ) : (
+        )}
+        {section === "pult" && (
           <div className="relative flex min-w-0 flex-1">
             <RealMap
               nodes={d.nodes}
@@ -242,9 +303,11 @@ export function Dashboard() {
               <AlternativesPanel
                 shipment={selected}
                 alert={selectedAlert}
+                closedAlert={closedAlert}
                 alternatives={alternatives}
                 nodes={d.nodes}
                 busy={busy}
+                canDecide={canDecide}
                 onPreview={setHoverRoute}
                 onClose={() => go({ panel: null })}
                 onAccept={(alertId, optionId) => accept(alertId, optionId)}
@@ -259,7 +322,8 @@ export function Dashboard() {
                 shipments={d.shipments}
                 nodes={d.nodes}
                 busy={busy}
-                onAccept={() => accept(newAlert.id)}
+                canDecide={canDecide}
+                onAccept={(optionId) => accept(newAlert.id, optionId)}
                 onReject={() => reject(newAlert.id)}
                 onOther={() => go({ shipment: newAlert.items[0]?.shipment_id ?? null, panel: "alternatives" })}
                 onClose={() => setDismissed((s) => new Set(s).add(newAlert.id))}
@@ -269,7 +333,7 @@ export function Dashboard() {
           </div>
         )}
         {d.error && (
-          <div className="absolute bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-[8px] border border-[#FECACA] bg-risk-soft px-4 py-2 text-[12.5px] text-risk-text">
+          <div className="absolute bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-[8px] border border-[var(--color-risk-line)] bg-risk-soft px-4 py-2 text-[12.5px] text-risk-text">
             {d.error}
           </div>
         )}

@@ -4,16 +4,14 @@ import { useMemo, useState } from "react";
 import { cargoIcon } from "@/lib/derive";
 import { formatDateTime, formatPercent, shipmentNumber, shortNodeName } from "@/lib/format";
 import type { GraphNode, Shipment } from "@/lib/types";
-import { FileIcon, FilterIcon, MapIcon, SearchIcon, TransportIcon } from "./icons";
+import { FilterIcon, SearchIcon, TransportIcon } from "./icons";
 import { StatusChip } from "./StatusChip";
 
 interface Props {
   shipments: Shipment[];
   nodes: Map<string, GraphNode>;
   selectedId: string | null;
-  view: "map" | "ledger";
   onSelect(id: string): void;
-  onView(view: "map" | "ledger"): void;
 }
 
 function nodeName(nodes: Map<string, GraphNode>, id: string) {
@@ -34,9 +32,9 @@ function ShipmentCard({
 }) {
   const atRisk = s.display_status === "at_risk";
   const rerouted = s.display_status === "rerouted";
-  const border = selected ? "#245BDB" : atRisk ? "#FECACA" : rerouted ? "#BBF7D0" : "#DFE6EF";
-  const tile = atRisk ? "#FEF2F2" : rerouted ? "#F0FDF4" : "#EFF6FF";
-  const iconColor = atRisk ? "#DC2626" : rerouted ? "#15803D" : "#245BDB";
+  const border = selected ? "var(--color-transit)" : atRisk ? "var(--color-risk-line)" : rerouted ? "var(--color-ok-line)" : "var(--color-line)";
+  const tile = atRisk ? "var(--color-risk-soft)" : rerouted ? "var(--color-ok-soft)" : "var(--color-info-soft)";
+  const iconColor = atRisk ? "var(--color-risk)" : rerouted ? "var(--color-rerouted)" : "var(--color-transit)";
   const prob = s.risk?.miss_probability ?? 0;
 
   return (
@@ -45,7 +43,7 @@ function ShipmentCard({
       onClick={onSelect}
       aria-pressed={selected}
       className="block h-[90px] w-full shrink-0 rounded-[12px] border pt-[10px] pr-[13px] pl-[11px] text-left transition-colors hover:brightness-110"
-      style={{ borderColor: border, background: selected ? "#EFF6FF" : "#FFFFFF" }}
+      style={{ borderColor: border, background: selected ? "var(--color-info-soft)" : "var(--color-panel)" }}
     >
       <div className="flex gap-[8px]">
         <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[8px]" style={{ background: tile, color: iconColor }}>
@@ -66,7 +64,7 @@ function ShipmentCard({
         <span className="tnum ml-auto text-[11px] text-faint">{formatDateTime(s.eta)}</span>
         <span
           className="tnum w-[44px] text-right text-[14px] leading-none font-bold"
-          style={{ color: s.risk_level === "high" ? "#DC2626" : s.risk_level === "medium" ? "#B45309" : "#64748B" }}
+          style={{ color: s.risk_level === "high" ? "var(--color-risk)" : s.risk_level === "medium" ? "var(--color-warn)" : "var(--color-muted)" }}
         >
           {formatPercent(prob)}
         </span>
@@ -75,7 +73,7 @@ function ShipmentCard({
   );
 }
 
-export function ShipmentList({ shipments, nodes, selectedId, view, onSelect, onView }: Props) {
+export function ShipmentList({ shipments, nodes, selectedId, onSelect }: Props) {
   const [query, setQuery] = useState("");
   const [onlyRisk, setOnlyRisk] = useState(false);
 
@@ -104,7 +102,7 @@ export function ShipmentList({ shipments, nodes, selectedId, view, onSelect, onV
           aria-pressed={onlyRisk}
           title={onlyRisk ? "Показать все грузы" : "Только под риском"}
           className={`flex size-[35px] items-center justify-center rounded-[8px] border transition-colors ${
-            onlyRisk ? "border-[#FECACA] bg-risk-soft text-risk-text" : "border-line-strong bg-panel text-muted hover:bg-tile"
+            onlyRisk ? "border-[var(--color-risk-line)] bg-risk-soft text-risk-text" : "border-line-strong bg-panel text-muted hover:bg-tile"
           }`}
         >
           <FilterIcon size={16} />
@@ -121,40 +119,13 @@ export function ShipmentList({ shipments, nodes, selectedId, view, onSelect, onV
         />
       </label>
 
-      <div className="scroll-thin mt-[14px] flex min-h-0 flex-1 flex-col gap-[11px] overflow-y-auto px-5 pb-4">
+      <div className="scroll-thin mt-[14px] flex min-h-0 flex-1 flex-col gap-[11px] overflow-y-auto px-5 pb-6">
         {visible.map((s) => (
           <ShipmentCard key={s.id} s={s} nodes={nodes} selected={s.id === selectedId} onSelect={() => onSelect(s.id)} />
         ))}
         {visible.length === 0 && <div className="pt-6 text-center text-[12.5px] text-muted">Ничего не найдено</div>}
       </div>
 
-      <div className="mx-5 border-t border-line pt-[13px] pb-[27px]">
-        <div className="caps text-[10.5px] leading-[12px] font-bold text-muted">Рабочая область</div>
-        <div className="mt-[14px] flex h-[43px] items-center gap-[4px] rounded-[12px] border border-line bg-tile p-[3px]">
-          {(
-            [
-              ["map", "Карта", MapIcon],
-              ["ledger", "Реестр", FileIcon],
-            ] as const
-          ).map(([key, title, Ico]) => {
-            const active = view === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={active}
-                onClick={() => onView(key)}
-                className={`flex h-[36px] flex-1 items-center justify-center gap-[9px] rounded-[8px] border text-[14px] font-bold transition-colors ${
-                  active ? "border-line bg-panel shadow-[0_1px_2px_rgba(18,48,74,0.06)]" : "border-transparent hover:bg-panel/70"
-                }`}
-              >
-                <Ico size={15} className="text-transit-text" />
-                {title}
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </aside>
   );
 }

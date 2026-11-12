@@ -1,0 +1,8 @@
+.env
+__pycache__/
+.venv/
+node_modules/
+build/
+.dart_tool/
+local_db.json
+*.cbm

@@ -244,7 +244,7 @@ export function divergenceNode(route: Route, plan: Route | null): string | null 
   return route.legs.find((l) => !planEdges.has(l.edge_id))?.to ?? null;
 }
 
-/** Через сколько часов начнётся шторм, считая от создания алерта (по сценарию или по прогнозу волны). */
+/** Запасной отсчёт, если в алерте нет starts_in_h. Живой бэкенд отдаёт starts_in_h от sim_now. */
 export function stormLeadHours(alert: Alert, weather: Weather | null, scenario: Scenario | null): number | null {
   let start: number | null = scenario ? Date.parse(scenario.start) : null;
   if (start === null && weather) {

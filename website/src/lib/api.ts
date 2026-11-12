@@ -3,6 +3,9 @@ import type {
   Alert,
   Alternative,
   ApiErrorBody,
+  AuthOut,
+  AuthRole,
+  AuthUser,
   Block,
   Graph,
   LedgerVerify,
@@ -49,6 +52,9 @@ export interface Api {
   /** Только моки: в контракте нет GET сценария, на бэкенде сценарий приходит из POST /scenarios. */
   getScenario?(id: string): Promise<Scenario | null>;
   resetDemo(): Promise<void>;
+  register(body: { name: string; email: string; password: string; role: AuthRole }): Promise<AuthOut>;
+  login(body: { email: string; password: string }): Promise<AuthOut>;
+  me(token: string): Promise<AuthUser>;
   /** URL WebSocket `/ws` или null, если его нет (моки). */
   wsUrl(): string | null;
 }
@@ -95,10 +101,20 @@ const httpApi: Api = {
   resetDemo: async () => {
     await request("/demo/reset", { method: "POST" });
   },
+  register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+  login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+  me: (token) =>
+    request("/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
   wsUrl: () => {
     const base = new URL(API_URL || window.location.origin);
     base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
     base.pathname = "/ws";
+    base.search = "";
+    base.hash = "";
+    // Браузер не умеет слать заголовки в WebSocket: ключ идёт query-параметром.
+    if (API_KEY) base.searchParams.set("api_key", API_KEY);
     return base.toString();
   },
 };
@@ -188,6 +204,12 @@ let mockRejected = false;
 /** Подделанная запись реестра (индекс блока) — для проверки целостности в моках. */
 let mockTampered: number | null = null;
 
+type MockAccount = AuthUser & { password: string };
+const mockAccounts: MockAccount[] = [
+  { id: "u-logist", name: "Демо логист", email: "logist@demo.ru", role: "logist", password: "demo123" },
+  { id: "u-expeditor", name: "Демо экспедитор", email: "expeditor@demo.ru", role: "expeditor", password: "demo123" },
+];
+
 async function load<T>(kind: keyof (typeof mockFiles)["base"]): Promise<T> {
   const mod = await mockFiles[state()][kind]();
   return structuredClone(mod.default) as T;
@@ -272,6 +294,29 @@ const mockApi: Api = {
     mockState = "base";
     mockRejected = false;
     mockTampered = null;
+  },
+
+  register: async (body) => {
+    const email = body.email.trim().toLowerCase();
+    if (!email.includes("@")) throw new ApiError(422, "invalid_email", "Некорректный email");
+    if (body.password.length < 6) throw new ApiError(422, "weak_password", "Пароль короче 6 символов");
+    if (mockAccounts.some((a) => a.email === email)) throw new ApiError(409, "email_taken", "Email уже занят");
+    const user: AuthUser = { id: `u-${mockAccounts.length + 1}`, name: body.name.trim(), email, role: body.role };
+    mockAccounts.push({ ...user, password: body.password });
+    return { token: `mock-${user.id}`, user };
+  },
+  login: async (body) => {
+    const email = body.email.trim().toLowerCase();
+    const acc = mockAccounts.find((a) => a.email === email && a.password === body.password);
+    if (!acc) throw new ApiError(401, "invalid_credentials", "Неверный email или пароль");
+    const user = { id: acc.id, name: acc.name, email: acc.email, role: acc.role };
+    return { token: `mock-${user.id}`, user };
+  },
+  me: async (token) => {
+    const id = token.startsWith("mock-") ? token.slice(5) : "";
+    const acc = mockAccounts.find((a) => a.id === id);
+    if (!acc) throw new ApiError(401, "invalid_token", "Сессия недействительна");
+    return { id: acc.id, name: acc.name, email: acc.email, role: acc.role };
   },
   wsUrl: () => null,
 };

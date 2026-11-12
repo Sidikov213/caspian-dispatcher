@@ -20,7 +20,7 @@ interface Props {
   onWait(alertId: string): void;
 }
 
-const RISK_COLOR: Record<RiskLevel, string> = { low: "#69E6A0", medium: "#F5A524", high: "#FF888D" };
+const RISK_COLOR: Record<RiskLevel, string> = { low: "#15803D", medium: "#B45309", high: "#DC2626" };
 
 function nodeName(nodes: Map<string, GraphNode>, id: string) {
   const n = nodes.get(id);
@@ -90,16 +90,16 @@ function OptionCard({
       onMouseLeave={() => onPreview(null)}
       className="h-[197px] shrink-0 rounded-[12px] border pr-[14px] pl-[14px]"
       style={{
-        background: rec ? "#142A30" : "#131C2E",
-        borderColor: rec ? "#327A66" : "#24304A",
+        background: rec ? "#F0FDF4" : "#FFFFFF",
+        borderColor: rec ? "#86EFAC" : "#DFE6EF",
       }}
     >
       <div className="relative pt-[12px]">
-        <div className="caps text-[10px] leading-[12px] font-bold" style={{ color: rec ? "#69E6A0" : "#8A97AD" }}>
+        <div className="caps text-[10px] leading-[12px] font-bold" style={{ color: rec ? "#15803D" : "#64748B" }}>
           Вариант {String(index + 1).padStart(2, "0")}
         </div>
         {rec && (
-          <span className="absolute top-[10px] right-[1px] flex h-[21px] w-[106px] items-center justify-center rounded-[6px] bg-[#1B4937] text-[11px] font-bold text-ok">
+          <span className="absolute top-[10px] right-[1px] flex h-[21px] w-[106px] items-center justify-center rounded-[6px] bg-[#DCFCE7] text-[11px] font-bold text-ok">
             Рекомендуем
           </span>
         )}
@@ -126,7 +126,7 @@ function OptionCard({
           disabled={!canPick}
           onClick={() => alert && (wait ? onWait(alert.id) : option && onAccept(alert.id, option.id))}
           className={`h-[39px] w-[106px] rounded-[9px] text-[13px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            rec ? "bg-action text-white hover:bg-[#2a74d8]" : "border border-line-strong bg-tile text-text hover:bg-[#1b2a42]"
+            rec ? "bg-action text-white hover:bg-action-hover" : "border border-line-strong bg-panel text-text hover:bg-tile"
           }`}
         >
           Выбрать
@@ -160,12 +160,12 @@ export function AlternativesPanel({
   const [num, name] = [shipmentNumber(shipment.id), shipment.title];
 
   return (
-    <aside className="scroll-thin absolute inset-y-0 right-0 z-20 flex w-[400px] flex-col overflow-y-auto border-l border-line bg-bg pt-[20px] pr-5 pb-[27.5px] pl-[19px]">
+    <aside className="scroll-thin absolute inset-y-0 right-0 z-20 flex w-[400px] flex-col overflow-y-auto border-l border-line bg-panel pt-[20px] pr-5 pb-[27.5px] pl-[19px] shadow-[-8px_0_24px_rgba(18,48,74,0.06)]">
       <button
         type="button"
         onClick={onClose}
         aria-label="Назад к грузу"
-        className="absolute top-[25px] right-[21.5px] flex size-[35px] items-center justify-center rounded-[9px] border border-line-strong bg-panel text-[#DCE3EE] hover:bg-tile"
+        className="absolute top-[25px] right-[21.5px] flex size-[35px] items-center justify-center rounded-[8px] border border-line bg-panel text-muted hover:bg-tile"
       >
         <CloseIcon size={16} />
       </button>

@@ -26,9 +26,9 @@ interface Props {
 }
 
 const RISK_TONE: Record<RiskLevel, { bg: string; border: string; text: string }> = {
-  high: { bg: "#281D2B", border: "#573244", text: "#FF888D" },
-  medium: { bg: "#272219", border: "#594325", text: "#FCC965" },
-  low: { bg: "#13231F", border: "#1F4535", text: "#7EE2A2" },
+  high: { bg: "#FEF2F2", border: "#FECACA", text: "#DC2626" },
+  medium: { bg: "#FFFBEB", border: "#FDE68A", text: "#B45309" },
+  low: { bg: "#F0FDF4", border: "#BBF7D0", text: "#15803D" },
 };
 
 function nodeName(nodes: Map<string, GraphNode>, id: string) {
@@ -81,7 +81,7 @@ function RiskCard({ shipment }: { shipment: Shipment }) {
                   className="absolute inset-y-0 left-0 rounded-full"
                   style={{
                     width: `${Math.max((f.impact_hours / maxImpact) * 100, 4)}%`,
-                    background: i === 0 && risk.level === "high" ? "#EF4444" : "#F59E0B",
+                    background: i === 0 && risk.level === "high" ? "#DC2626" : "#B45309",
                   }}
                 />
               </span>
@@ -105,7 +105,7 @@ function Stops({ shipment, nodes }: { shipment: Shipment; nodes: Map<string, Gra
             {i < stops.length - 1 && <span className="absolute top-[29.5px] left-[14.5px] h-[16.5px] w-px bg-line-strong" />}
             <span
               className="flex size-[29.5px] shrink-0 items-center justify-center rounded-[7px]"
-              style={{ background: danger ? "#351F2D" : "#172338", color: danger ? "#FF888D" : "#9DC8FF" }}
+              style={{ background: danger ? "#FEF2F2" : "#EFF6FF", color: danger ? "#DC2626" : "#245BDB" }}
             >
               <TransportIcon kind={modeIcon(stop.mode)} size={15} />
             </span>
@@ -114,7 +114,7 @@ function Stops({ shipment, nodes }: { shipment: Shipment; nodes: Map<string, Gra
                 <span className="truncate text-[14px] leading-[17px] font-bold">{nodeName(nodes, stop.nodeId)}</span>
                 <span
                   className="tnum ml-auto pl-3 text-[11.5px] whitespace-nowrap"
-                  style={{ color: danger ? "#FF888D" : "#8A97AD" }}
+                  style={{ color: danger ? "#DC2626" : "#64748B" }}
                 >
                   {stopTime(stop)}
                 </span>
@@ -133,13 +133,13 @@ function Co2Card({ shipment, edges }: { shipment: Shipment; edges: Map<string, E
   const total = shipment.route.total_co2_kg || parts.rail + parts.sea + parts.road;
   const sum = parts.rail + parts.sea + parts.road || 1;
   const segments = [
-    { key: "rail", label: "Ж/д", value: parts.rail, color: "#3B82F6" },
-    { key: "sea", label: "Море", value: parts.sea, color: "#73D9EE" },
-    { key: "road", label: "Авто", value: parts.road, color: "#22C55E" },
+    { key: "rail", label: "Ж/д", value: parts.rail, color: "#245BDB" },
+    { key: "sea", label: "Море", value: parts.sea, color: "#087F8C" },
+    { key: "road", label: "Авто", value: parts.road, color: "#15803D" },
   ].filter((p) => p.value > 0);
 
   return (
-    <section className="mt-[19px] h-[79px] shrink-0 rounded-[12px] border border-line bg-panel pt-[11px] pr-[13.5px] pl-[11.5px]">
+    <section className="mt-[19px] h-[79px] shrink-0 rounded-[12px] border border-line bg-bg pt-[11px] pr-[13.5px] pl-[11.5px]">
       <div className="flex items-center">
         <LeafIcon size={15} className="text-rerouted" />
         <span className="ml-[8.5px] text-[14px] leading-[17px] font-bold">Выбросы CO₂</span>
@@ -169,19 +169,19 @@ function PassCard({ shipment, pass, nodes }: { shipment: Shipment; pass: Pass | 
 
   let title = "Пропуск оформлен";
   let sub = where;
-  let color = "#E6EDF7";
+  let color = "#12304A";
   if (shipment.pass_state === "reissue_pending") {
     title = "Пропуск ожидает переоформления";
     sub = pass ? `Действует старый: ${where}` : "Маршрут изменён";
-    color = "#FCC965";
+    color = "#B45309";
   } else if (shipment.pass_state === "none" || !shipment.pass_id) {
     title = "Пропуск не оформлен";
     sub = "Нужен снимок инвойса в приложении";
-    color = "#8A97AD";
+    color = "#64748B";
   }
 
   return (
-    <section className="mt-[11.5px] flex h-[73.5px] shrink-0 items-center rounded-[12px] border border-line bg-panel pr-[13px] pl-[11.5px]">
+    <section className="mt-[11.5px] flex h-[73.5px] shrink-0 items-center rounded-[12px] border border-line bg-bg pr-[13px] pl-[11.5px]">
       <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[8px] bg-tile text-muted">
         <FileIcon size={15} />
       </span>
@@ -202,12 +202,12 @@ function PassCard({ shipment, pass, nodes }: { shipment: Shipment; pass: Pass | 
 
 export function TwinPanel({ shipment, nodes, edges, pass, onClose, onAlternatives }: Props) {
   return (
-    <aside className="scroll-thin absolute inset-y-0 right-0 z-20 flex w-[400px] flex-col overflow-y-auto border-l border-line bg-bg pt-[20px] pr-[20.5px] pb-[27.5px] pl-[20px]">
+    <aside className="scroll-thin absolute inset-y-0 right-0 z-20 flex w-[400px] flex-col overflow-y-auto border-l border-line bg-panel pt-[20px] pr-[20.5px] pb-[27.5px] pl-[20px] shadow-[-8px_0_24px_rgba(18,48,74,0.06)]">
       <button
         type="button"
         onClick={onClose}
         aria-label="Закрыть"
-        className="absolute top-[25px] right-[21.5px] flex size-[35px] items-center justify-center rounded-[9px] border border-line-strong bg-panel text-[#DCE3EE] hover:bg-tile"
+        className="absolute top-[25px] right-[21.5px] flex size-[35px] items-center justify-center rounded-[8px] border border-line bg-panel text-muted hover:bg-tile"
       >
         <CloseIcon size={16} />
       </button>
@@ -239,7 +239,7 @@ export function TwinPanel({ shipment, nodes, edges, pass, onClose, onAlternative
       <button
         type="button"
         onClick={onAlternatives}
-        className="mt-[21.5px] flex h-[47px] shrink-0 items-center justify-center gap-[12px] rounded-[10px] bg-action text-[15px] font-bold text-white transition-colors hover:bg-[#2a74d8]"
+        className="mt-[21.5px] flex h-[47px] shrink-0 items-center justify-center gap-[12px] rounded-[8px] bg-action text-[15px] font-bold text-white transition-colors hover:bg-action-hover"
       >
         <RouteIcon size={16} />
         Альтернативные маршруты

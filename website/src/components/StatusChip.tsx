@@ -1,12 +1,13 @@
 import { STATUS_LABEL } from "@/lib/derive";
 import type { DisplayStatus } from "@/lib/types";
 
+/** Светлые подложки статусов: бриф (красная / жёлтая / зелёная / синяя). */
 const TONE: Record<DisplayStatus, { bg: string; dot: string; text: string }> = {
-  planned: { bg: "rgba(138,151,173,0.12)", dot: "#8A97AD", text: "#A9B4C6" },
-  in_transit: { bg: "rgba(59,130,246,0.12)", dot: "#3B82F6", text: "#9DC8FF" },
-  at_risk: { bg: "rgba(239,68,68,0.12)", dot: "#EF4444", text: "#FF888D" },
-  rerouted: { bg: "rgba(34,197,94,0.12)", dot: "#22C55E", text: "#7EE2A2" },
-  delivered: { bg: "rgba(138,151,173,0.12)", dot: "#8A97AD", text: "#C9D2E0" },
+  planned: { bg: "#F1F5F9", dot: "#64748B", text: "#64748B" },
+  in_transit: { bg: "#EFF6FF", dot: "#245BDB", text: "#245BDB" },
+  at_risk: { bg: "#FEF2F2", dot: "#DC2626", text: "#DC2626" },
+  rerouted: { bg: "#F0FDF4", dot: "#15803D", text: "#15803D" },
+  delivered: { bg: "#F1F5F9", dot: "#64748B", text: "#64748B" },
 };
 
 export function StatusChip({ status }: { status: DisplayStatus }) {

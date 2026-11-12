@@ -199,17 +199,26 @@ export const ResetIcon = (p: IconProps) => (
   </Icon>
 );
 
+/** Знак без текста — для иконок и компактных мест. */
 export function LogoMark({ size = 50 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 89 89" aria-hidden>
-      <rect x=".5" y=".5" width="88" height="88" rx="23" fill="#132D50" stroke="#284D79" />
-      <g transform="translate(17.8 17.8) scale(2.225)">
-        <g fill="none" stroke="#73D9EE" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2.8 21.2 8v8L12 21.2 2.8 16V8Z" />
-          <path d="m5.5 14.5 4-4 3 2.3 5.8-5.1M15.5 7.7h2.8v2.8" />
-          <circle cx="5.5" cy="14.5" r=".75" />
-        </g>
-      </g>
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/logo-mark.png" alt="" width={size} height={size} className="block object-contain" draggable={false} />
+  );
+}
+
+/** Знак с названием — шапка сайта. */
+export function LogoWordmark({ height = 44 }: { height?: number }) {
+  const width = Math.round(height * (1024 / 262));
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/logo.png"
+      alt="Каспийский диспетчер"
+      width={width}
+      height={height}
+      className="block object-contain object-left"
+      draggable={false}
+    />
   );
 }

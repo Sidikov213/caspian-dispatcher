@@ -1,31 +1,40 @@
 @import "tailwindcss";
 
-/* Палитра — docs/design/screens.pdf, лист «Компоненты и стили». */
+/* Светлая тема: бриф логотипа и DEMO_SCENARIO (белый интерфейс, синий + бирюза). */
 @theme {
-  --color-bg: #0b1220;
-  --color-panel: #131c2e;
-  --color-field: #101b2d;
-  --color-tile: #172338;
-  --color-line: #24304a;
-  --color-line-strong: #30425c;
-  --color-text: #e6edf7;
-  --color-muted: #8a97ad;
-  --color-faint: #7b889d;
-  --color-action: #2f80ed;
-  --color-transit: #3b82f6;
-  --color-transit-text: #9dc8ff;
-  --color-risk: #ef4444;
-  --color-risk-text: #ff888d;
-  --color-rerouted: #22c55e;
-  --color-rerouted-text: #7ee2a2;
-  --color-warn: #f59e0b;
-  --color-warn-text: #fcc965;
-  --color-ok: #69e6a0;
-  --color-cyan: #73d9ee;
-  --color-map-sea: #0c192c;
-  --color-map-land: #142338;
+  --color-bg: #f5f7fb;
+  --color-panel: #ffffff;
+  --color-field: #ffffff;
+  --color-tile: #eef2f7;
+  --color-line: #dfe6ef;
+  --color-line-strong: #c9d4e3;
+  --color-text: #12304a;
+  --color-muted: #64748b;
+  --color-faint: #94a3b8;
+  --color-action: #245bdb;
+  --color-action-hover: #1e4fc7;
+  --color-brand: #087f8c;
+  --color-transit: #245bdb;
+  --color-transit-text: #245bdb;
+  --color-risk: #dc2626;
+  --color-risk-text: #dc2626;
+  --color-risk-soft: #fef2f2;
+  --color-rerouted: #15803d;
+  --color-rerouted-text: #15803d;
+  --color-rerouted-soft: #f0fdf4;
+  --color-warn: #b45309;
+  --color-warn-text: #b45309;
+  --color-warn-soft: #fffbeb;
+  --color-ok: #15803d;
+  --color-ok-soft: #f0fdf4;
+  --color-cyan: #087f8c;
+  --color-info-soft: #eff6ff;
+  --color-map-sea: #e8eef6;
+  --color-map-land: #d7e0ec;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 12px;
+  --radius-btn: 8px;
 }
 
 html,

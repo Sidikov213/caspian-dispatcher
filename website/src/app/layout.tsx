@@ -10,7 +10,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Каспийский диспетчер",
   description: "Окно логиста коридора «Север–Юг»: карта, цифровые двойники грузов, прогноз задержек",
-  icons: { icon: "/caspian-dispatch-logo.svg" },
+  icons: { icon: [{ url: "/logo-mark.png", type: "image/png" }] },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

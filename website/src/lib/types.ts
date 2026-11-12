@@ -63,12 +63,20 @@ export interface RiskFactor {
   impact_hours: number;
 }
 
+export interface ProbabilityDriver {
+  name: string;
+  label: string;
+  impact_pp: number;
+}
+
 export interface Risk {
   miss_probability: number;
   level: RiskLevel;
   departure_shift_h: number;
   arrival_delay_h: number;
   factors: RiskFactor[];
+  /** Три главных признака CatBoost (SHAP). У формулы и сухопутных маршрутов — null. Сайт их не рисует. */
+  probability_drivers?: ProbabilityDriver[] | null;
 }
 
 export type Stage = "planned" | "in_transit" | "delivered";
@@ -126,6 +134,8 @@ export interface Stats {
   saved_hours: number;
   saved_rub: number;
   co2_saved_kg: number;
+  /** На сколько % ниже CO₂ к исходным маршрутам. 6.9 → показывать «−6,9%». Считает бэкенд. */
+  co2_saved_pct: number;
   decisions: number;
   shipments_total: number;
   at_risk: number;
@@ -139,6 +149,8 @@ export interface Scenario {
   affected_nodes: string[];
   start: string;
   end: string;
+  /** Через сколько часов от sim_now начинается угроза. Не считать от created_at. */
+  starts_in_h: number;
   params: { wave_height_m?: number; wind_ms?: number };
 }
 
@@ -174,6 +186,8 @@ export interface Alert {
   id: string;
   scenario_id: string;
   created_at: string;
+  /** Через сколько часов от sim_now начинается угроза — копия из сценария. */
+  starts_in_h: number;
   severity: string;
   title: string;
   text: string;
@@ -236,4 +250,19 @@ export interface Block {
 export interface LedgerVerify {
   valid: boolean;
   broken_at: number | null;
+}
+
+/** Аккаунты — POST /api/auth/register|login, GET /api/auth/me. */
+export type AuthRole = "logist" | "expeditor";
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: AuthRole;
+}
+
+export interface AuthOut {
+  token: string;
+  user: AuthUser;
 }

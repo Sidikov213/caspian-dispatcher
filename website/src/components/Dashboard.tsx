@@ -131,8 +131,9 @@ export function Dashboard() {
     [d, go],
   );
 
-  // Доля CO₂ по принятым решениям: сумма дельт к сумме исходных выбросов.
+  // Счётчик CO₂ приходит из /stats: 6.9 значит «−6,9%». Старые моки без поля — считаем по алертам.
   const co2Pct = useMemo(() => {
+    if (d.stats && typeof d.stats.co2_saved_pct === "number") return -d.stats.co2_saved_pct;
     let delta = 0;
     let base = 0;
     for (const a of d.alerts) {
@@ -141,7 +142,7 @@ export function Dashboard() {
       base += (a.totals.co2_delta_kg / a.totals.co2_delta_pct) * 100;
     }
     return base ? (delta / base) * 100 : 0;
-  }, [d.alerts]);
+  }, [d.stats, d.alerts]);
 
   const freshness = useMemo(() => {
     if (!d.weather) return null;
@@ -266,7 +267,7 @@ export function Dashboard() {
           </div>
         )}
         {d.error && (
-          <div className="absolute bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-[9px] border border-[#573244] bg-[#281D2B] px-4 py-2 text-[12.5px] text-risk-text">
+          <div className="absolute bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-[8px] border border-[#FECACA] bg-risk-soft px-4 py-2 text-[12.5px] text-risk-text">
             {d.error}
           </div>
         )}

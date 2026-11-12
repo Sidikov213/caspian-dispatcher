@@ -46,7 +46,7 @@ function plural(n: number, one: string, few: string, many: string) {
 
 export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, onAccept, onOther, onReject, onClose }: Props) {
   const best = alert.options.find((o) => o.recommended) ?? alert.options.find((o) => o.id !== "wait") ?? null;
-  const lead = stormLeadHours(alert, weather, scenario);
+  const lead = alert.starts_in_h != null ? Math.round(alert.starts_in_h) : stormLeadHours(alert, weather, scenario);
   const affected = alert.items
     .map((i) => shipments.find((s) => s.id === i.shipment_id))
     .filter((s): s is Shipment => !!s);
@@ -59,19 +59,19 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, o
       role="dialog"
       aria-label="Прогноз шторма"
       data-map-ui
-      className="absolute bottom-[96px] left-[22px] z-30 h-[371px] w-[632px] rounded-[14px] border border-[#824552] bg-[#101B2B] px-[18px] shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
+      className="absolute bottom-[96px] left-[22px] z-30 h-[371px] w-[632px] rounded-[12px] border border-[#FECACA] bg-panel px-[18px] shadow-[0_24px_60px_rgba(18,48,74,0.16)]"
     >
       <button
         type="button"
         onClick={onClose}
         aria-label="Закрыть"
-        className="absolute top-[17px] right-[18px] flex size-[36px] items-center justify-center rounded-[9px] border border-line-strong bg-panel text-[#DCE3EE] hover:bg-tile"
+        className="absolute top-[17px] right-[18px] flex size-[36px] items-center justify-center rounded-[8px] border border-line bg-panel text-muted hover:bg-tile"
       >
         <CloseIcon size={16} />
       </button>
 
       <div className="flex pt-[17px]">
-        <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[10px] bg-[#452632] text-risk-text">
+        <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[10px] bg-risk-soft text-risk-text">
           <StormIcon size={18} />
         </span>
         <div className="caps mt-[2px] ml-[13px] text-[10.5px] leading-[13px] font-bold text-risk-text">
@@ -86,12 +86,12 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, o
       </p>
 
       <div className="mt-[17px] flex gap-[7px]">
-        <div className="h-[111px] flex-1 rounded-[12px] border border-[#553343] bg-[#291E2C] px-[13px] pt-[10px]">
+        <div className="h-[111px] flex-1 rounded-[12px] border border-[#FECACA] bg-risk-soft px-[13px] pt-[10px]">
           <div className="text-[12.5px] leading-[20px] font-bold text-risk-text">Ничего не делать</div>
           <div className="tnum mt-[10px] text-[32px] leading-[36px] font-bold">{formatHoursDelta(alert.do_nothing.delay_hours)}</div>
           <div className="mt-[9px] text-[11px] leading-[13px] text-muted">Простой {formatRub(alert.do_nothing.loss_rub)}</div>
         </div>
-        <div className="h-[111px] flex-1 rounded-[12px] border border-[#2A5B4D] bg-[#132B29] px-[13px] pt-[10px]">
+        <div className="h-[111px] flex-1 rounded-[12px] border border-[#BBF7D0] bg-ok-soft px-[13px] pt-[10px]">
           <div className="text-[12.5px] leading-[20px] font-bold text-ok">Решение диспетчера</div>
           {best ? (
             <>
@@ -112,16 +112,16 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, o
             type="button"
             disabled={busy}
             onClick={onAccept}
-            className="flex h-[38px] w-[179px] items-center justify-center gap-[9px] rounded-[9px] bg-action text-[13px] font-bold text-white transition-colors hover:bg-[#2a74d8] disabled:opacity-60"
+            className="flex h-[38px] w-[179px] items-center justify-center gap-[9px] rounded-[8px] bg-action text-[13px] font-bold text-white transition-colors hover:bg-action-hover disabled:opacity-60"
           >
-            <CheckIcon size={14} strokeWidth={2} className="text-[#CFE2FF]" />
+            <CheckIcon size={14} strokeWidth={2} className="text-white/90" />
             Принять
           </button>
         )}
         <button
           type="button"
           onClick={onOther}
-          className="h-[38px] w-[169px] rounded-[9px] border border-[#2A3B53] bg-tile text-[13px] font-bold transition-colors hover:bg-[#1b2a42]"
+          className="h-[38px] w-[169px] rounded-[8px] border border-line-strong bg-panel text-[13px] font-bold transition-colors hover:bg-tile"
         >
           Другие варианты
         </button>

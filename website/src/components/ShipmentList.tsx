@@ -34,9 +34,9 @@ function ShipmentCard({
 }) {
   const atRisk = s.display_status === "at_risk";
   const rerouted = s.display_status === "rerouted";
-  const border = selected ? "#2C517B" : atRisk ? "#573244" : rerouted ? "#1E4A3A" : "#24304A";
-  const tile = atRisk ? "rgba(239,68,68,0.15)" : rerouted ? "rgba(34,197,94,0.12)" : "#172338";
-  const iconColor = atRisk ? "#FF888D" : rerouted ? "#7EE2A2" : "#9DC8FF";
+  const border = selected ? "#245BDB" : atRisk ? "#FECACA" : rerouted ? "#BBF7D0" : "#DFE6EF";
+  const tile = atRisk ? "#FEF2F2" : rerouted ? "#F0FDF4" : "#EFF6FF";
+  const iconColor = atRisk ? "#DC2626" : rerouted ? "#15803D" : "#245BDB";
   const prob = s.risk?.miss_probability ?? 0;
 
   return (
@@ -45,7 +45,7 @@ function ShipmentCard({
       onClick={onSelect}
       aria-pressed={selected}
       className="block h-[90px] w-full shrink-0 rounded-[12px] border pt-[10px] pr-[13px] pl-[11px] text-left transition-colors hover:brightness-110"
-      style={{ borderColor: border, background: selected ? "#192B45" : "#131C2E" }}
+      style={{ borderColor: border, background: selected ? "#EFF6FF" : "#FFFFFF" }}
     >
       <div className="flex gap-[8px]">
         <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[8px]" style={{ background: tile, color: iconColor }}>
@@ -66,7 +66,7 @@ function ShipmentCard({
         <span className="tnum ml-auto text-[11px] text-faint">{formatDateTime(s.eta)}</span>
         <span
           className="tnum w-[44px] text-right text-[14px] leading-none font-bold"
-          style={{ color: s.risk_level === "high" ? "#FF888D" : s.risk_level === "medium" ? "#F5A524" : "#8A97AD" }}
+          style={{ color: s.risk_level === "high" ? "#DC2626" : s.risk_level === "medium" ? "#B45309" : "#64748B" }}
         >
           {formatPercent(prob)}
         </span>
@@ -90,7 +90,7 @@ export function ShipmentList({ shipments, nodes, selectedId, view, onSelect, onV
   }, [shipments, query, onlyRisk]);
 
   return (
-    <aside className="flex w-[320px] shrink-0 flex-col bg-bg shadow-[inset_-1px_0_0_var(--color-line)]">
+    <aside className="flex w-[320px] shrink-0 flex-col bg-panel shadow-[inset_-1px_0_0_var(--color-line)]">
       <div className="mt-[23.5px] flex h-[35px] items-start justify-between pr-[21px] pl-5">
         <div className="flex items-start">
           <h1 className="text-[28px] leading-[34px] font-bold">Грузы</h1>
@@ -104,7 +104,7 @@ export function ShipmentList({ shipments, nodes, selectedId, view, onSelect, onV
           aria-pressed={onlyRisk}
           title={onlyRisk ? "Показать все грузы" : "Только под риском"}
           className={`flex size-[35px] items-center justify-center rounded-[8px] border transition-colors ${
-            onlyRisk ? "border-[#573244] bg-[#281D2B] text-risk-text" : "border-line-strong bg-panel text-[#CFD6E1] hover:bg-tile"
+            onlyRisk ? "border-[#FECACA] bg-risk-soft text-risk-text" : "border-line-strong bg-panel text-muted hover:bg-tile"
           }`}
         >
           <FilterIcon size={16} />
@@ -130,7 +130,7 @@ export function ShipmentList({ shipments, nodes, selectedId, view, onSelect, onV
 
       <div className="mx-5 border-t border-line pt-[13px] pb-[27px]">
         <div className="caps text-[10.5px] leading-[12px] font-bold text-muted">Рабочая область</div>
-        <div className="mt-[14px] flex h-[43px] items-center gap-[4px] rounded-[10px] border border-[#1A263B] bg-field p-[3px]">
+        <div className="mt-[14px] flex h-[43px] items-center gap-[4px] rounded-[12px] border border-line bg-tile p-[3px]">
           {(
             [
               ["map", "Карта", MapIcon],
@@ -145,7 +145,7 @@ export function ShipmentList({ shipments, nodes, selectedId, view, onSelect, onV
                 aria-pressed={active}
                 onClick={() => onView(key)}
                 className={`flex h-[36px] flex-1 items-center justify-center gap-[9px] rounded-[8px] border text-[14px] font-bold transition-colors ${
-                  active ? "border-[#2A3850] bg-tile" : "border-transparent hover:bg-tile/60"
+                  active ? "border-line bg-panel shadow-[0_1px_2px_rgba(18,48,74,0.06)]" : "border-transparent hover:bg-panel/70"
                 }`}
               >
                 <Ico size={15} className="text-transit-text" />

@@ -52,21 +52,21 @@ const MAX_SCALE = 4;
 const BOX = { x: 0, y: 0, w: 0, h: 0 };
 
 const MARKER_FILL: Record<DisplayStatus, string> = {
-  in_transit: "#3B82F6",
-  at_risk: "#EF4444",
-  rerouted: "#22C55E",
+  in_transit: "#245BDB",
+  at_risk: "#DC2626",
+  rerouted: "#15803D",
   planned: "#64748B",
   delivered: "#64748B",
 };
 
 const ROUTE = {
-  active: "#4D9AFF",
-  pending: "#73D9EE",
-  blocked: "#FF5A64",
-  rerouted: "#3DDC84",
-  other: "#C9D2DE",
-  casing: "#091522",
-  preview: "#A9CBFF",
+  active: "#245BDB",
+  pending: "#087F8C",
+  blocked: "#DC2626",
+  rerouted: "#15803D",
+  other: "#94A3B8",
+  casing: "#E2E8F0",
+  preview: "#60A5FA",
 };
 
 /** Подогнать прямоугольник карты в видимую часть контейнера. */
@@ -270,7 +270,7 @@ export function CorridorMap({
   return (
     <div
       ref={ref}
-      className="relative min-w-0 flex-1 touch-none overflow-hidden bg-map-sea select-none"
+      className="relative min-w-0 flex-1 touch-none overflow-hidden bg-bg select-none"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -280,16 +280,16 @@ export function CorridorMap({
       <svg className="absolute inset-0 size-full" aria-label="Схема коридора «Север–Юг»">
         <defs>
           <pattern id="storm-hatch" width={10} height={10} patternUnits="userSpaceOnUse" patternTransform="rotate(32)">
-            <line x1="0" y1="0" x2="0" y2="10" stroke="rgba(239,68,68,0.55)" strokeWidth={1.4} />
+            <line x1="0" y1="0" x2="0" y2="10" stroke="rgba(220,38,38,0.55)" strokeWidth={1.4} />
           </pattern>
         </defs>
 
         <g transform={`matrix(${s} 0 0 ${s} ${tx} ${ty})`}>
-          <path d={LAND} fill="#142338" stroke="#2B4058" strokeWidth={1.1 * k} strokeLinejoin="round" />
-          <path d={INLAND_SEA} fill="#102941" stroke="#2B4A66" strokeWidth={1.1 * k} />
-          <path d={CASPIAN} fill="#0F3151" stroke="#3E6E8C" strokeWidth={1.2 * k} strokeLinejoin="round" />
+          <path d={LAND} fill="#E8EEF5" stroke="#CDD7E4" strokeWidth={1.1 * k} strokeLinejoin="round" />
+          <path d={INLAND_SEA} fill="#D5E4F0" stroke="#B7CADA" strokeWidth={1.1 * k} />
+          <path d={CASPIAN} fill="#C5DBEC" stroke="#8FB0C8" strokeWidth={1.2 * k} strokeLinejoin="round" />
           {CASPIAN_CONTOURS.map((d, i) => (
-            <path key={i} d={d} fill="none" stroke="rgba(115,217,238,0.15)" strokeWidth={1 * k} strokeLinejoin="round" />
+            <path key={i} d={d} fill="none" stroke="rgba(8,127,140,0.18)" strokeWidth={1 * k} strokeLinejoin="round" />
           ))}
           {layers.borders &&
             BORDERS.map((d, i) => (
@@ -297,7 +297,7 @@ export function CorridorMap({
                 key={i}
                 d={d}
                 fill="none"
-                stroke="#3A4E68"
+                stroke="#A8B8C9"
                 strokeWidth={1.1 * k}
                 strokeDasharray={`${2.6 * k} ${3.4 * k}`}
                 strokeLinejoin="round"
@@ -307,12 +307,12 @@ export function CorridorMap({
 
           {stormPath && (
             <g>
-              <path d={stormPath} fill="rgba(239,68,68,0.17)" />
+              <path d={stormPath} fill="rgba(220,38,38,0.14)" />
               <path d={stormPath} fill="url(#storm-hatch)" />
               <path
                 d={stormPath}
                 fill="none"
-                stroke="rgba(239,68,68,0.6)"
+                stroke="rgba(220,38,38,0.65)"
                 strokeWidth={1.1 * k}
                 strokeDasharray={`${4 * k} ${3 * k}`}
               />
@@ -384,7 +384,7 @@ export function CorridorMap({
               y={y}
               textAnchor={c.anchor}
               dominantBaseline="central"
-              fill={c.sea ? "#6D9AB6" : "#738CAA"}
+              fill={c.sea ? "#087F8C" : "#64748B"}
               fontSize={c.sea ? 11 : 9.5}
               fontWeight={700}
               letterSpacing={c.sea ? "0.2em" : "0.16em"}
@@ -408,7 +408,7 @@ export function CorridorMap({
           return (
             <g key={id} className="pointer-events-none">
               {label && (
-                <circle cx={x} cy={y} r={4.6} fill={id === checkpointNode ? "#3DDC84" : "#F4F7FB"} stroke="#0B1220" strokeWidth={1.8} />
+                <circle cx={x} cy={y} r={4.6} fill={id === checkpointNode ? "#15803D" : "#FFFFFF"} stroke="#12304A" strokeWidth={1.8} />
               )}
               {label && node && (
                 <text
@@ -416,7 +416,7 @@ export function CorridorMap({
                   y={y + label.dy}
                   textAnchor={label.anchor}
                   dominantBaseline="central"
-                  fill="#F4F7FB"
+                  fill="#12304A"
                   fontSize={11}
                   fontWeight={700}
                 >
@@ -442,8 +442,8 @@ export function CorridorMap({
               height={17.5}
               rx={5}
               fill={MARKER_FILL[sh.display_status]}
-              stroke="#0B1220"
-              strokeOpacity={0.55}
+              stroke="#FFFFFF"
+              strokeOpacity={0.9}
               strokeWidth={1}
             />
             <text textAnchor="middle" dominantBaseline="central" y={0.5} fill="#FFFFFF" fontSize={10.5} fontWeight={700}>
@@ -468,9 +468,9 @@ export function CorridorMap({
               style={{
                 left: x + chip.dx,
                 top: y + chip.dy,
-                color: w.storm ? "#FF888D" : "#73D9EE",
-                borderColor: w.storm ? "#573244" : "#24304A",
-                background: w.storm ? "#1E1726" : "#101B2D",
+                color: w.storm ? "#DC2626" : "#087F8C",
+                borderColor: w.storm ? "#FECACA" : "#DFE6EF",
+                background: w.storm ? "#FEF2F2" : "#FFFFFF",
               }}
             >
               <WavesIcon size={12} strokeWidth={1.8} />
@@ -504,7 +504,7 @@ export function CorridorMap({
             <LayersIcon size={16} />
           </MapButton>
           {layersOpen && (
-            <div className="absolute top-0 right-[44px] w-[168px] rounded-[10px] border border-line-strong bg-panel p-[6px] text-[12.5px] font-semibold shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
+            <div className="absolute top-0 right-[44px] w-[168px] rounded-[10px] border border-line-strong bg-panel p-[6px] text-[12.5px] font-semibold shadow-[0_16px_40px_rgba(18,48,74,0.14)]">
               {(
                 [
                   ["waves", "Волна в портах"],
@@ -546,7 +546,7 @@ export function CorridorMap({
       </div>
 
       <div
-        className="pointer-events-none absolute bottom-[22px] text-right text-[9.5px] leading-[13px] text-[#77849A] transition-[right] duration-300"
+        className="pointer-events-none absolute bottom-[22px] text-right text-[9.5px] leading-[13px] text-muted transition-[right] duration-300"
         style={{ right: insetRight + 24 }}
       >
         <div>
@@ -572,7 +572,7 @@ function Grid({ k }: { k: number }) {
     lines.push(<line key={`y${y}`} x1={x0} y1={y} x2={x1} y2={y} />);
   }
   return (
-    <g stroke="rgba(130,170,220,0.06)" strokeWidth={1.6 * k}>
+    <g stroke="rgba(18,48,74,0.06)" strokeWidth={1.6 * k}>
       {lines}
     </g>
   );
@@ -595,7 +595,7 @@ function MapButton({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`flex size-[35px] items-center justify-center rounded-[9px] border border-line-strong text-[#DCE3EE] transition-colors hover:bg-tile ${
+      className={`flex size-[35px] items-center justify-center rounded-[9px] border border-line-strong text-text transition-colors hover:bg-tile ${
         active ? "bg-tile" : "bg-panel"
       }`}
     >
@@ -625,7 +625,7 @@ function LegendItem({
           y1={2}
           x2={33}
           y2={2}
-          stroke="#73D9EE"
+          stroke="#087F8C"
           strokeWidth={pattern === "road" ? 2.2 : 2}
           strokeDasharray={pattern === "sea" ? "6 3" : pattern === "road" ? "0.01 4.2" : undefined}
           strokeLinecap={pattern === "road" ? "round" : "butt"}

@@ -415,7 +415,9 @@ async def link_user(body: M.UserLinkIn):
 async def demo_reset(_=Depends(need("reset_demo"))):
     async with state.lock:
         state.reset()
-    await hub.send("demo.reset", None)   # первым: клиенты сбрасывают всё и перезапрашивают
+    # первым: клиенты сбрасывают всё и перезапрашивают; через шину — чтобы сброс видели и подписчики
+    # (уведомитель пушей очищает список уже отправленного)
+    await events.publish("demo.reset", None)
     for s in state.shipments_list():
         await hub.send("shipment.updated", s)
     await hub.send("stats.updated", state.stats())

@@ -282,3 +282,28 @@ def test_bot_logs_send_and_edit_without_text(bot_env, caplog):
     assert f"Бот: итог принятия alert-001 отправлен, получателей {n} из {n}" in lines
     joined = "\n".join(lines)
     assert "Махачкал" not in joined and all(str(uid) not in joined for uid in USERS)   # ни текста, ни chat_id
+
+
+def test_alert_and_result_repeat_after_reset(bot_env):
+    """У уведомителя бота список отправленного привязан к номеру прогона (state.epoch): после reset тот же
+    alert-001 уходит снова, итог принятия — тоже; повтор без reset ничего не дублирует."""
+    st, fake, service = bot_env
+
+    def run():
+        async def go():
+            a = (await st.run_scenario("storm_north"))["alert"]
+            await events.flush(st)
+            await st.accept(a["id"], "web")
+            await events.flush(st)
+            return a["id"]
+        return asyncio.run(go())
+
+    assert run() == "alert-001"
+    per_run = len(fake.sent)
+    assert per_run == 2 * len(USERS)            # алерт и итог принятия каждому получателю
+    assert run() == "alert-001" and len(fake.sent) == per_run   # повтор без reset — тишина
+    st.reset()
+    for uid, name in USERS.items():
+        st.link_user(uid, name)
+    assert run() == "alert-001"
+    assert len(fake.sent) == 2 * per_run        # после reset — снова

@@ -171,7 +171,9 @@ class PushNotifier:
         self.done: set[tuple[str, str]] = set()   # (alert_id, статус) — один пуш на событие
 
     async def __call__(self, type_: str, payload) -> None:
-        if type_ == "alert.created" and payload and payload.get("items"):
+        if type_ == "demo.reset":   # новый прогон демо: номера алертов идут заново, пуши должны уйти снова
+            self.done.clear()
+        elif type_ == "alert.created" and payload and payload.get("items"):
             await self.push(payload, "alert.created", payload["title"], short(payload.get("text", "")))
         elif type_ == "alert.updated" and payload and payload.get("status") == "accepted":
             opt = next((o for o in payload.get("options", []) if o.get("recommended")), None)

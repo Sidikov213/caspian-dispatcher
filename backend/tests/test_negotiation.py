@@ -116,6 +116,15 @@ def test_steps_reject_counter_ok(st):
     assert {s["actor"] for s in steps} == set(N.ACTORS)
     assert all(s["result"] == "ok" for s in steps[2:]) and N.agreed(steps)
     assert len(steps) == 7 and "за 7 шагов" in a["text"]
+    # названия в шагах железной дороги — из графа, по реальному маршруту груза
+    assert steps[5]["action"] == "Переадресация №01 и №03: Астрахань → Махачкала"
+    assert steps[6]["action"] == "Переадресация №02 на западную ветку (Самур — Астара)"
+    assert steps[6]["detail"] == ("Маршрут Астрахань → Махачкала → Самур → Баку → Астара: "
+                                  "отправление 13 ноя, 20:00, прибытие +13 ч к плану")
+    legs = {i["shipment_id"]: i["to_route"]["legs"] for i in a["items"]}
+    assert [leg["edge_id"] for leg in legs["sh-01"][1:3]] == ["e-astrakhan-makhachkala", "e-makhachkala-anzali"]
+    assert [leg["edge_id"] for leg in legs["sh-02"][1:6]] == [
+        "e-astrakhan-makhachkala", "e-makhachkala-samur", "e-samur-baku", "e-baku-astara", "e-astara-rasht"]
     for s in steps:
         assert set(s) == {"actor", "action", "result", "detail", "ts", "block_index"} and s["detail"]
 

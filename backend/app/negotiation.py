@@ -214,19 +214,38 @@ def _customs(st, rer: list[dict]) -> tuple:
             "после принятия пропуска переоформляются на новый пункт")
 
 
+def _name(st, node: str) -> str:
+    """Название узла из графа без пояснений: «Самур (граница)» → «Самур», «Баку / Алят» → «Баку»."""
+    return st.graph.nodes[node]["name"].split(" (")[0].split(" /")[0]
+
+
 def _rail(st, rer: list[dict]) -> list[tuple]:
-    """Переадресация по суше: грузы группируются по первому новому этапу маршрута."""
+    """Переадресация по суше: грузы группируются по первому новому этапу и ветке нового маршрута.
+    Все названия — из графа, по этапам нового маршрута груза."""
     groups: dict[tuple, list[dict]] = {}
     for it in rer:
         old = [leg["edge_id"] for leg in it["from_route"]["legs"]]
-        leg = next((x for i, x in enumerate(it["to_route"]["legs"]) if i >= len(old) or old[i] != x["edge_id"]), None)
-        if leg is not None:
-            groups.setdefault((leg["edge_id"], leg["planned_start"], it["sailing_id"]), []).append((it, leg))
+        n = next((i for i, x in enumerate(it["to_route"]["legs"]) if i >= len(old) or old[i] != x["edge_id"]), None)
+        if n is not None:
+            leg = it["to_route"]["legs"][n]
+            key = (leg["edge_id"], leg["planned_start"], it["sailing_id"], it["to_route"]["branch"])
+            groups.setdefault(key, []).append((it, leg, n))
     out = []
-    for (_, _, sid), pairs in groups.items():
-        it, leg = pairs[0]
+    for (_, _, sid, branch), pairs in groups.items():
+        it, leg, n = pairs[0]
         ids = [p[0]["shipment_id"] for p in pairs]
-        a, b = st.graph.nodes[leg["from"]]["name"], st.graph.nodes[leg["to"]]["name"]
+        a, b = _name(st, leg["from"]), _name(st, leg["to"])
+        new_legs = it["to_route"]["legs"][n:]
+        borders = [x["from"] for x in new_legs if st.graph.nodes[x["from"]]["type"] == "border"]
+        if branch == "west" and borders:   # груз уходит на западную ветку: называем по погранпереходам маршрута
+            action = (f"Переадресация {nums(ids)} на западную ветку "
+                      f"({' — '.join(_name(st, x) for x in borders)})")
+            last = max(i for i, x in enumerate(new_legs) if x["from"] == borders[-1])
+            path = [new_legs[0]["from"]] + [x["to"] for x in new_legs[:last]]
+            out.append(("rail", action, "ok",
+                        f"Маршрут {' → '.join(_name(st, x) for x in path)}: отправление "
+                        f"{day_time(leg['planned_start'])}, прибытие +{num(it['delay_vs_plan_h'])} ч к плану"))
+            continue
         action = f"Переадресация {nums(ids)}: {a} → {b}"
         if sid and st.graph.kind(leg["edge_id"]) != KIND_FERRY:
             s = st.sailings[sid]

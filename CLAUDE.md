@@ -53,7 +53,7 @@ web (React/Vue + Leaflet)   mobile (Flutter)   Telegram
 - **Реестр — hash-chain** (каждый блок хранит хэш предыдущего) + эндпоинт проверки целостности. Блокчейном его не называем. Реестр у одного оператора показывает сторонние изменения; от самого оператора защищают копии у участников. В прототипе копия одна: пропуск на телефоне экспедитора. В продакшене — узлы у таможен и портов.
 - **QR-пропуск — подписанный JWT (HS256)**, внутри `doc_hash` и `block_hash`. Действителен, если подпись верна, статус `active`, запись о выдаче цела и хэш документов совпадает. Это внутренний пропуск сервиса, интеграции с портом нет.
 - **Погода:** Open-Meteo Marine (Каспий отдаёт, проверено), `forecast_days=7`, обновление раз в 30 мин, кэш в файл. Алерты строятся по ближайшим 48 ч. Кнопка сценария умножает реальный прогноз, а не выдумывает погоду.
-- **Два шага прогноза:** модель даёт вероятность срыва стыковки и самое раннее возможное отправление; обычный код по расписанию рейсов находит первый подходящий рейс и считает задержку прибытия.
+- **Два шага прогноза:** классификатор CatBoost даёт вероятность срыва стыковки; самое раннее возможное отправление и факторы в часах считает код по прогнозу погоды; обычный код по расписанию рейсов находит первый подходящий рейс и считает задержку прибытия. `PREDICTOR=catboost|formula` в `.env`; нет модели или catboost — откат на формулу с записью в лог. Модель обучена на синтетической истории (`scripts/gen_history.py`, `scripts/train.py`), так и говорим.
 - Бот живёт в процессе бэкенда (polling как asyncio-задача) и вызывает функции напрямую.
 - Состояние в памяти, сид из `data/seed.json`, `POST /api/demo/reset` возвращает всё к началу демо.
 
@@ -95,7 +95,10 @@ Leg       {index, edge_id, from, to, mode, sailing_id, planned_start, planned_en
 Risk      {miss_probability: 0..1, level: low|medium|high,
            departure_shift_h,   # на сколько позже планового рейса возможно отправление
            arrival_delay_h,     # задержка прибытия, если рейс отменят
-           factors: [{name, label, impact_hours}]}
+           factors: [{name, label, impact_hours}],   # часы — расчёт по прогнозу и расписанию
+           probability_drivers?: [{name, label, impact_pp}]}
+           # необязательно: три главных признака по SHAP классификатора CatBoost, вклад в
+           # вероятность срыва в п. п.; у формулы и сухопутных маршрутов — null
 Scenario  {id, type: storm|congestion|customs, title, blocked_edges: [id],
            affected_nodes: [id], start, end, params: {wave_height_m, wind_ms}}
 Alert     {id, scenario_id, created_at, severity, title, text,
@@ -152,7 +155,8 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | GET | `/stats` | — | `{saved_hours, saved_rub, co2_saved_kg, decisions, shipments_total, at_risk}` (сумма по Decision; часы — груз-часы) |
 | POST | `/users/link` | `{telegram_id, name}` | `{ok: true}` |
 | POST | `/demo/reset` | — | `{ok: true}` |
-| GET | `/demo/check` (только демо) | — | `{ok, sim_now, weather: {source, stale, updated_at}, checks: [{name, label, expected, actual, ok}], problems: [string]}`: storm_north на копии исходного состояния, сверка с эталоном (82/74/68%, +18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, рекомендован `mkh`); `problems` — почему разошлось. Состояние не меняет |
+| GET | `/demo/check` (только демо) | — | `{ok, sim_now, weather: {source, stale, updated_at}, checks: [{name, label, expected, actual, ok}], problems: [string]}`: storm_north на копии исходного состояния, сверка с эталоном (риски 82/74/68% ±5 п. п. и порядок №01 > №02 > №03; точно: +18 ч, +48 ч, +6 ч, 126 груз-ч, 596 640 ₽, рекомендован `mkh`); `problems` — почему разошлось. Состояние не меняет |
+| GET | `/model` | — | `{active: "catboost" \| "formula", requested, fallback_reason, synthetic: true, note, used_at_runtime: {miss_probability, departure_shift_and_delays, shift_regressor}, trained_at, seed, classifier: {auc, brier, n_train, n_test} \| null, regressor: {mae_h, n_train, n_test} \| null, feature_importance: [{name, label, importance}]}`: только чтение, метрики из `data/model_report.json`. На сервере работает только классификатор; сдвиг и задержки — расчёт; регрессор — только проверка |
 | POST | `/demo/fail_next_pass` (только демо) | — | `{ok: true}`; следующий выпуск пропуска сорвётся → груз получает `pass_state: reissue_pending`, старый пропуск активен, повтор через `/shipments/{id}/pass/retry` |
 
 WebSocket `/ws`, сообщения `{type, payload}`:
@@ -172,7 +176,7 @@ WebSocket `/ws`, сообщения `{type, payload}`:
 
 ```
 backend/  app/{main,models,state,graph,predictor,dispatcher,documents,ledger,weather}.py
-          app/bot/  data/{seed.json,history.csv,model.cbm}  scripts/{gen_history,train}.py
+          app/bot/  data/{seed.json,history.csv,model.cbm,model_shift.cbm,model_report.json}  scripts/{gen_history,train}.py
 web/      mobile/   docs/{PLAN.md,DEMO_SCENARIO.md,design/,pitch/}   CLAUDE.md
 ```
 

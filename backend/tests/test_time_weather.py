@@ -138,7 +138,7 @@ def test_weather_mode_synthetic_never_touches_network(tmp_path):
 def test_demo_check_ok_and_read_only(client):
     before = client.get("/api/alerts").json(), client.get("/api/stats").json()
     r = client.get("/api/demo/check").json()
-    assert r["ok"] is True and r["problems"] == [] and len(r["checks"]) == 9
+    assert r["ok"] is True and r["problems"] == [] and len(r["checks"]) == 10   # 3 риска + порядок + 6 точных
     assert all(c["ok"] for c in r["checks"])
     assert (client.get("/api/alerts").json(), client.get("/api/stats").json()) == before
 

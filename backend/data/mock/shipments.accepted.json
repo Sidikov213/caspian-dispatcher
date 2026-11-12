@@ -132,7 +132,8 @@
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-01-r1",
     "pass_state": "active"
@@ -270,7 +271,8 @@
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-02-r1",
     "pass_state": "active"
@@ -408,7 +410,8 @@
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-03-r1",
     "pass_state": "active"
@@ -517,7 +520,8 @@
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-04",
     "pass_state": "active"
@@ -583,7 +587,8 @@
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-05",
     "pass_state": "active"

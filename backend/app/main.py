@@ -23,6 +23,7 @@ from . import models as M
 from .bot import start_bot, stop_bot
 from .config import API_KEY, WEATHER_MODE
 from .democheck import log_check, run_check
+from .modelinfo import model_info
 from .state import ApiError, state
 
 log = logging.getLogger("caspian")
@@ -347,6 +348,13 @@ async def demo_reset():
     log.info("Reset: sim_now %s", state.sim_now.isoformat())
     log_check(state, "reset")
     return {"ok": True}
+
+
+@api.get("/model", response_model=M.ModelInfoOut, tags=["модель"])
+async def get_model():
+    """Активный предиктор, метрики на отложенной выборке, что модель делает на сервере. Обучена на
+    синтетической истории: метрики показывают работу конвейера, а не точность на реальных данных."""
+    return model_info(state.predictor)
 
 
 @api.get("/demo/check", response_model=M.DemoCheckOut, tags=["демо"])

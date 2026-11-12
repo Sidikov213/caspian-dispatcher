@@ -34,3 +34,10 @@ WEATHER_CACHE_PATH = DATA_DIR / "weather_cache.json"
 
 # Привязки Telegram (/start) переживают перезапуск сервера.
 USERS_PATH = DATA_DIR / "users.json"
+
+# Предиктор срыва стыковки: catboost (классификатор на синтетической истории) или formula.
+# Нет модели или не импортируется catboost — откат на формулу с записью в лог.
+PREDICTOR = os.getenv("PREDICTOR", "catboost").strip().lower()
+MODEL_PATH = DATA_DIR / "model.cbm"               # классификатор срыва — используется сервером
+SHIFT_MODEL_PATH = DATA_DIR / "model_shift.cbm"   # регрессор сдвига — только проверка, в расчёт не входит
+MODEL_REPORT_PATH = DATA_DIR / "model_report.json"

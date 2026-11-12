@@ -104,12 +104,21 @@ class RiskFactor(Model):
     impact_hours: float
 
 
+class ProbabilityDriver(Model):
+    name: str = Field(description="Признак модели, напр. wave_height_m")
+    label: str = Field(description="Подпись, напр. «Волна 3,4 м»")
+    impact_pp: float = Field(description="Вклад в вероятность срыва, п. п. (SHAP классификатора)")
+
+
 class Risk(Model):
     miss_probability: float = Field(ge=0, le=1)
     level: RiskLevel
     departure_shift_h: float = Field(description="На сколько позже планового рейса возможно отправление")
     arrival_delay_h: float = Field(description="Задержка прибытия, если рейс отменят")
     factors: list[RiskFactor]
+    probability_drivers: list[ProbabilityDriver] | None = Field(
+        None, description="Необязательно: три главных признака по SHAP классификатора CatBoost "
+                          "с вкладом в вероятность в п. п. У формулы и сухопутных маршрутов — null")
 
 
 class Shipment(Model):
@@ -456,3 +465,44 @@ class DemoCheckOut(Model):
     checks: list[DemoCheckItem]
     problems: list[str]
 
+
+
+# ---------- Модель предиктора (GET /api/model) ----------
+
+class ModelUsage(Model):
+    miss_probability: str = Field(description="Чем считается вероятность срыва стыковки")
+    departure_shift_and_delays: str = Field(description="Чем считаются сдвиг отправления, задержки, деньги, CO₂")
+    shift_regressor: str = Field(description="Роль регрессора сдвига (только проверка)")
+
+
+class ClassifierMetrics(Model):
+    auc: float
+    brier: float
+    n_train: int
+    n_test: int
+
+
+class RegressorMetrics(Model):
+    mae_h: float
+    n_train: int
+    n_test: int
+
+
+class FeatureImportance(Model):
+    name: str
+    label: str
+    importance: float
+
+
+class ModelInfoOut(Model):
+    active: Literal["catboost", "formula"]
+    requested: str = Field(description="PREDICTOR из .env")
+    fallback_reason: str | None = Field(description="Почему включилась формула вместо CatBoost")
+    synthetic: bool = Field(description="Модель обучена на синтетической истории")
+    note: str
+    used_at_runtime: ModelUsage
+    trained_at: str | None
+    seed: int | None
+    classifier: ClassifierMetrics | None
+    regressor: RegressorMetrics | None
+    feature_importance: list[FeatureImportance]

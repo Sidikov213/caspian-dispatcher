@@ -115,7 +115,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": 6.0,
@@ -258,7 +259,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": 13.0,
@@ -384,7 +386,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": 6.0,
@@ -527,7 +530,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": 13.0,
@@ -653,7 +657,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": 6.0,
@@ -796,7 +801,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": 13.0,
@@ -893,7 +899,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": 0.0,
@@ -947,7 +954,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": 0.0,
@@ -1011,7 +1019,8 @@
             "label": "Очередь на таможне",
             "impact_hours": 1.0
           }
-        ]
+        ],
+        "probability_drivers": null
       },
       "delta": {
         "hours": -42.0,

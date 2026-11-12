@@ -196,6 +196,7 @@ class Weather:
     def __init__(self, sim_now: datetime, scenarios: list[dict] | None = None, forecast=None):
         self.sim_now = sim_now
         self.forecast = forecast or SyntheticForecast()
+        self.scenarios = list(scenarios or ())
         self.series: dict[str, list[float]] = {}
         self.base: dict[str, list[float]] = {}
         for node in WEATHER_BASE:
@@ -225,6 +226,18 @@ class Weather:
         if row is None:
             return 0.0
         return row[min(max(int(math.floor(hours(self.sim_now, ts))), 0), HORIZON_H - 1)]
+
+    def wind(self, node: str, ts) -> float:
+        """Ветер в порту, м/с: прогноз источника; в окне шторма сценария — не ниже ветра сценария."""
+        if node not in WEATHER_BASE:
+            return 0.0
+        w = self.forecast.wind(node, self.sim_now)
+        t = parse(ts)
+        for sc in self.scenarios:
+            ov, sw = sc.get("_overlay"), (sc.get("params") or {}).get("wind_ms")
+            if ov and sw and node in ov["storm_nodes"] and parse(sc["start"]) <= t < parse(sc["end"]):
+                w = max(w, float(sw))
+        return w
 
     def max_wave(self, node: str, a, b) -> float:
         row = self.series.get(node)

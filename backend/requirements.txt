@@ -6,3 +6,5 @@ python-dotenv==1.0.1
 networkx==3.4.2
 pydantic==2.13.5
 aiogram==3.31.0
+catboost==1.2.10
+numpy==2.5.4

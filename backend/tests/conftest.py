@@ -9,6 +9,7 @@ os.environ["BOT_TOKEN"] = ""      # тесты никогда не ходят в
 os.environ["LLM_API_KEY"] = ""
 os.environ["WEATHER_MODE"] = "synthetic"  # тесты не ходят в сеть
 os.environ["DEMO_NOW"] = ""
+os.environ["PREDICTOR"] = "formula"      # старые тесты — на формуле; CatBoost проверяется явно (test_model.py)
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))

@@ -100,9 +100,12 @@ def predict_route(st, sh: dict, route: dict) -> tuple[PredictorResult, int | Non
 
 def risk_of(res: PredictorResult, departure=None, arrival_delay_h: float = 0) -> dict:
     shift = hours(departure, res.earliest_departure) if departure and res.earliest_departure else 0
-    return {"miss_probability": res.miss_probability, "level": res.level,
+    risk = {"miss_probability": res.miss_probability, "level": res.level,
             "departure_shift_h": max(shift, 0), "arrival_delay_h": arrival_delay_h,
             "factors": copy.deepcopy(res.factors)}
+    if res.probability_drivers is not None:   # только у CatBoost: объяснение вероятности по SHAP
+        risk["probability_drivers"] = copy.deepcopy(res.probability_drivers)
+    return risk
 
 
 def position(st, route: dict, stage: str, origin: str) -> tuple[dict, int | None]:

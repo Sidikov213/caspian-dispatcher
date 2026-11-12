@@ -478,8 +478,11 @@ def run_engine() -> dict:
     from app import state as state_mod
     from app.clock import FixedClock
     state_mod.PASS_SECRET = MOCK_JWT_SECRET
+    from app.predictor import FormulaPredictor
     from app.weather import SyntheticForecast
-    st = state_mod.State(DATA_DIR / "seed.json", clock=FixedClock(iso(NOW)), forecast=SyntheticForecast())
+    # моки всегда на формуле: не зависят ни от обученной модели, ни от установленного catboost
+    st = state_mod.State(DATA_DIR / "seed.json", clock=FixedClock(iso(NOW)), forecast=SyntheticForecast(),
+                         predictor=FormulaPredictor())
 
     dump("graph", st.graph_out(), M.GraphOut)
     dump("scenario_presets", st.presets(), M.PresetOut, many=True)

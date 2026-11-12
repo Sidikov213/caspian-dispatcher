@@ -1,0 +1,281 @@
+{
+  "trained_at": "2026-11-12T09:49:51Z",
+  "synthetic": true,
+  "note": "История синтетическая, сгенерирована по правилам (scripts/gen_history.py); метрики показывают работу конвейера, а не точность на реальных данных.",
+  "seed": 42,
+  "history": {
+    "path": "data/history.csv",
+    "rows": 30000,
+    "missed_rate": 0.2832,
+    "generator": "scripts/gen_history.py",
+    "params": {
+      "storm_p_cold": 0.3,
+      "storm_p_warm": 0.08,
+      "storm_congestion_boost": 0.25,
+      "tight_buffer_p": 0.35,
+      "storm_hit_p": 0.58,
+      "storm_miss_lo": 0.35,
+      "storm_miss_hi": 0.7,
+      "storm_queue_load": 0.15,
+      "wave_forecast_sigma": 0.1,
+      "wave_free_m": 2.0,
+      "wave_stop_m": 3.5,
+      "ramp_max_h": 32.0,
+      "ramp_power": 0.4,
+      "stop_min_h": 32.0,
+      "stop_max_h": 48.0,
+      "congestion_knee": 0.8,
+      "congestion_k": 120.0,
+      "customs_sigma": 1.0,
+      "inspection_mult": 2.0,
+      "customs_window_h": 1.0,
+      "noise_mean_h": -1.0,
+      "noise_sigma_h": 1.0,
+      "noise_rel": 0.08,
+      "outlier_p": 0.02,
+      "outlier_min_h": 10.0,
+      "outlier_max_h": 60.0
+    }
+  },
+  "features": [
+    "wave_height_m",
+    "wind_ms",
+    "port_congestion",
+    "customs_queue_h",
+    "buffer_hours",
+    "month",
+    "weekday",
+    "cargo_type",
+    "port_id",
+    "ice"
+  ],
+  "cat_features": [
+    "cargo_type",
+    "port_id"
+  ],
+  "test_size": 0.2,
+  "classifier": {
+    "file": "data/model.cbm",
+    "used_at_runtime": true,
+    "params": {
+      "iterations": 800,
+      "depth": 6,
+      "learning_rate": 0.04,
+      "l2_leaf_reg": 5,
+      "monotone_constraints": {
+        "wave_height_m": 1,
+        "wind_ms": 1,
+        "port_congestion": 1,
+        "customs_queue_h": 1,
+        "buffer_hours": -1
+      },
+      "feature_weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.3,
+        0.1,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "auc": 0.8997,
+    "brier": 0.1096,
+    "n_train": 24000,
+    "n_test": 6000,
+    "positive_rate_test": 0.2832,
+    "feature_importance": [
+      {
+        "name": "buffer_hours",
+        "label": "Запас до окончания приёма",
+        "importance": 26.7
+      },
+      {
+        "name": "wave_height_m",
+        "label": "Волна",
+        "importance": 25.5
+      },
+      {
+        "name": "ice",
+        "label": "Лёд",
+        "importance": 19.4
+      },
+      {
+        "name": "customs_queue_h",
+        "label": "Очередь на таможне",
+        "importance": 12.2
+      },
+      {
+        "name": "cargo_type",
+        "label": "Тип груза",
+        "importance": 7.1
+      },
+      {
+        "name": "wind_ms",
+        "label": "Ветер",
+        "importance": 3.9
+      },
+      {
+        "name": "port_id",
+        "label": "Порт",
+        "importance": 3.4
+      },
+      {
+        "name": "port_congestion",
+        "label": "Загрузка порта",
+        "importance": 0.8
+      },
+      {
+        "name": "weekday",
+        "label": "День недели",
+        "importance": 0.7
+      },
+      {
+        "name": "month",
+        "label": "Месяц",
+        "importance": 0.4
+      }
+    ]
+  },
+  "regressor": {
+    "file": "data/model_shift.cbm",
+    "used_at_runtime": false,
+    "params": {
+      "iterations": 600,
+      "depth": 6,
+      "learning_rate": 0.05,
+      "l2_leaf_reg": 3
+    },
+    "target": "departure_shift_h",
+    "mae_h": 4.35,
+    "n_train": 24000,
+    "n_test": 6000,
+    "feature_importance": [
+      {
+        "name": "wave_height_m",
+        "label": "Волна",
+        "importance": 30.7
+      },
+      {
+        "name": "buffer_hours",
+        "label": "Запас до окончания приёма",
+        "importance": 17.5
+      },
+      {
+        "name": "customs_queue_h",
+        "label": "Очередь на таможне",
+        "importance": 16.6
+      },
+      {
+        "name": "ice",
+        "label": "Лёд",
+        "importance": 10.4
+      },
+      {
+        "name": "wind_ms",
+        "label": "Ветер",
+        "importance": 8.1
+      },
+      {
+        "name": "cargo_type",
+        "label": "Тип груза",
+        "importance": 6.5
+      },
+      {
+        "name": "port_congestion",
+        "label": "Загрузка порта",
+        "importance": 3.6
+      },
+      {
+        "name": "month",
+        "label": "Месяц",
+        "importance": 3.4
+      },
+      {
+        "name": "port_id",
+        "label": "Порт",
+        "importance": 1.8
+      },
+      {
+        "name": "weekday",
+        "label": "День недели",
+        "importance": 1.4
+      }
+    ]
+  },
+  "scenario_check": {
+    "storm_north_pct": {
+      "sh-01": 82,
+      "sh-02": 77,
+      "sh-03": 68
+    },
+    "expected_pct": {
+      "sh-01": 82,
+      "sh-02": 74,
+      "sh-03": 68
+    },
+    "tolerance_pp": 5,
+    "in_tolerance": true,
+    "order_ok": true,
+    "before_storm_pct": {
+      "sh-01": 26,
+      "sh-02": 5,
+      "sh-03": 4
+    },
+    "by_weekday_pct": {
+      "sh-01": [
+        81,
+        81,
+        81,
+        81,
+        82,
+        82,
+        83
+      ],
+      "sh-02": [
+        77,
+        76,
+        76,
+        77,
+        77,
+        77,
+        77
+      ],
+      "sh-03": [
+        68,
+        67,
+        67,
+        67,
+        68,
+        68,
+        68
+      ]
+    },
+    "all_weekdays_ok": true,
+    "drivers_sh01": [
+      {
+        "name": "wave_height_m",
+        "label": "Волна 3,4 м",
+        "impact_pp": 38.0
+      },
+      {
+        "name": "buffer_hours",
+        "label": "Запас до окончания приёма 2 ч",
+        "impact_pp": 16.8
+      },
+      {
+        "name": "customs_queue_h",
+        "label": "Очередь на таможне 2 ч",
+        "impact_pp": 5.3
+      }
+    ],
+    "true_rate_pct": {
+      "sh-01": 81.8,
+      "sh-02": 70.6,
+      "sh-03": 63.1
+    }
+  }
+}

@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* Палитра — docs/design/screens.pdf, лист «Компоненты и стили». */
+@theme {
+  --color-bg: #0b1220;
+  --color-panel: #131c2e;
+  --color-field: #101b2d;
+  --color-tile: #172338;
+  --color-line: #24304a;
+  --color-line-strong: #30425c;
+  --color-text: #e6edf7;
+  --color-muted: #8a97ad;
+  --color-faint: #7b889d;
+  --color-action: #2f80ed;
+  --color-transit: #3b82f6;
+  --color-transit-text: #9dc8ff;
+  --color-risk: #ef4444;
+  --color-risk-text: #ff888d;
+  --color-rerouted: #22c55e;
+  --color-rerouted-text: #7ee2a2;
+  --color-warn: #f59e0b;
+  --color-warn-text: #fcc965;
+  --color-ok: #69e6a0;
+  --color-cyan: #73d9ee;
+  --color-map-sea: #0c192c;
+  --color-map-land: #142338;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.caps {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "pass-01",
+    "shipment_id": "sh-01",
+    "checkpoint_node": "astrakhan",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiJwYXNzLTAxIiwic2lkIjoic2gtMDEiLCJjcCI6ImFzdHJha2hhbiIsImRvY19oYXNoIjoiMmQ3YjlmNmQ5NWExZTgwYzI5MDEzNjYyMzAyMDNiM2IxMTA0MjU1ZWQ1YjgwYTQwZGE2MWJmZTYyZmFmZDQxMCIsImJsb2NrX2hhc2giOiJjMWVlMWM3ZTlkOGI1ZmNiZGMyNWYzZmNkOTBhYzZhOTI3MTIyOWRjMDdiNzgyOGFiOWQ3MTFhZWQ2ZmRiN2NmIiwiZXhwIjoxNzk1OTg2MDAwfQ.lXCq0XKjaPOHFtgjfDf80u2FZ7EmONakgbAHgbFDVSY",
+    "doc_hash": "2d7b9f6d95a1e80c2901366230203b3b1104255ed5b80a40da61bfe62fafd410",
+    "block_hash": "c1ee1c7e9d8b5fcbdc25f3fcd90ac6a9271229dc07b7828ab9d711aed6fdb7cf",
+    "valid_until": "2026-11-29T21:00:00Z",
+    "status": "active"
+  },
+  {
+    "id": "pass-02",
+    "shipment_id": "sh-02",
+    "checkpoint_node": "astrakhan",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiJwYXNzLTAyIiwic2lkIjoic2gtMDIiLCJjcCI6ImFzdHJha2hhbiIsImRvY19oYXNoIjoiNzA5MjU0NmJiMjUyN2Y5YTc4NTc2YThlYzUxMmUyZGU1NGQ3NjdiZWMzMjQyZTkxNTg2ODEyMmViMmM1ZGU1MSIsImJsb2NrX2hhc2giOiIyNWVmM2RmNjQ5NzNkYTY3YzViNzM0ZGJmZjk2NzVlYmZmZmMzM2VjYjIzZTE0MmNkN2JmMzdlOWIzMmMzYjkyIiwiZXhwIjoxNzk1OTg2MDAwfQ.ft_-YpxDOqKSBqEDiSuc6znN4kinrWxL6SQv3Dkmat8",
+    "doc_hash": "7092546bb2527f9a78576a8ec512e2de54d767bec3242e915868122eb2c5de51",
+    "block_hash": "25ef3df64973da67c5b734dbff9675ebfffc33ecb23e142cd7bf37e9b32c3b92",
+    "valid_until": "2026-11-29T21:00:00Z",
+    "status": "active"
+  },
+  {
+    "id": "pass-03",
+    "shipment_id": "sh-03",
+    "checkpoint_node": "astrakhan",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiJwYXNzLTAzIiwic2lkIjoic2gtMDMiLCJjcCI6ImFzdHJha2hhbiIsImRvY19oYXNoIjoiYzc3MjFjNDYzYWZkOWRlM2YwODg2ODNlZDAwMWIxMTI3MzY3YWMyNmM2NGViNWVhMjM5ODUyNzUyMWNjMzEzOSIsImJsb2NrX2hhc2giOiI2N2ZmMmI3OTQ4OWRjMTExZTEzYzdiMWE4ZDY0ZDVhNzM3NjVlZjI3NmRkZjQ1NjMyYjAxNzhiNjI5ZTBiODIwIiwiZXhwIjoxNzk1OTg2MDAwfQ.PgjQ7BDEZxViENk8I7g0wP-_cVrCEPS_orGggk7aghk",
+    "doc_hash": "c7721c463afd9de3f088683ed001b1127367ac26c64eb5ea2398527521cc3139",
+    "block_hash": "67ff2b79489dc111e13c7b1a8d64d5a73765ef276ddf45632b0178b629e0b820",
+    "valid_until": "2026-11-29T21:00:00Z",
+    "status": "active"
+  },
+  {
+    "id": "pass-04",
+    "shipment_id": "sh-04",
+    "checkpoint_node": "astara",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiJwYXNzLTA0Iiwic2lkIjoic2gtMDQiLCJjcCI6ImFzdGFyYSIsImRvY19oYXNoIjoiZTA1Y2RmMjM1NTk4M2VlNmZhZGE3YThhMGM5ODRhZTI4ZTNmYmIzNmQ5ZTA0Yjc4YTFjYWNhZjhiN2YxNDc1OSIsImJsb2NrX2hhc2giOiJjYTkyZWVlNTRkNDRhMDQwNTIxOGNlNjRhYzQ0NWM2NmEyYTk5MmZlMjBlZWZhOGViMGQ5Njc5OTI5ODgwNWI0IiwiZXhwIjoxNzk1OTg2MDAwfQ.-7e9EO58yaVk3L4KRbh6YFvN9VqNTEG0PHyYOnqRYYE",
+    "doc_hash": "e05cdf2355983ee6fada7a8a0c984ae28e3fbb36d9e04b78a1cacaf8b7f14759",
+    "block_hash": "ca92eee54d44a0405218ce64ac445c66a2a992fe20eefa8eb0d96799298805b4",
+    "valid_until": "2026-11-29T21:00:00Z",
+    "status": "active"
+  }
+]

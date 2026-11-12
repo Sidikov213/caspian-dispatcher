@@ -1,0 +1,555 @@
+[
+  {
+    "id": "sh-01",
+    "title": "Зерно",
+    "cargo_type": "grain",
+    "weight_t": 60.0,
+    "owner_tg_id": 100000001,
+    "origin": "moscow",
+    "destination": "mumbai",
+    "stage": "in_transit",
+    "risk_level": "high",
+    "rerouted": false,
+    "display_status": "at_risk",
+    "position": {
+      "lat": 53.4,
+      "lon": 40.225
+    },
+    "current_leg": 0,
+    "route": {
+      "id": "r-sh-01-plan",
+      "legs": [
+        {
+          "index": 0,
+          "edge_id": "e-moscow-astrakhan",
+          "from": "moscow",
+          "to": "astrakhan",
+          "mode": "rail",
+          "sailing_id": null,
+          "planned_start": "2026-11-12T01:00:00Z",
+          "planned_end": "2026-11-13T17:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "active"
+        },
+        {
+          "index": 1,
+          "edge_id": "e-astrakhan-anzali",
+          "from": "astrakhan",
+          "to": "anzali",
+          "mode": "sea",
+          "sailing_id": "sl-ast-anz-1114",
+          "planned_start": "2026-11-14T07:00:00Z",
+          "planned_end": "2026-11-16T07:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "blocked"
+        },
+        {
+          "index": 2,
+          "edge_id": "e-anzali-rasht",
+          "from": "anzali",
+          "to": "rasht",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-16T19:00:00Z",
+          "planned_end": "2026-11-16T20:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 3,
+          "edge_id": "e-rasht-tehran",
+          "from": "rasht",
+          "to": "tehran",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-16T20:00:00Z",
+          "planned_end": "2026-11-17T01:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 4,
+          "edge_id": "e-tehran-bandar_abbas",
+          "from": "tehran",
+          "to": "bandar_abbas",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-17T01:00:00Z",
+          "planned_end": "2026-11-17T19:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 5,
+          "edge_id": "e-bandar_abbas-mumbai",
+          "from": "bandar_abbas",
+          "to": "mumbai",
+          "mode": "sea",
+          "sailing_id": null,
+          "planned_start": "2026-11-18T07:00:00Z",
+          "planned_end": "2026-11-21T07:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        }
+      ],
+      "total_hours": 222.0,
+      "total_cost_rub": 712200.0,
+      "total_co2_kg": 13590.0,
+      "branch": "transcaspian"
+    },
+    "planned_eta": "2026-11-21T07:00:00Z",
+    "eta": "2026-11-23T07:00:00Z",
+    "risk": {
+      "miss_probability": 0.82,
+      "level": "high",
+      "departure_shift_h": 18.0,
+      "arrival_delay_h": 48.0,
+      "factors": [
+        {
+          "name": "wave_height",
+          "label": "Волна 3,4 м",
+          "impact_hours": 11.0
+        },
+        {
+          "name": "port_congestion",
+          "label": "Загрузка порта 85%",
+          "impact_hours": 5.0
+        },
+        {
+          "name": "customs_queue",
+          "label": "Очередь на таможне",
+          "impact_hours": 2.0
+        }
+      ]
+    },
+    "pass_id": "pass-01",
+    "pass_state": "active"
+  },
+  {
+    "id": "sh-02",
+    "title": "Металл",
+    "cargo_type": "metal",
+    "weight_t": 40.0,
+    "owner_tg_id": 100000001,
+    "origin": "samara",
+    "destination": "mumbai",
+    "stage": "in_transit",
+    "risk_level": "high",
+    "rerouted": false,
+    "display_status": "at_risk",
+    "position": {
+      "lat": 52.019,
+      "lon": 49.7862
+    },
+    "current_leg": 0,
+    "route": {
+      "id": "r-sh-02-plan",
+      "legs": [
+        {
+          "index": 0,
+          "edge_id": "e-samara-astrakhan",
+          "from": "samara",
+          "to": "astrakhan",
+          "mode": "rail",
+          "sailing_id": null,
+          "planned_start": "2026-11-12T06:00:00Z",
+          "planned_end": "2026-11-13T11:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "active"
+        },
+        {
+          "index": 1,
+          "edge_id": "e-astrakhan-anzali",
+          "from": "astrakhan",
+          "to": "anzali",
+          "mode": "sea",
+          "sailing_id": "sl-ast-anz-1114",
+          "planned_start": "2026-11-14T07:00:00Z",
+          "planned_end": "2026-11-16T07:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "blocked"
+        },
+        {
+          "index": 2,
+          "edge_id": "e-anzali-rasht",
+          "from": "anzali",
+          "to": "rasht",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-16T19:00:00Z",
+          "planned_end": "2026-11-16T20:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 3,
+          "edge_id": "e-rasht-tehran",
+          "from": "rasht",
+          "to": "tehran",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-16T20:00:00Z",
+          "planned_end": "2026-11-17T01:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 4,
+          "edge_id": "e-tehran-bandar_abbas",
+          "from": "tehran",
+          "to": "bandar_abbas",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-17T01:00:00Z",
+          "planned_end": "2026-11-17T19:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 5,
+          "edge_id": "e-bandar_abbas-mumbai",
+          "from": "bandar_abbas",
+          "to": "mumbai",
+          "mode": "sea",
+          "sailing_id": null,
+          "planned_start": "2026-11-18T07:00:00Z",
+          "planned_end": "2026-11-21T07:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        }
+      ],
+      "total_hours": 217.0,
+      "total_cost_rub": 439600.0,
+      "total_co2_kg": 8740.0,
+      "branch": "transcaspian"
+    },
+    "planned_eta": "2026-11-21T07:00:00Z",
+    "eta": "2026-11-23T07:00:00Z",
+    "risk": {
+      "miss_probability": 0.74,
+      "level": "high",
+      "departure_shift_h": 18.0,
+      "arrival_delay_h": 48.0,
+      "factors": [
+        {
+          "name": "wave_height",
+          "label": "Волна 3,4 м",
+          "impact_hours": 11.0
+        },
+        {
+          "name": "port_congestion",
+          "label": "Загрузка порта 85%",
+          "impact_hours": 5.0
+        },
+        {
+          "name": "customs_queue",
+          "label": "Очередь на таможне",
+          "impact_hours": 2.0
+        }
+      ]
+    },
+    "pass_id": "pass-02",
+    "pass_state": "active"
+  },
+  {
+    "id": "sh-03",
+    "title": "Оборудование",
+    "cargo_type": "equipment",
+    "weight_t": 20.0,
+    "owner_tg_id": 100000001,
+    "origin": "saratov",
+    "destination": "mumbai",
+    "stage": "in_transit",
+    "risk_level": "high",
+    "rerouted": false,
+    "display_status": "at_risk",
+    "position": {
+      "lat": 50.8825,
+      "lon": 46.2812
+    },
+    "current_leg": 0,
+    "route": {
+      "id": "r-sh-03-plan",
+      "legs": [
+        {
+          "index": 0,
+          "edge_id": "e-saratov-astrakhan",
+          "from": "saratov",
+          "to": "astrakhan",
+          "mode": "rail",
+          "sailing_id": null,
+          "planned_start": "2026-11-12T09:00:00Z",
+          "planned_end": "2026-11-13T01:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "active"
+        },
+        {
+          "index": 1,
+          "edge_id": "e-astrakhan-anzali",
+          "from": "astrakhan",
+          "to": "anzali",
+          "mode": "sea",
+          "sailing_id": "sl-ast-anz-1114",
+          "planned_start": "2026-11-14T07:00:00Z",
+          "planned_end": "2026-11-16T07:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "blocked"
+        },
+        {
+          "index": 2,
+          "edge_id": "e-anzali-rasht",
+          "from": "anzali",
+          "to": "rasht",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-16T19:00:00Z",
+          "planned_end": "2026-11-16T20:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 3,
+          "edge_id": "e-rasht-tehran",
+          "from": "rasht",
+          "to": "tehran",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-16T20:00:00Z",
+          "planned_end": "2026-11-17T01:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 4,
+          "edge_id": "e-tehran-bandar_abbas",
+          "from": "tehran",
+          "to": "bandar_abbas",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-17T01:00:00Z",
+          "planned_end": "2026-11-17T19:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        },
+        {
+          "index": 5,
+          "edge_id": "e-bandar_abbas-mumbai",
+          "from": "bandar_abbas",
+          "to": "mumbai",
+          "mode": "sea",
+          "sailing_id": null,
+          "planned_start": "2026-11-18T07:00:00Z",
+          "planned_end": "2026-11-21T07:00:00Z",
+          "predicted_delay_h": 48.0,
+          "status": "pending"
+        }
+      ],
+      "total_hours": 214.0,
+      "total_cost_rub": 200440.0,
+      "total_co2_kg": 4194.0,
+      "branch": "transcaspian"
+    },
+    "planned_eta": "2026-11-21T07:00:00Z",
+    "eta": "2026-11-23T07:00:00Z",
+    "risk": {
+      "miss_probability": 0.68,
+      "level": "high",
+      "departure_shift_h": 18.0,
+      "arrival_delay_h": 48.0,
+      "factors": [
+        {
+          "name": "wave_height",
+          "label": "Волна 3,4 м",
+          "impact_hours": 11.0
+        },
+        {
+          "name": "port_congestion",
+          "label": "Загрузка порта 85%",
+          "impact_hours": 5.0
+        },
+        {
+          "name": "customs_queue",
+          "label": "Очередь на таможне",
+          "impact_hours": 2.0
+        }
+      ]
+    },
+    "pass_id": "pass-03",
+    "pass_state": "active"
+  },
+  {
+    "id": "sh-04",
+    "title": "Текстиль",
+    "cargo_type": "textile",
+    "weight_t": 25.0,
+    "owner_tg_id": 100000001,
+    "origin": "baku",
+    "destination": "mumbai",
+    "stage": "in_transit",
+    "risk_level": "low",
+    "rerouted": false,
+    "display_status": "in_transit",
+    "position": {
+      "lat": 39.038,
+      "lon": 49.086
+    },
+    "current_leg": 0,
+    "route": {
+      "id": "r-sh-04-plan",
+      "legs": [
+        {
+          "index": 0,
+          "edge_id": "e-baku-astara",
+          "from": "baku",
+          "to": "astara",
+          "mode": "rail",
+          "sailing_id": null,
+          "planned_start": "2026-11-12T05:00:00Z",
+          "planned_end": "2026-11-12T15:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "active"
+        },
+        {
+          "index": 1,
+          "edge_id": "e-astara-rasht",
+          "from": "astara",
+          "to": "rasht",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-13T15:00:00Z",
+          "planned_end": "2026-11-13T19:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "pending"
+        },
+        {
+          "index": 2,
+          "edge_id": "e-rasht-tehran",
+          "from": "rasht",
+          "to": "tehran",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-13T19:00:00Z",
+          "planned_end": "2026-11-14T00:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "pending"
+        },
+        {
+          "index": 3,
+          "edge_id": "e-tehran-bandar_abbas",
+          "from": "tehran",
+          "to": "bandar_abbas",
+          "mode": "road",
+          "sailing_id": null,
+          "planned_start": "2026-11-14T00:00:00Z",
+          "planned_end": "2026-11-14T18:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "pending"
+        },
+        {
+          "index": 4,
+          "edge_id": "e-bandar_abbas-mumbai",
+          "from": "bandar_abbas",
+          "to": "mumbai",
+          "mode": "sea",
+          "sailing_id": null,
+          "planned_start": "2026-11-15T06:00:00Z",
+          "planned_end": "2026-11-18T06:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "pending"
+        }
+      ],
+      "total_hours": 145.0,
+      "total_cost_rub": 204350.0,
+      "total_co2_kg": 3928.8,
+      "branch": "west"
+    },
+    "planned_eta": "2026-11-18T06:00:00Z",
+    "eta": "2026-11-18T06:00:00Z",
+    "risk": {
+      "miss_probability": 0.11,
+      "level": "low",
+      "departure_shift_h": 0.0,
+      "arrival_delay_h": 0.0,
+      "factors": [
+        {
+          "name": "border_queue",
+          "label": "Очередь на границе Астара",
+          "impact_hours": 2.0
+        },
+        {
+          "name": "customs_queue",
+          "label": "Очередь на таможне",
+          "impact_hours": 1.0
+        }
+      ]
+    },
+    "pass_id": "pass-04",
+    "pass_state": "active"
+  },
+  {
+    "id": "sh-05",
+    "title": "Удобрения",
+    "cargo_type": "fertilizer",
+    "weight_t": 30.0,
+    "owner_tg_id": 100000001,
+    "origin": "astrakhan",
+    "destination": "anzali",
+    "stage": "planned",
+    "risk_level": "low",
+    "rerouted": false,
+    "display_status": "planned",
+    "position": {
+      "lat": 46.35,
+      "lon": 48.04
+    },
+    "current_leg": null,
+    "route": {
+      "id": "r-sh-05-plan",
+      "legs": [
+        {
+          "index": 0,
+          "edge_id": "e-astrakhan-anzali",
+          "from": "astrakhan",
+          "to": "anzali",
+          "mode": "sea",
+          "sailing_id": "sl-ast-anz-1116",
+          "planned_start": "2026-11-16T07:00:00Z",
+          "planned_end": "2026-11-18T07:00:00Z",
+          "predicted_delay_h": 0.0,
+          "status": "pending"
+        }
+      ],
+      "total_hours": 48.0,
+      "total_cost_rub": 55200.0,
+      "total_co2_kg": 1725.0,
+      "branch": "transcaspian"
+    },
+    "planned_eta": "2026-11-18T07:00:00Z",
+    "eta": "2026-11-18T07:00:00Z",
+    "risk": {
+      "miss_probability": 0.02,
+      "level": "low",
+      "departure_shift_h": 0.0,
+      "arrival_delay_h": 0.0,
+      "factors": [
+        {
+          "name": "wave_height",
+          "label": "Волна 0,9 м",
+          "impact_hours": 0.0
+        },
+        {
+          "name": "port_congestion",
+          "label": "Загрузка порта 62%",
+          "impact_hours": 0.0
+        },
+        {
+          "name": "customs_queue",
+          "label": "Очередь на таможне",
+          "impact_hours": 1.0
+        }
+      ]
+    },
+    "pass_id": "pass-05",
+    "pass_state": "active"
+  }
+]

@@ -31,7 +31,7 @@
 - Telegram-бот — диспетчер: алерты с кнопками, вопросы свободным текстом.
 - Telegram Mini App (`backend/app/miniapp/`, `/tg/`) — пульт логиста внутри Telegram: Обзор, Грузы с двойником и новым грузом, Решения с принятием.
 
-**Продакшен:** `https://129-101-122-103.sslip.io` — сайт на `/`, API на `/api`, WebSocket на `/ws`, мини-приложение на `/tg/`. Один VPS, Caddy с HTTPS, выкатка через GitHub Actions (`backend/scripts/deploy.ps1`). Telegram-бот работает только там.
+**Продакшен:** `https://caspian-dispatcher.ru` (запасной адрес `https://129-101-122-103.sslip.io` работает так же) — сайт на `/`, API на `/api`, WebSocket на `/ws`, мини-приложение на `/tg/`. Один VPS, Caddy с HTTPS, выкатка через GitHub Actions (`backend/scripts/deploy.ps1`). Telegram-бот работает только там.
 
 **Бонус:** фото инвойса на фарси → поля декларации на русском.
 
@@ -151,7 +151,7 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 
 ## 5. Контракт API
 
-База: `/api` (продакшен `https://129-101-122-103.sslip.io/api`). JSON, UTF-8, время в ISO 8601 UTC. Авторизация на всех `/api/*`: заголовок `X-API-Key` (сайт, приложение, бот) **или** `Authorization: Bearer <сессия мини-приложения>` из `POST /api/tg/auth`. Токен входа сайта (`/api/auth/*`) доступа к API не даёт, но если пришёл вместе с `X-API-Key`, сервер проверяет права роли (см. «Аккаунты»). Ошибки: `{"error": {"code": "...", "message": "...", "fields"?: [string]}}`; `fields` — поля запроса с ошибкой, где это известно. Неверное тело запроса — 422.
+База: `/api` (продакшен `https://caspian-dispatcher.ru/api`). JSON, UTF-8, время в ISO 8601 UTC. Авторизация на всех `/api/*`: заголовок `X-API-Key` (сайт, приложение, бот) **или** `Authorization: Bearer <сессия мини-приложения>` из `POST /api/tg/auth`. Токен входа сайта (`/api/auth/*`) доступа к API не даёт, но если пришёл вместе с `X-API-Key`, сервер проверяет права роли (см. «Аккаунты»). Ошибки: `{"error": {"code": "...", "message": "...", "fields"?: [string]}}`; `fields` — поля запроса с ошибкой, где это известно. Неверное тело запроса — 422.
 
 | Метод | Путь | Запрос | Ответ |
 |---|---|---|---|

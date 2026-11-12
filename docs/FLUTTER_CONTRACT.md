@@ -20,7 +20,7 @@
 | `/api/auth/register`, `/login`, `/me` | — | есть |
 | `/api/model`, `/api/demo/check` | — | есть |
 | Наблюдатель угроз (алерт без сценария) | — | есть |
-| Продакшен `https://129-101-122-103.sslip.io` | HTTPS, WebSocket | есть; на сервере только бэкенд, сайта там нет |
+| Продакшен `https://caspian-dispatcher.ru` (запасной `https://129-101-122-103.sslip.io`) | HTTPS, WebSocket | есть; на сервере только бэкенд, сайта там нет |
 
 ### Запланировано, не реализовано
 
@@ -69,8 +69,8 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 
 ### Подключение
 
-- База: `https://129-101-122-103.sslip.io/api`, заголовок `X-API-Key: <ключ из чата>` на каждом запросе. Не `caspian-dev-key` — он только для локального запуска.
-- WebSocket: `wss://129-101-122-103.sslip.io/ws?api_key=<ключ>`. Сообщения `{type, payload}`:
+- База: `https://caspian-dispatcher.ru/api`, заголовок `X-API-Key: <ключ из чата>` на каждом запросе. Не `caspian-dev-key` — он только для локального запуска.
+- WebSocket: `wss://caspian-dispatcher.ru/ws?api_key=<ключ>`. Сообщения `{type, payload}`:
 
 | `type` | `payload` | Что делать |
 |---|---|---|

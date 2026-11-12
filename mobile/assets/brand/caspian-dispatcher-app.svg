@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title"><title id="title">Каспийский диспетчер — иконка приложения</title><rect width="512" height="512" rx="112" fill="#FFFFFF"/><g transform="translate(66 114) scale(.94)"><g id="brand-mark"><path fill="#245BDB" d="M40 210V91C40 40 80 0 131 0H250Z"/>
+ <path fill="#245BDB" d="M55 302C115 287 174 262 223 228C265 200 291 197 322 211C351 225 378 247 405 266V302Z"/>
+ <path fill="#087F8C" d="M0 302C21 245 49 215 88 198C121 183 144 190 170 174C202 154 210 119 241 96C267 77 296 70 333 70A37 37 0 1 1 359 106C322 101 300 112 280 132C254 158 238 193 210 216C179 244 144 253 110 259C65 267 33 283 0 302Z"/></g></g></svg>

@@ -8,8 +8,9 @@ import { CloseIcon, RailIcon, RoadIcon, SeaIcon } from "./icons";
 export const MODE_LABEL: Record<Mode, string> = { rail: "Ж/д", road: "Авто", sea: "Море" };
 const MODE_ICON: Record<Mode, typeof RailIcon> = { rail: RailIcon, road: RoadIcon, sea: SeaIcon };
 
+// справа, как карточка узла: слева сверху грузы в пути (север коридора) — карточка их не закрывает
 const box =
-  "absolute top-[76px] left-5 z-[600] w-[340px] rounded-[12px] border border-line bg-panel p-[16px] shadow-[0_16px_40px_var(--color-shadow)]";
+  "absolute top-5 z-[600] w-[340px] rounded-[12px] border border-line bg-panel p-[16px] shadow-[0_16px_40px_var(--color-shadow)]";
 const closeBtn =
   "absolute top-[12px] right-[12px] flex size-[32px] items-center justify-center rounded-[8px] border border-line text-muted hover:bg-tile";
 
@@ -19,11 +20,13 @@ const name = (nodes: Map<string, GraphNode>, id: string | undefined) => (id ? sh
 export function LiveCard({
   shipment: s,
   nodes,
+  right,
   onOpen,
   onClose,
 }: {
   shipment: Shipment;
   nodes: Map<string, GraphNode>;
+  right: number;
   onOpen(): void;
   onClose(): void;
 }) {
@@ -31,7 +34,7 @@ export function LiveCard({
   const Icon = p ? MODE_ICON[p.mode] : null;
   const row = "flex justify-between gap-[12px] py-[5px] text-[14px]";
   return (
-    <div data-map-ui className={box} role="dialog" aria-label={`Груз ${shipmentNumber(s.id)}`}>
+    <div data-map-ui className={box} style={{ right }} role="dialog" aria-label={`Груз ${shipmentNumber(s.id)}`}>
       <button type="button" onClick={onClose} aria-label="Закрыть" className={closeBtn}>
         <CloseIcon size={14} />
       </button>
@@ -94,15 +97,17 @@ export function LiveCard({
 /** Несколько грузов в одной точке: список, клик — карточка груза. */
 export function LiveList({
   shipments,
+  right,
   onPick,
   onClose,
 }: {
   shipments: Shipment[];
+  right: number;
   onPick(id: string): void;
   onClose(): void;
 }) {
   return (
-    <div data-map-ui className={box} role="dialog" aria-label="Грузы в этой точке">
+    <div data-map-ui className={box} style={{ right }} role="dialog" aria-label="Грузы в этой точке">
       <button type="button" onClick={onClose} aria-label="Закрыть" className={closeBtn}>
         <CloseIcon size={14} />
       </button>

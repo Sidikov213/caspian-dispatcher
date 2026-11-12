@@ -1,0 +1,401 @@
+{
+  "nodes": [
+    {
+      "id": "moscow",
+      "name": "Москва",
+      "country": "RU",
+      "type": "city",
+      "lat": 55.75,
+      "lon": 37.62,
+      "congestion": 0.4
+    },
+    {
+      "id": "samara",
+      "name": "Самара",
+      "country": "RU",
+      "type": "station",
+      "lat": 53.2,
+      "lon": 50.15,
+      "congestion": 0.35
+    },
+    {
+      "id": "saratov",
+      "name": "Саратов",
+      "country": "RU",
+      "type": "station",
+      "lat": 51.53,
+      "lon": 46.03,
+      "congestion": 0.35
+    },
+    {
+      "id": "astrakhan",
+      "name": "Астрахань",
+      "country": "RU",
+      "type": "port",
+      "lat": 46.35,
+      "lon": 48.04,
+      "congestion": 0.62
+    },
+    {
+      "id": "olya",
+      "name": "Оля",
+      "country": "RU",
+      "type": "port",
+      "lat": 45.78,
+      "lon": 47.55,
+      "congestion": 0.5
+    },
+    {
+      "id": "makhachkala",
+      "name": "Махачкала",
+      "country": "RU",
+      "type": "port",
+      "lat": 42.98,
+      "lon": 47.5,
+      "congestion": 0.55
+    },
+    {
+      "id": "samur",
+      "name": "Самур (граница)",
+      "country": "RU/AZ",
+      "type": "border",
+      "lat": 41.63,
+      "lon": 48.43,
+      "congestion": 0.45
+    },
+    {
+      "id": "baku",
+      "name": "Баку / Алят",
+      "country": "AZ",
+      "type": "port",
+      "lat": 39.95,
+      "lon": 49.41,
+      "congestion": 0.5
+    },
+    {
+      "id": "astara",
+      "name": "Астара (граница)",
+      "country": "AZ/IR",
+      "type": "border",
+      "lat": 38.43,
+      "lon": 48.87,
+      "congestion": 0.55
+    },
+    {
+      "id": "rasht",
+      "name": "Решт",
+      "country": "IR",
+      "type": "station",
+      "lat": 37.28,
+      "lon": 49.58,
+      "congestion": 0.4
+    },
+    {
+      "id": "anzali",
+      "name": "Энзели",
+      "country": "IR",
+      "type": "port",
+      "lat": 37.47,
+      "lon": 49.46,
+      "congestion": 0.58
+    },
+    {
+      "id": "amirabad",
+      "name": "Амирабад",
+      "country": "IR",
+      "type": "port",
+      "lat": 36.85,
+      "lon": 53.37,
+      "congestion": 0.45
+    },
+    {
+      "id": "aktau",
+      "name": "Актау",
+      "country": "KZ",
+      "type": "port",
+      "lat": 43.65,
+      "lon": 51.16,
+      "congestion": 0.5
+    },
+    {
+      "id": "incheh",
+      "name": "Инче-Бурун (граница)",
+      "country": "TM/IR",
+      "type": "border",
+      "lat": 37.45,
+      "lon": 54.72,
+      "congestion": 0.4
+    },
+    {
+      "id": "tehran",
+      "name": "Тегеран",
+      "country": "IR",
+      "type": "city",
+      "lat": 35.69,
+      "lon": 51.39,
+      "congestion": 0.5
+    },
+    {
+      "id": "bandar_abbas",
+      "name": "Бендер-Аббас",
+      "country": "IR",
+      "type": "port",
+      "lat": 27.18,
+      "lon": 56.27,
+      "congestion": 0.6
+    },
+    {
+      "id": "mumbai",
+      "name": "Мумбаи (Нава-Шева)",
+      "country": "IN",
+      "type": "port",
+      "lat": 18.95,
+      "lon": 72.95,
+      "congestion": 0.55
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-moscow-astrakhan",
+      "from": "moscow",
+      "to": "astrakhan",
+      "mode": "rail",
+      "branch": "transcaspian",
+      "distance_km": 1400,
+      "base_hours": 40,
+      "cost_rub_per_t": 3080.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-samara-astrakhan",
+      "from": "samara",
+      "to": "astrakhan",
+      "mode": "rail",
+      "branch": "transcaspian",
+      "distance_km": 1000,
+      "base_hours": 29,
+      "cost_rub_per_t": 2200.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-saratov-astrakhan",
+      "from": "saratov",
+      "to": "astrakhan",
+      "mode": "rail",
+      "branch": "transcaspian",
+      "distance_km": 560,
+      "base_hours": 16,
+      "cost_rub_per_t": 1232.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-astrakhan-olya",
+      "from": "astrakhan",
+      "to": "olya",
+      "mode": "rail",
+      "branch": "transcaspian",
+      "distance_km": 70,
+      "base_hours": 2,
+      "cost_rub_per_t": 154.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-astrakhan-makhachkala",
+      "from": "astrakhan",
+      "to": "makhachkala",
+      "mode": "rail",
+      "branch": "transcaspian",
+      "distance_km": 490,
+      "base_hours": 14,
+      "cost_rub_per_t": 1078.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-astrakhan-anzali",
+      "from": "astrakhan",
+      "to": "anzali",
+      "mode": "sea",
+      "branch": "transcaspian",
+      "distance_km": 1150,
+      "base_hours": 48,
+      "cost_rub_per_t": 1840.0,
+      "co2_g_per_tkm": 50
+    },
+    {
+      "id": "e-olya-anzali",
+      "from": "olya",
+      "to": "anzali",
+      "mode": "sea",
+      "branch": "transcaspian",
+      "distance_km": 1100,
+      "base_hours": 46,
+      "cost_rub_per_t": 1760.0,
+      "co2_g_per_tkm": 50
+    },
+    {
+      "id": "e-olya-amirabad",
+      "from": "olya",
+      "to": "amirabad",
+      "mode": "sea",
+      "branch": "transcaspian",
+      "distance_km": 1250,
+      "base_hours": 52,
+      "cost_rub_per_t": 2000.0,
+      "co2_g_per_tkm": 50
+    },
+    {
+      "id": "e-makhachkala-anzali",
+      "from": "makhachkala",
+      "to": "anzali",
+      "mode": "sea",
+      "branch": "transcaspian",
+      "distance_km": 650,
+      "base_hours": 34,
+      "cost_rub_per_t": 1040.0,
+      "co2_g_per_tkm": 50
+    },
+    {
+      "id": "e-aktau-baku",
+      "from": "aktau",
+      "to": "baku",
+      "mode": "sea",
+      "branch": "transcaspian",
+      "distance_km": 450,
+      "base_hours": 20,
+      "cost_rub_per_t": 720.0,
+      "co2_g_per_tkm": 50
+    },
+    {
+      "id": "e-anzali-rasht",
+      "from": "anzali",
+      "to": "rasht",
+      "mode": "road",
+      "branch": "transcaspian",
+      "distance_km": 40,
+      "base_hours": 1,
+      "cost_rub_per_t": 160.0,
+      "co2_g_per_tkm": 75
+    },
+    {
+      "id": "e-rasht-tehran",
+      "from": "rasht",
+      "to": "tehran",
+      "mode": "road",
+      "branch": "transcaspian",
+      "distance_km": 320,
+      "base_hours": 5,
+      "cost_rub_per_t": 1280.0,
+      "co2_g_per_tkm": 75
+    },
+    {
+      "id": "e-amirabad-tehran",
+      "from": "amirabad",
+      "to": "tehran",
+      "mode": "road",
+      "branch": "transcaspian",
+      "distance_km": 300,
+      "base_hours": 6,
+      "cost_rub_per_t": 1200.0,
+      "co2_g_per_tkm": 75
+    },
+    {
+      "id": "e-tehran-bandar_abbas",
+      "from": "tehran",
+      "to": "bandar_abbas",
+      "mode": "road",
+      "branch": "transcaspian",
+      "distance_km": 1140,
+      "base_hours": 18,
+      "cost_rub_per_t": 4560.0,
+      "co2_g_per_tkm": 75
+    },
+    {
+      "id": "e-bandar_abbas-mumbai",
+      "from": "bandar_abbas",
+      "to": "mumbai",
+      "mode": "sea",
+      "branch": "transcaspian",
+      "distance_km": 1900,
+      "base_hours": 72,
+      "cost_rub_per_t": 950.0,
+      "co2_g_per_tkm": 15
+    },
+    {
+      "id": "e-makhachkala-samur",
+      "from": "makhachkala",
+      "to": "samur",
+      "mode": "rail",
+      "branch": "west",
+      "distance_km": 200,
+      "base_hours": 6,
+      "cost_rub_per_t": 440.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-samur-baku",
+      "from": "samur",
+      "to": "baku",
+      "mode": "rail",
+      "branch": "west",
+      "distance_km": 210,
+      "base_hours": 6,
+      "cost_rub_per_t": 462.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-baku-astara",
+      "from": "baku",
+      "to": "astara",
+      "mode": "rail",
+      "branch": "west",
+      "distance_km": 320,
+      "base_hours": 10,
+      "cost_rub_per_t": 704.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-astara-rasht",
+      "from": "astara",
+      "to": "rasht",
+      "mode": "road",
+      "branch": "west",
+      "distance_km": 170,
+      "base_hours": 4,
+      "cost_rub_per_t": 680.0,
+      "co2_g_per_tkm": 75
+    },
+    {
+      "id": "e-moscow-aktau",
+      "from": "moscow",
+      "to": "aktau",
+      "mode": "rail",
+      "branch": "east",
+      "distance_km": 2600,
+      "base_hours": 74,
+      "cost_rub_per_t": 5720.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-aktau-incheh",
+      "from": "aktau",
+      "to": "incheh",
+      "mode": "rail",
+      "branch": "east",
+      "distance_km": 1200,
+      "base_hours": 34,
+      "cost_rub_per_t": 2640.0,
+      "co2_g_per_tkm": 20
+    },
+    {
+      "id": "e-incheh-tehran",
+      "from": "incheh",
+      "to": "tehran",
+      "mode": "rail",
+      "branch": "east",
+      "distance_km": 650,
+      "base_hours": 18,
+      "cost_rub_per_t": 1430.0,
+      "co2_g_per_tkm": 20
+    }
+  ]
+}

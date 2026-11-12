@@ -1,0 +1,58 @@
+{
+  "document": {
+    "id": "doc-05",
+    "shipment_id": "sh-05",
+    "type": "invoice",
+    "source_lang": "fa",
+    "image_url": "mock://invoice-sh-05.jpg",
+    "fields": {
+      "seller": "ООО «АстраханьАгроХим»",
+      "buyer": "Компания «Кешт Гостар Гилян»",
+      "goods": "Удобрения азотные (карбамид)",
+      "hs_code": "3102 10",
+      "weight_kg": 30000,
+      "value": 10500,
+      "currency": "USD",
+      "origin_country": "RU"
+    },
+    "checks": [
+      {
+        "name": "required_fields",
+        "ok": true,
+        "note": "Все обязательные поля заполнены"
+      },
+      {
+        "name": "weight_match",
+        "ok": true,
+        "note": "Вес 30 000 кг совпадает с заявкой (30 т)"
+      },
+      {
+        "name": "hs_code",
+        "ok": true,
+        "note": "Код ТН ВЭД 3102 10"
+      }
+    ],
+    "status": "confirmed",
+    "hash": "a3738ed7283c87dc5e5a084ce05ade316f51dc33a3be49a52a5f6179704225cf"
+  },
+  "pass": {
+    "id": "pass-05",
+    "shipment_id": "sh-05",
+    "checkpoint_node": "astrakhan",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiJwYXNzLTA1Iiwic2lkIjoic2gtMDUiLCJjcCI6ImFzdHJha2hhbiIsImRvY19oYXNoIjoiYTM3MzhlZDcyODNjODdkYzVlNWEwODRjZTA1YWRlMzE2ZjUxZGMzM2EzYmU0OWE1MmE1ZjYxNzk3MDQyMjVjZiIsImJsb2NrX2hhc2giOiJkYTc0N2FiMmJiNmVkMjBhNDQ0MTVkZjQzNWQ5MmQ4N2Y3MTRhNzMwOGNhOTc3MWNhNmMyMzdhYjg4ODI2ZTA3IiwiZXhwIjoxNzk1OTg2MDAwfQ.-TxU-pawvKKdz-9kgTDKrF8b_kt74vILgY7wtc3o5n4",
+    "doc_hash": "a3738ed7283c87dc5e5a084ce05ade316f51dc33a3be49a52a5f6179704225cf",
+    "block_hash": "da747ab2bb6ed20a44415df435d92d87f714a7308ca9771ca6c237ab88826e07",
+    "valid_until": "2026-11-29T21:00:00Z",
+    "status": "active"
+  },
+  "block": {
+    "index": 4,
+    "ts": "2026-11-12T10:50:00Z",
+    "event": "issued",
+    "shipment_id": "sh-05",
+    "checkpoint_node": "astrakhan",
+    "doc_hash": "a3738ed7283c87dc5e5a084ce05ade316f51dc33a3be49a52a5f6179704225cf",
+    "prev_hash": "ca92eee54d44a0405218ce64ac445c66a2a992fe20eefa8eb0d96799298805b4",
+    "hash": "da747ab2bb6ed20a44415df435d92d87f714a7308ca9771ca6c237ab88826e07"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "id": "doc-05",
+  "shipment_id": "sh-05",
+  "type": "invoice",
+  "source_lang": "fa",
+  "image_url": "mock://invoice-sh-05.jpg",
+  "fields": {
+    "seller": "ООО «АстраханьАгроХим»",
+    "buyer": "Компания «Кешт Гостар Гилян»",
+    "goods": "Удобрения азотные (карбамид)",
+    "hs_code": "3102 10",
+    "weight_kg": 30000,
+    "value": 10500,
+    "currency": "USD",
+    "origin_country": "RU"
+  },
+  "checks": [
+    {
+      "name": "required_fields",
+      "ok": true,
+      "note": "Все обязательные поля заполнены"
+    },
+    {
+      "name": "weight_match",
+      "ok": true,
+      "note": "Вес 30 000 кг совпадает с заявкой (30 т)"
+    },
+    {
+      "name": "hs_code",
+      "ok": true,
+      "note": "Код ТН ВЭД 3102 10"
+    }
+  ],
+  "status": "draft",
+  "hash": null
+}

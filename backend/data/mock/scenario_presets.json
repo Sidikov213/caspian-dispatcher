@@ -1,0 +1,14 @@
+[
+  {
+    "key": "storm_north",
+    "title": "Шторм на Северном Каспии"
+  },
+  {
+    "key": "storm_full",
+    "title": "Шторм на всём море"
+  },
+  {
+    "key": "congestion_astrakhan",
+    "title": "Затор в порту Астрахань"
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "id": "dec-001",
+  "alert_id": "alert-001",
+  "ts": "2026-11-12T11:32:00Z",
+  "accepted_via": "web",
+  "items": [
+    {
+      "shipment_id": "sh-01",
+      "saved_hours": 42.0,
+      "saved_rub": 298320,
+      "co2_delta_kg": -912.0,
+      "sailing_id": "sl-mkh-anz-1115"
+    },
+    {
+      "shipment_id": "sh-02",
+      "saved_hours": 42.0,
+      "saved_rub": 198880,
+      "co2_delta_kg": -608.0,
+      "sailing_id": "sl-mkh-anz-1115"
+    },
+    {
+      "shipment_id": "sh-03",
+      "saved_hours": 42.0,
+      "saved_rub": 99440,
+      "co2_delta_kg": -304.0,
+      "sailing_id": "sl-mkh-anz-1115"
+    }
+  ]
+}

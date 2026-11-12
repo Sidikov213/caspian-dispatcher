@@ -1,0 +1,74 @@
+[
+  {
+    "id": "sl-ast-anz-1112",
+    "from": "astrakhan",
+    "to": "anzali",
+    "departure": "2026-11-12T07:00:00Z",
+    "cutoff": "2026-11-12T03:00:00Z",
+    "duration_h": 48,
+    "capacity_t": 1800,
+    "booked_t": 1650,
+    "status": "departed",
+    "cancel_reason": null
+  },
+  {
+    "id": "sl-ast-anz-1114",
+    "from": "astrakhan",
+    "to": "anzali",
+    "departure": "2026-11-14T07:00:00Z",
+    "cutoff": "2026-11-14T03:00:00Z",
+    "duration_h": 48,
+    "capacity_t": 1800,
+    "booked_t": 1310,
+    "status": "scheduled",
+    "cancel_reason": null
+  },
+  {
+    "id": "sl-ast-anz-1116",
+    "from": "astrakhan",
+    "to": "anzali",
+    "departure": "2026-11-16T07:00:00Z",
+    "cutoff": "2026-11-16T03:00:00Z",
+    "duration_h": 48,
+    "capacity_t": 1800,
+    "booked_t": 640,
+    "status": "scheduled",
+    "cancel_reason": null
+  },
+  {
+    "id": "sl-mkh-anz-1113",
+    "from": "makhachkala",
+    "to": "anzali",
+    "departure": "2026-11-13T03:00:00Z",
+    "cutoff": "2026-11-12T23:00:00Z",
+    "duration_h": 34,
+    "capacity_t": 1200,
+    "booked_t": 1150,
+    "status": "scheduled",
+    "cancel_reason": null
+  },
+  {
+    "id": "sl-mkh-anz-1115",
+    "from": "makhachkala",
+    "to": "anzali",
+    "departure": "2026-11-15T03:00:00Z",
+    "cutoff": "2026-11-14T23:00:00Z",
+    "duration_h": 34,
+    "capacity_t": 1200,
+    "booked_t": 760,
+    "status": "scheduled",
+    "cancel_reason": null
+  },
+  {
+    "id": "sl-mkh-anz-1117",
+    "from": "makhachkala",
+    "to": "anzali",
+    "departure": "2026-11-17T03:00:00Z",
+    "cutoff": "2026-11-16T23:00:00Z",
+    "duration_h": 34,
+    "capacity_t": 1200,
+    "booked_t": 300,
+    "status": "scheduled",
+    "cancel_reason": null
+  }
+]

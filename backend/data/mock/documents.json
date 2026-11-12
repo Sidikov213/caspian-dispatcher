@@ -1,0 +1,146 @@
+[
+  {
+    "id": "doc-01",
+    "shipment_id": "sh-01",
+    "type": "invoice",
+    "source_lang": "ru",
+    "image_url": "mock://invoice-sh-01.jpg",
+    "fields": {
+      "seller": "ООО «Волга-Агро»",
+      "buyer": "Shree Grain Imports Pvt Ltd",
+      "goods": "Пшеница продовольственная 3 класса",
+      "hs_code": "1001 99",
+      "weight_kg": 60000,
+      "value": 15000,
+      "currency": "USD",
+      "origin_country": "RU"
+    },
+    "checks": [
+      {
+        "name": "required_fields",
+        "ok": true,
+        "note": "Все обязательные поля заполнены"
+      },
+      {
+        "name": "weight_match",
+        "ok": true,
+        "note": "Вес 60 000 кг совпадает с заявкой (60 т)"
+      },
+      {
+        "name": "hs_code",
+        "ok": true,
+        "note": "Код ТН ВЭД 1001 99"
+      }
+    ],
+    "status": "confirmed",
+    "hash": "2d7b9f6d95a1e80c2901366230203b3b1104255ed5b80a40da61bfe62fafd410"
+  },
+  {
+    "id": "doc-02",
+    "shipment_id": "sh-02",
+    "type": "invoice",
+    "source_lang": "ru",
+    "image_url": "mock://invoice-sh-02.jpg",
+    "fields": {
+      "seller": "ООО «СамараМеталлТрейд»",
+      "buyer": "Bharat Steel Traders",
+      "goods": "Прокат стальной горячекатаный",
+      "hs_code": "7208 51",
+      "weight_kg": 40000,
+      "value": 28000,
+      "currency": "USD",
+      "origin_country": "RU"
+    },
+    "checks": [
+      {
+        "name": "required_fields",
+        "ok": true,
+        "note": "Все обязательные поля заполнены"
+      },
+      {
+        "name": "weight_match",
+        "ok": true,
+        "note": "Вес 40 000 кг совпадает с заявкой (40 т)"
+      },
+      {
+        "name": "hs_code",
+        "ok": true,
+        "note": "Код ТН ВЭД 7208 51"
+      }
+    ],
+    "status": "confirmed",
+    "hash": "7092546bb2527f9a78576a8ec512e2de54d767bec3242e915868122eb2c5de51"
+  },
+  {
+    "id": "doc-03",
+    "shipment_id": "sh-03",
+    "type": "invoice",
+    "source_lang": "ru",
+    "image_url": "mock://invoice-sh-03.jpg",
+    "fields": {
+      "seller": "ООО «СарЭнергоМаш»",
+      "buyer": "Pune Engineering Works Ltd",
+      "goods": "Насосное оборудование",
+      "hs_code": "8413 70",
+      "weight_kg": 20000,
+      "value": 96000,
+      "currency": "USD",
+      "origin_country": "RU"
+    },
+    "checks": [
+      {
+        "name": "required_fields",
+        "ok": true,
+        "note": "Все обязательные поля заполнены"
+      },
+      {
+        "name": "weight_match",
+        "ok": true,
+        "note": "Вес 20 000 кг совпадает с заявкой (20 т)"
+      },
+      {
+        "name": "hs_code",
+        "ok": true,
+        "note": "Код ТН ВЭД 8413 70"
+      }
+    ],
+    "status": "confirmed",
+    "hash": "c7721c463afd9de3f088683ed001b1127367ac26c64eb5ea2398527521cc3139"
+  },
+  {
+    "id": "doc-04",
+    "shipment_id": "sh-04",
+    "type": "invoice",
+    "source_lang": "ru",
+    "image_url": "mock://invoice-sh-04.jpg",
+    "fields": {
+      "seller": "Baku Textile LLC",
+      "buyer": "Mumbai Fabrics Co.",
+      "goods": "Ткани хлопчатобумажные",
+      "hs_code": "5208 52",
+      "weight_kg": 25000,
+      "value": 62000,
+      "currency": "USD",
+      "origin_country": "AZ"
+    },
+    "checks": [
+      {
+        "name": "required_fields",
+        "ok": true,
+        "note": "Все обязательные поля заполнены"
+      },
+      {
+        "name": "weight_match",
+        "ok": true,
+        "note": "Вес 25 000 кг совпадает с заявкой (25 т)"
+      },
+      {
+        "name": "hs_code",
+        "ok": true,
+        "note": "Код ТН ВЭД 5208 52"
+      }
+    ],
+    "status": "confirmed",
+    "hash": "e05cdf2355983ee6fada7a8a0c984ae28e3fbb36d9e04b78a1cacaf8b7f14759"
+  }
+]

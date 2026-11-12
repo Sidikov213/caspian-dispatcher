@@ -52,6 +52,7 @@ class StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = AppColors.statusFg(status.tone);
     final bg = AppColors.statusBg(status.tone);
+    final showCheck = status == CargoStatus.delivered;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 10,
@@ -61,13 +62,22 @@ class StatusPill extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
       ),
-      child: Text(
-        status.label,
-        style: TextStyle(
-          color: fg,
-          fontSize: compact ? 11 : 12,
-          fontWeight: FontWeight.w700,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showCheck) ...[
+            Icon(Icons.check_rounded, size: compact ? 12 : 14, color: fg),
+            SizedBox(width: compact ? 3 : 4),
+          ],
+          Text(
+            status.label,
+            style: TextStyle(
+              color: fg,
+              fontSize: compact ? 11 : 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -86,6 +96,7 @@ class PassStatusPill extends StatelessWidget {
       PassStatus.reissued => (AppColors.infoBg, AppColors.primary),
       PassStatus.awaitingReissue => (AppColors.warningBg, AppColors.warning),
       PassStatus.invalid => (AppColors.dangerBg, AppColors.danger),
+      PassStatus.unknown => (AppColors.neutralBg, AppColors.muted),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

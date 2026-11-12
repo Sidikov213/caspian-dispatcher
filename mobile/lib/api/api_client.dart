@@ -8,11 +8,19 @@ import '../models/auth_user.dart';
 import 'api_config.dart';
 
 class ApiException implements Exception {
-  ApiException(this.message, {this.statusCode, this.code});
+  ApiException(
+    this.message, {
+    this.statusCode,
+    this.code,
+    this.fields,
+  });
 
   final String message;
   final int? statusCode;
   final String? code;
+
+  /// Поля из `error.fields` (например `document_invalid`).
+  final Map<String, String>? fields;
 
   @override
   String toString() => message;
@@ -39,7 +47,8 @@ class ApiClient {
   Map<String, String> get _headers {
     if (apiKey.trim().isEmpty) {
       throw ApiException(
-        'Не задан API_KEY. Пропишите его в файле .env в корне проекта.',
+        'Не задан API_KEY. Запустите с '
+        '--dart-define-from-file=.env или --dart-define=API_KEY=…',
       );
     }
     return {'X-API-Key': apiKey, 'Accept': 'application/json'};
@@ -132,7 +141,7 @@ class ApiClient {
       rethrow;
     } catch (e) {
       _log('── API ERROR GET $uri → $e');
-      throw ApiException('Нет связи с сервером: $e');
+      throw ApiException(_networkMessage(e));
     }
   }
 
@@ -159,8 +168,50 @@ class ApiClient {
       rethrow;
     } catch (e) {
       _log('── API ERROR POST $uri → $e');
-      throw ApiException('Нет связи с сервером: $e');
+      throw ApiException(_networkMessage(e));
     }
+  }
+
+  Future<dynamic> deleteJson(
+    String path, {
+    Object? body,
+    String? bearerToken,
+  }) async {
+    final uri = _uri(path);
+    _logRequest('DELETE', uri, body: body);
+    try {
+      final res = await _http
+          .delete(
+            uri,
+            headers: {
+              ..._headersWith(bearerToken: bearerToken),
+              'Content-Type': 'application/json',
+            },
+            body: body == null ? null : jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 20));
+      return _decode(res, method: 'DELETE', uri: uri);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      _log('── API ERROR DELETE $uri → $e');
+      throw ApiException(_networkMessage(e));
+    }
+  }
+
+  String _networkMessage(Object error) {
+    final raw = '$error'.toLowerCase();
+    if (raw.contains('timeout') || raw.contains('timed out')) {
+      return 'Сервер не ответил вовремя. Попробуйте ещё раз.';
+    }
+    if (raw.contains('connection refused') ||
+        raw.contains('network is unreachable') ||
+        raw.contains('failed host lookup') ||
+        raw.contains('socketexception') ||
+        raw.contains('clientexception')) {
+      return 'Нет связи с сервером. Проверьте интернет и попробуйте снова.';
+    }
+    return 'Нет связи с сервером. Попробуйте позже.';
   }
 
   Future<dynamic> postMultipart(
@@ -192,7 +243,7 @@ class ApiClient {
       rethrow;
     } catch (e) {
       _log('── API ERROR POST multipart $uri → $e');
-      throw ApiException('Нет связи с сервером: $e');
+      throw ApiException(_networkMessage(e));
     }
   }
 
@@ -208,16 +259,29 @@ class ApiClient {
     if (res.statusCode < 200 || res.statusCode >= 300) {
       String msg = 'HTTP ${res.statusCode}';
       String? code;
+      Map<String, String>? fields;
       if (raw is Map) {
         final err = raw['error'];
         if (err is Map) {
           if (err['message'] != null) msg = '${err['message']}';
           if (err['code'] != null) code = '${err['code']}';
+          final rawFields = err['fields'];
+          if (rawFields is Map) {
+            fields = {
+              for (final e in rawFields.entries)
+                '${e.key}': '${e.value}',
+            };
+          }
         } else if (raw['detail'] != null) {
           msg = '${raw['detail']}';
         }
       }
-      throw ApiException(msg, statusCode: res.statusCode, code: code);
+      throw ApiException(
+        msg,
+        statusCode: res.statusCode,
+        code: code,
+        fields: fields,
+      );
     }
     return raw;
   }
@@ -291,6 +355,39 @@ class ApiClient {
 
   Future<Map<String, dynamic>> fetchPass(String passId) async {
     final data = await getJson('/passes/$passId');
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchPasses({String? shipmentId}) async {
+    final data = await getJson(
+      '/passes',
+      query: shipmentId == null ? null : {'shipment_id': shipmentId},
+    );
+    return (data as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> registerDevice({
+    required String token,
+    required String platform,
+    required String bearerToken,
+  }) async {
+    final data = await postJson(
+      '/devices',
+      body: {'token': token, 'platform': platform},
+      bearerToken: bearerToken,
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> unregisterDevice({
+    required String token,
+    required String bearerToken,
+  }) async {
+    final data = await deleteJson(
+      '/devices',
+      body: {'token': token},
+      bearerToken: bearerToken,
+    );
     return Map<String, dynamic>.from(data as Map);
   }
 

@@ -7,7 +7,7 @@ import '../theme/app_spacing.dart';
 import '../widgets/app_chrome.dart';
 import 'pass_screen.dart';
 
-/// 09 — Проверка полей → confirm.
+/// Проверка полей → confirm.
 class FieldsCheckScreen extends StatefulWidget {
   const FieldsCheckScreen({super.key, required this.cargoId});
 
@@ -26,6 +26,7 @@ class _FieldsCheckScreenState extends State<FieldsCheckScreen> {
   final _amount = TextEditingController();
   final _origin = TextEditingController();
   String? _blockError;
+  Map<String, String> _fieldErrors = {};
   bool _submitting = false;
   bool _filled = false;
 
@@ -72,6 +73,13 @@ class _FieldsCheckScreenState extends State<FieldsCheckScreen> {
     );
   }
 
+  void _clearFieldError(String key) {
+    if (!_fieldErrors.containsKey(key)) return;
+    setState(() {
+      _fieldErrors = Map<String, String>.from(_fieldErrors)..remove(key);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
@@ -97,19 +105,20 @@ class _FieldsCheckScreenState extends State<FieldsCheckScreen> {
             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 14),
-          _field('Продавец', _seller),
-          _field('Покупатель', _buyer),
-          _field('Товар', _product),
+          _field('Продавец', _seller, keyName: 'seller'),
+          _field('Покупатель', _buyer, keyName: 'buyer'),
+          _field('Товар', _product, keyName: 'product'),
           _field(
             'Код ТН ВЭД',
             _hs,
+            keyName: 'hsCode',
             warning: app.hasHsCodeWarning
-                ? 'Сомнение в коде — предупреждение, без блокировки'
+                ? 'Сомнение в коде: предупреждение, без блокировки'
                 : null,
           ),
-          _field('Вес, т', _weight),
-          _field('Стоимость', _amount),
-          _field('Страна происхождения', _origin),
+          _field('Вес, т', _weight, keyName: 'weight'),
+          _field('Стоимость', _amount, keyName: 'amount'),
+          _field('Страна происхождения', _origin, keyName: 'origin'),
           if (_blockError != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -127,17 +136,21 @@ class _FieldsCheckScreenState extends State<FieldsCheckScreen> {
                 : () async {
                     _sync(app);
                     final err = app.validateInvoice(cargo);
-                    setState(() => _blockError = err);
+                    setState(() {
+                      _blockError = err;
+                      _fieldErrors = {};
+                    });
                     if (err != null) return;
                     final navigator = Navigator.of(context);
                     setState(() => _submitting = true);
-                    final issueErr = await app.issuePass(cargo.id);
+                    final result = await app.issuePass(cargo.id);
                     if (!mounted) return;
-                    setState(() => _submitting = false);
-                    if (issueErr != null) {
-                      setState(() => _blockError = issueErr);
-                      return;
-                    }
+                    setState(() {
+                      _submitting = false;
+                      _blockError = result.message;
+                      _fieldErrors = result.fields;
+                    });
+                    if (result.message != null) return;
                     navigator.pushAndRemoveUntil(
                       MaterialPageRoute(
                         builder: (_) => PassScreen(cargoId: cargo.id),
@@ -156,7 +169,13 @@ class _FieldsCheckScreenState extends State<FieldsCheckScreen> {
     );
   }
 
-  Widget _field(String label, TextEditingController c, {String? warning}) {
+  Widget _field(
+    String label,
+    TextEditingController c, {
+    required String keyName,
+    String? warning,
+  }) {
+    final error = _fieldErrors[keyName];
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -164,10 +183,24 @@ class _FieldsCheckScreenState extends State<FieldsCheckScreen> {
         children: [
           TextField(
             controller: c,
-            decoration: InputDecoration(labelText: label),
+            onChanged: (_) => _clearFieldError(keyName),
+            decoration: InputDecoration(
+              labelText: label,
+              errorText: error,
+              enabledBorder: error == null
+                  ? null
+                  : OutlineInputBorder(
+                      borderSide: BorderSide(color: AppColors.danger),
+                    ),
+              focusedBorder: error == null
+                  ? null
+                  : OutlineInputBorder(
+                      borderSide: BorderSide(color: AppColors.danger, width: 2),
+                    ),
+            ),
             style: TextStyle(color: AppColors.text),
           ),
-          if (warning != null) ...[
+          if (warning != null && error == null) ...[
             const SizedBox(height: 4),
             Text(
               warning,

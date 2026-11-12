@@ -35,8 +35,6 @@ class CargoDetailScreen extends StatelessWidget {
 
     final hasPass = cargo.passStatus != PassStatus.none;
     final waves = app.overview?.waves ?? const <WavePort>[];
-    final isFertilizerDemo =
-        cargo.id == 'sh-05' || cargo.title.toLowerCase().contains('удобрен');
 
     return Scaffold(
       appBar: AppBar(title: Text(cargo.displayName)),
@@ -109,7 +107,7 @@ class CargoDetailScreen extends StatelessWidget {
                 if (cargo.riskPercent > 0) ...[
                   const SizedBox(height: 10),
                   Text(
-                    '${cargo.riskPercent}% — риск срыва стыковки',
+                    '${cargo.riskPercent}% риск срыва стыковки',
                     style: TextStyle(
                       color: cargo.displayStatus == CargoStatus.atRisk
                           ? AppColors.danger
@@ -144,12 +142,8 @@ class CargoDetailScreen extends StatelessWidget {
                         ),
                         SoftBadge(
                           label: w.heightLabel,
-                          background: w.dangerous
-                              ? AppColors.dangerBg
-                              : AppColors.successBg,
-                          foreground: w.dangerous
-                              ? AppColors.danger
-                              : AppColors.success,
+                          background: AppColors.infoBg,
+                          foreground: AppColors.primary,
                         ),
                       ],
                     ),
@@ -200,7 +194,7 @@ class CargoDetailScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 _kv('Пункт', cargo.passPort ?? cargo.nextPoint),
                 const SizedBox(height: 6),
-                _kv('Срок', cargo.passValidUntil ?? '—'),
+                _kv('Срок', cargo.passValidUntil ?? '-'),
                 const SizedBox(height: 6),
                 _kv(
                   'Состояние',
@@ -218,19 +212,17 @@ class CargoDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          if (isFertilizerDemo) ...[
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CorridorScreen(cargoId: cargo.id),
-                  ),
-                );
-              },
-              child: const Text('Цифровой коридор'),
-            ),
-          ],
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => CorridorScreen(cargoId: cargo.id),
+                ),
+              );
+            },
+            child: const Text('Цифровой коридор'),
+          ),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () {

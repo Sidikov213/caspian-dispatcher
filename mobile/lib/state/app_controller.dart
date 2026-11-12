@@ -7,16 +7,27 @@ import '../api/api_client.dart';
 import '../api/mappers.dart';
 import '../models/cargo.dart';
 import '../services/pass_store.dart';
+import '../services/realtime_service.dart';
 
 enum AppLoadState { idle, loading, ready, error }
 
 class AppController extends ChangeNotifier {
-  AppController({ApiClient? api, PassStore? passStore})
+  AppController({ApiClient? api, PassStore? passStore, RealtimeService? realtime})
     : _api = api ?? ApiClient(),
-      _passStore = passStore ?? PassStore();
+      _passStore = passStore ?? PassStore() {
+    _realtime =
+        realtime ??
+        RealtimeService(
+          onEvent: (type, payload) {
+            unawaited(_onRealtimeEvent(type, payload));
+          },
+          onConnection: (_) => _syncPolling(),
+        );
+  }
 
   final ApiClient _api;
   final PassStore _passStore;
+  late final RealtimeService _realtime;
 
   List<Cargo> _cargos = [];
   List<Map<String, dynamic>> _alerts = [];
@@ -45,7 +56,9 @@ class AppController extends ChangeNotifier {
 
   /// Кэш пропусков, чтобы silent-poll не долбил /passes/* каждые N секунд.
   final Map<String, Map<String, dynamic>> _passById = {};
-  static const _pollInterval = Duration(seconds: 45);
+
+  /// Fallback, если WebSocket недоступен (контракт: 3 с).
+  static const _pollFallback = Duration(seconds: 3);
 
   List<Cargo> get cargos => _cargos;
   OverviewData? get overview => _overview;
@@ -57,6 +70,7 @@ class AppController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get refreshing => _refreshing;
   bool get isReady => _loadState == AppLoadState.ready;
+  bool get realtimeConnected => _realtime.isConnected;
 
   List<Cargo> get filteredCargos =>
       cargos.where(_cargoListFilter.matches).toList(growable: false);
@@ -79,28 +93,76 @@ class AppController extends ChangeNotifier {
   Future<void> bootstrap() async {
     await _passStore.loadAll().then((v) => _storedPasses = v);
     await refresh(forceLoading: true);
-    startPolling();
+    await _realtime.start();
+    _syncPolling();
   }
 
-  void startPolling() {
+  void _syncPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(_pollInterval, (_) {
+    if (_realtime.isConnected) {
+      _pollTimer = null;
+      return;
+    }
+    _pollTimer = Timer.periodic(_pollFallback, (_) {
       if (_loadState == AppLoadState.ready) {
         refresh(silent: true);
       }
     });
   }
 
+  Future<void> _onRealtimeEvent(String type, Object? payload) async {
+    _syncPolling();
+    switch (type) {
+      case 'demo.reset':
+        await _handleDemoReset();
+      case 'weather.updated':
+        await refresh(silent: true, forceGraph: false);
+      case 'shipment.updated':
+      case 'alert.created':
+      case 'alert.updated':
+      case 'stats.updated':
+      case 'ledger.appended':
+        await refresh(silent: true);
+      default:
+        await refresh(silent: true);
+    }
+  }
+
+  Future<void> _handleDemoReset() async {
+    _passById.clear();
+    _nodes = {};
+    _pendingDocId = null;
+    _documentUploaded = false;
+    _fieldsConfirmed = false;
+    _passIssuedForDoc = false;
+    _ledgerRecorded = false;
+    _invoice = const InvoiceFields();
+    await refresh(forceLoading: true, forceGraph: true);
+  }
+
+  /// Возобновить realtime / fallback-опрос (lifecycle).
+  void startPolling() {
+    unawaited(_realtime.start());
+    _syncPolling();
+  }
+
   void stopPolling() {
     _pollTimer?.cancel();
     _pollTimer = null;
+    unawaited(_realtime.stop());
   }
 
   Future<void> onAppResumed() async {
+    await _realtime.start();
+    _syncPolling();
     await refresh(silent: true);
   }
 
-  Future<void> refresh({bool silent = false, bool forceLoading = false}) async {
+  Future<void> refresh({
+    bool silent = false,
+    bool forceLoading = false,
+    bool forceGraph = false,
+  }) async {
     if (_pollInFlight) return;
     _pollInFlight = true;
     if (forceLoading || (!silent && _loadState != AppLoadState.ready)) {
@@ -113,7 +175,7 @@ class AppController extends ChangeNotifier {
     }
 
     try {
-      if (_nodes.isEmpty) {
+      if (_nodes.isEmpty || forceGraph) {
         final graph = await _api.fetchGraph();
         _nodes = nodesFromGraph(graph);
       }
@@ -129,6 +191,17 @@ class AppController extends ChangeNotifier {
       final stats = results[1] as Map<String, dynamic>;
       final weather = results[2] as Map<String, dynamic>;
       _alerts = results[3] as List<Map<String, dynamic>>;
+
+      List<Map<String, dynamic>> remotePasses = const [];
+      try {
+        remotePasses = await _api.fetchPasses();
+      } catch (_) {
+        // Локальная история остаётся.
+      }
+      for (final p in remotePasses) {
+        final id = p['id']?.toString();
+        if (id != null) _passById[id] = p;
+      }
 
       final mapped = <Cargo>[];
       final seenPassIds = <String>{};
@@ -152,6 +225,14 @@ class AppController extends ChangeNotifier {
         if (pass != null && pass['token'] != null) {
           await _ingestPass(pass, cargo);
         }
+        for (final p in remotePasses) {
+          if (p['shipment_id']?.toString() != cargo.id) continue;
+          final id = p['id']?.toString();
+          if (id != null) seenPassIds.add(id);
+          if (p['token'] != null) {
+            await _ingestPass(p, cargo);
+          }
+        }
       }
       _passById.removeWhere((id, _) => !seenPassIds.contains(id));
 
@@ -166,6 +247,7 @@ class AppController extends ChangeNotifier {
       await _syncStoredStatuses(mapped);
       _loadState = AppLoadState.ready;
       _errorMessage = null;
+      _syncPolling();
     } catch (e) {
       _errorMessage = e is ApiException ? e.message : e.toString();
       if (_loadState != AppLoadState.ready) {
@@ -195,10 +277,10 @@ class AppController extends ChangeNotifier {
         next.add(p);
         continue;
       }
-      // Актуальный pass_id груза — active; предыдущие id — reissued, если ещё active в истории
       if (cargo.passId != null && cargo.passId == p.id) {
         if (p.status != cargo.passStatus &&
-            cargo.passStatus != PassStatus.none) {
+            cargo.passStatus != PassStatus.none &&
+            cargo.passStatus != PassStatus.unknown) {
           next.add(p.copyWith(status: cargo.passStatus));
           changed = true;
         } else {
@@ -256,7 +338,7 @@ class AppController extends ChangeNotifier {
   }
 
   DispatcherDecision decisionFor(Cargo cargo) =>
-      decisionForCargo(cargo: cargo, alerts: _alerts, nodes: _nodes);
+      decisionForCargo(cargo: cargo, alerts: _alerts);
 
   Future<void> startRecognition(
     String cargoId, {
@@ -320,9 +402,15 @@ class AppController extends ChangeNotifier {
 
   bool get hasHsCodeWarning => _invoice.hsCodeDoubt;
 
-  Future<String?> issuePass(String cargoId) async {
+  /// null = успех; иначе сообщение и опционально поля формы с ошибками.
+  Future<({String? message, Map<String, String> fields})> issuePass(
+    String cargoId,
+  ) async {
     if (_pendingDocId == null) {
-      return 'Сначала загрузите документ';
+      return (
+        message: 'Сначала загрузите документ',
+        fields: const <String, String>{},
+      );
     }
     try {
       final out = await _api.confirmDocument(
@@ -344,9 +432,19 @@ class AppController extends ChangeNotifier {
         await _ingestPass(pass, cargo);
         notifyListeners();
       }
-      return null;
+      return (message: null, fields: const <String, String>{});
+    } on ApiException catch (e) {
+      final mapped = <String, String>{};
+      final raw = e.fields;
+      if (raw != null) {
+        for (final entry in raw.entries) {
+          final key = invoiceFieldKeyFromApi(entry.key) ?? entry.key;
+          mapped[key] = entry.value;
+        }
+      }
+      return (message: e.message, fields: mapped);
     } catch (e) {
-      return e is ApiException ? e.message : e.toString();
+      return (message: e.toString(), fields: const <String, String>{});
     }
   }
 
@@ -374,7 +472,6 @@ class AppController extends ChangeNotifier {
     return _api.verifyPass(pass.token);
   }
 
-  /// Состояние цифрового коридора для груза (по API + локальные шаги сессии).
   CorridorProgress corridorProgress(Cargo cargo) {
     final hasPass = cargo.passStatus != PassStatus.none && cargo.passId != null;
     final inHistory = storedPasses.any((p) => p.shipmentId == cargo.id);
@@ -397,6 +494,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     stopPolling();
+    unawaited(_realtime.stop());
     super.dispose();
   }
 }

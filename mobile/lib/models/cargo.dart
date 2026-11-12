@@ -1,8 +1,9 @@
 import '../theme/app_colors.dart';
+import 'alert_card.dart';
 
-enum CargoStatus { planned, inTransit, atRisk, rerouted, delivered }
+enum CargoStatus { planned, inTransit, atRisk, rerouted, delivered, unknown }
 
-enum PassStatus { none, active, reissued, awaitingReissue, invalid }
+enum PassStatus { none, active, reissued, awaitingReissue, invalid, unknown }
 
 enum CargoListFilter {
   all,
@@ -64,6 +65,7 @@ extension CargoStatusX on CargoStatus {
     CargoStatus.atRisk => 'Под риском',
     CargoStatus.rerouted => 'Перестроен',
     CargoStatus.delivered => 'Доставлен',
+    CargoStatus.unknown => 'Статус неизвестен',
   };
 
   CargoStatusTone get tone => switch (this) {
@@ -72,6 +74,7 @@ extension CargoStatusX on CargoStatus {
     CargoStatus.atRisk => CargoStatusTone.atRisk,
     CargoStatus.rerouted => CargoStatusTone.rerouted,
     CargoStatus.delivered => CargoStatusTone.delivered,
+    CargoStatus.unknown => CargoStatusTone.unknown,
   };
 }
 
@@ -82,6 +85,7 @@ extension PassStatusX on PassStatus {
     PassStatus.reissued => 'Переоформлен',
     PassStatus.awaitingReissue => 'Ожидает переоформления',
     PassStatus.invalid => 'Недействителен',
+    PassStatus.unknown => 'Статус неизвестен',
   };
 }
 
@@ -142,8 +146,6 @@ class WavePort {
   final String name;
   final double heightM;
   final String heightLabel;
-
-  bool get dangerous => heightM >= 2.5;
 }
 
 class Cargo {
@@ -343,6 +345,7 @@ class OverviewData {
     this.lastAlertBody,
     this.lastAlertCargoId,
     this.decisionNote,
+    this.lastAlertCard,
   });
 
   final int shipmentsTotal;
@@ -360,6 +363,9 @@ class OverviewData {
   final String? lastAlertBody;
   final String? lastAlertCargoId;
   final String? decisionNote;
+
+  /// Структурированный `Alert.card` (или временная заглушка до бэка).
+  final AlertCardData? lastAlertCard;
 }
 
 /// Локальная копия пропуска (история на устройстве).
@@ -423,7 +429,7 @@ class StoredPass {
       validUntilLabel: '${j['valid_until_label'] ?? ''}',
       status: PassStatus.values.firstWhere(
         (e) => e.name == j['status'],
-        orElse: () => PassStatus.active,
+        orElse: () => PassStatus.unknown,
       ),
       receivedAtIso: '${j['received_at'] ?? ''}',
       cargoNumber: '${j['cargo_number'] ?? ''}',

@@ -1,4 +1,5 @@
 import 'package:caspian_dispatcher/api/mappers.dart';
+import 'package:caspian_dispatcher/models/alert_card.dart';
 import 'package:caspian_dispatcher/models/cargo.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -7,7 +8,9 @@ void main() {
     expect(numberFromId('sh-01'), '№01');
     expect(numberFromId('sh-05'), '№05');
     expect(mapDisplayStatus('at_risk'), CargoStatus.atRisk);
+    expect(mapDisplayStatus('weird'), CargoStatus.unknown);
     expect(mapPassState('reissue_pending'), PassStatus.awaitingReissue);
+    expect(mapPassApiStatus('weird'), PassStatus.unknown);
   });
 
   test('shipmentToCargo берёт риск и факторы с API', () {
@@ -48,7 +51,7 @@ void main() {
           {'name': 'wave_height', 'label': 'Высота волны', 'impact_pp': 12.5},
         ],
       },
-    });
+    }, nodes: {'moscow': 'Москва', 'astrakhan': 'Астрахань', 'mumbai': 'Мумбаи'});
 
     expect(cargo.displayName, '№01 Зерно');
     expect(cargo.riskPercent, 82);
@@ -58,39 +61,37 @@ void main() {
     expect(cargo.probabilityDrivers, hasLength(1));
     expect(cargo.probabilityDrivers.first.impactPp, 12.5);
     expect(cargo.status, CargoStatus.atRisk);
+    expect(cargo.origin, 'Москва');
   });
 
-  test('decisionSummaryFromAlert: new / accepted / superseded', () {
+  test('decisionSummaryFromAlert: options + accepted_by, без эвристик маршрута', () {
     expect(
       decisionSummaryFromAlert({
         'status': 'new',
         'starts_in_h': 36,
-        'source': 'scenario',
-        'options': [],
+        'options': [
+          {'id': 'ice', 'title': 'Обход по льду канала', 'recommended': true},
+        ],
         'items': [],
-      }, {}),
-      'Ожидает решения логиста · через 36 ч · сценарий',
+      }),
+      'Ожидает решения · Обход по льду канала · через 36 ч',
     );
     expect(
       decisionSummaryFromAlert({
         'status': 'accepted',
         'accepted_via': 'web',
+        'accepted_by': {'name': 'Иван Логист', 'role': 'logist'},
         'options': [
-          {'id': 'mkh', 'recommended': true},
-        ],
-        'items': [
           {
+            'id': 'mkh',
+            'title': 'Через Махачкалу',
+            'recommended': true,
             'delay_vs_plan_h': 6,
-            'to_route': {
-              'legs': [
-                {'from': 'astrakhan', 'to': 'makhachkala'},
-                {'from': 'makhachkala', 'to': 'anzali'},
-              ],
-            },
           },
         ],
-      }, {}),
-      'Решение диспетчера: через Махачкалу, +6 ч к плану · сайт',
+        'items': [],
+      }),
+      'Через Махачкалу · +6 ч к плану · Иван Логист',
     );
     expect(
       decisionSummaryFromAlert({
@@ -98,15 +99,29 @@ void main() {
         'status_note': 'угроза снята',
         'options': [],
         'items': [],
-      }, {}),
-      'Угроза снята — решение не нужно',
+      }),
+      'угроза снята',
     );
   });
 
-  test('fmtCo2SavedPct из stats.co2_saved_pct', () {
+  test('fmtRub и fmtDt по контракту', () {
+    expect(fmtRub(597000), '597 тыс ₽');
     expect(fmtCo2SavedPct(6.9), '−6,9% CO₂');
     expect(fmtCo2SavedPct(0), isNull);
-    expect(fmtCo2SavedPct(null), isNull);
+    // 2026-05-12 11:30 UTC → 14:30 МСК, месяц «мая»
+    expect(fmtDt('2026-05-12T11:30:00Z'), '12 мая, 14:30');
+  });
+
+  test('wavesFromWeather берёт все точки', () {
+    final waves = wavesFromWeather({
+      'points': [
+        {'node_id': 'astrakhan', 'wave_height_m': 3.4},
+        {'node_id': 'olya', 'wave_height_m': 1.1},
+      ],
+    }, {'astrakhan': 'Астрахань', 'olya': 'Оля'});
+    expect(waves, hasLength(2));
+    expect(waves.first.name, 'Астрахань');
+    expect(waves.last.name, 'Оля');
   });
 
   test('фильтр пропусков: reissued только в истории', () {
@@ -140,5 +155,26 @@ void main() {
       ),
     );
     expect(fields['weight_kg'], 60000);
+  });
+
+  test('AlertCardData stub и fromJson', () {
+    final stub = AlertCardData.stub();
+    expect(stub.kind, 'ice');
+    expect(stub.metrics, isNotEmpty);
+    expect(stub.decision?.chips, isNotEmpty);
+
+    final parsed = AlertCardData.fromJson({
+      'kind': 'storm',
+      'headline': 'Шторм',
+      'subtitle': '2 груза',
+      'period': '1 ноя – 2 ноя',
+      'metrics': [
+        {'key': 'wave', 'label': 'Волна', 'value': '3 м'},
+      ],
+      'decision': null,
+    });
+    expect(parsed.kind, 'storm');
+    expect(parsed.metrics.single.label, 'Волна');
+    expect(parsed.decision, isNull);
   });
 }

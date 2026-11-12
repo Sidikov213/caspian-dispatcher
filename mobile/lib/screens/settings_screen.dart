@@ -67,25 +67,19 @@ class _SettingsScreenState extends State<SettingsScreen>
         padding: AppSpacing.page,
         children: [
           if (user != null) ...[
-            Text(
-              'Аккаунт',
-              style: TextStyle(
-                color: AppColors.text,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 12),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const SectionLabel('Аккаунт'),
+                  const SizedBox(height: 12),
                   Text(
                     user.name,
                     style: TextStyle(
                       color: AppColors.text,
                       fontWeight: FontWeight.w800,
-                      fontSize: 15,
+                      fontSize: 17,
+                      letterSpacing: -0.2,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -93,88 +87,79 @@ class _SettingsScreenState extends State<SettingsScreen>
                     user.email,
                     style: TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 13,
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    user.role.label,
-                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  const SizedBox(height: 10),
+                  SoftBadge(
+                    label: user.role.label,
+                    background: AppColors.infoBg,
+                    foreground: AppColors.primary,
                   ),
-                  const SizedBox(height: 14),
-                  OutlinedButton(
-                    onPressed: _logout,
-                    child: const Text('Выйти'),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _logout,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        side: BorderSide(color: AppColors.danger.withValues(alpha: 0.35)),
+                      ),
+                      child: const Text('Выйти'),
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 12),
           ],
-          Text(
-            'Тема',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Светлая, тёмная или как в системе',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          ),
-          const SizedBox(height: 12),
           AppCard(
-            child: SegmentedButton<ThemeMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ThemeMode.system,
-                  label: Text('Система'),
-                  icon: Icon(Icons.brightness_auto_outlined, size: 18),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.light,
-                  label: Text('Светлая'),
-                  icon: Icon(Icons.light_mode_outlined, size: 18),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.dark,
-                  label: Text('Тёмная'),
-                  icon: Icon(Icons.dark_mode_outlined, size: 18),
-                ),
-              ],
-              selected: {theme.mode},
-              onSelectionChanged: (next) {
-                if (next.isEmpty) return;
-                theme.setMode(next.first);
-              },
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                ),
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SectionLabel('Тема'),
+                const SizedBox(height: 6),
+                Text(
+                  'Светлая, тёмная или как в системе',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    height: 1.35,
                   ),
                 ),
-              ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ThemeOption(
+                        selected: theme.mode == ThemeMode.system,
+                        icon: Icons.brightness_auto_outlined,
+                        label: 'Авто',
+                        onTap: () => theme.setMode(ThemeMode.system),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _ThemeOption(
+                        selected: theme.mode == ThemeMode.light,
+                        icon: Icons.light_mode_outlined,
+                        label: 'Светлая',
+                        onTap: () => theme.setMode(ThemeMode.light),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _ThemeOption(
+                        selected: theme.mode == ThemeMode.dark,
+                        icon: Icons.dark_mode_outlined,
+                        label: 'Тёмная',
+                        onTap: () => theme.setMode(ThemeMode.dark),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 28),
-          Text(
-            'Уведомления',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Статусы грузов, риски маршрута и сроки пропуска',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 12),
           AppCard(
@@ -183,37 +168,67 @@ class _SettingsScreenState extends State<SettingsScreen>
               children: [
                 Row(
                   children: [
-                    Icon(
-                      notifications.enabled
-                          ? Icons.notifications_active_outlined
-                          : Icons.notifications_off_outlined,
-                      color: notifications.enabled
+                    const Expanded(child: SectionLabel('Уведомления')),
+                    SoftBadge(
+                      label: notifications.enabled ? 'Вкл' : 'Выкл',
+                      background: notifications.enabled
+                          ? AppColors.successBg
+                          : AppColors.neutralBg,
+                      foreground: notifications.enabled
                           ? AppColors.success
                           : AppColors.muted,
                     ),
-                    const SizedBox(width: 10),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: notifications.enabled
+                            ? AppColors.successBg
+                            : AppColors.neutralBg,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      ),
+                      child: Icon(
+                        notifications.enabled
+                            ? Icons.notifications_active_outlined
+                            : Icons.notifications_off_outlined,
+                        color: notifications.enabled
+                            ? AppColors.success
+                            : AppColors.muted,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            notifications.enabled ? 'Включены' : 'Выключены',
+                            notifications.enabled
+                                ? 'Уведомления включены'
+                                : 'Уведомления выключены',
                             style: TextStyle(
                               color: AppColors.text,
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Text(
                             notifications.enabled
-                                ? 'Разрешение выдано системой'
+                                ? 'Статусы грузов, риски и сроки пропуска'
                                 : notifications.permanentlyDenied
-                                ? 'Откройте настройки системы, чтобы включить'
-                                : 'Разрешение ещё не выдано',
+                                ? 'Разрешите доступ в настройках телефона'
+                                : 'Включите, чтобы получать важные события',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
+                              height: 1.35,
                             ),
                           ),
                         ],
@@ -221,29 +236,90 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ),
                   ],
                 ),
-                if (!notifications.enabled) ...[
-                  const SizedBox(height: 14),
-                  FilledButton(
-                    onPressed: () async {
-                      await notifications.requestOrOpenSettings();
-                    },
-                    child: Text(
-                      notifications.permanentlyDenied
-                          ? 'Открыть настройки системы'
-                          : 'Включить уведомления',
+                const SizedBox(height: 16),
+                if (!notifications.enabled)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () async {
+                        final auth = AuthScope.of(context);
+                        final ok = await notifications.requestOrOpenSettings();
+                        if (!mounted) return;
+                        if (ok) await auth.syncPushDevices();
+                      },
+                      child: Text(
+                        notifications.permanentlyDenied
+                            ? 'Открыть настройки телефона'
+                            : 'Включить уведомления',
+                      ),
+                    ),
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => notifications.openSystemSettings(),
+                      child: const Text('Открыть настройки телефона'),
                     ),
                   ),
-                ] else ...[
-                  const SizedBox(height: 14),
-                  OutlinedButton(
-                    onPressed: () => notifications.openSystemSettings(),
-                    child: const Text('Управление в системе'),
-                  ),
-                ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  const _ThemeOption({
+    required this.selected,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected ? AppColors.infoBg : AppColors.field;
+    final fg = selected ? AppColors.primary : AppColors.textSecondary;
+    final border = selected ? AppColors.primary : AppColors.border;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        child: Ink(
+          height: 72,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            border: Border.all(color: border, width: selected ? 1.5 : 1),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: fg),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

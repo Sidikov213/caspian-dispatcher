@@ -96,7 +96,8 @@ ThemeData buildAppTheme(Brightness brightness) {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: p.field,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
         borderSide: BorderSide(color: p.border),
@@ -110,7 +111,8 @@ ThemeData buildAppTheme(Brightness brightness) {
         borderSide: BorderSide(color: p.primary),
       ),
       labelStyle: TextStyle(color: p.muted),
-      hintStyle: TextStyle(color: p.muted),
+      hintStyle: TextStyle(color: p.muted, height: 1.2),
+      suffixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(

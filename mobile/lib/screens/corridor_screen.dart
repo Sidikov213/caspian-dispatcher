@@ -7,7 +7,7 @@ import '../widgets/app_chrome.dart';
 import 'document_capture_screen.dart';
 import 'pass_screen.dart';
 
-/// 07 — Цифровой коридор для груза №05 «Удобрения».
+/// Цифровой коридор: документ → поля → пропуск → реестр (любой груз).
 class CorridorScreen extends StatelessWidget {
   const CorridorScreen({super.key, required this.cargoId});
 
@@ -23,7 +23,7 @@ class CorridorScreen extends StatelessWidget {
         body: const EmptyStateView(
           icon: Icons.search_off_rounded,
           title: 'Груз не найден',
-          subtitle: 'Нужен груз №05 Удобрения.',
+          subtitle: 'Обновите список грузов и откройте карточку снова.',
         ),
       );
     }
@@ -51,7 +51,7 @@ class CorridorScreen extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Один документ — инвойс. Статусы по фактическим данным.',
+            'Один документ: инвойс. Статусы по фактическим данным.',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 18),

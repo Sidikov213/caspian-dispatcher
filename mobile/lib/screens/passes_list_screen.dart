@@ -26,7 +26,7 @@ class PassesListScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(18, 4, 18, 12),
           child: Text(
             filter == PassListFilter.all
-                ? 'Локальная история · ${items.length}'
+                ? 'История · ${items.length}'
                 : '${filter.label}: ${items.length}',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
@@ -50,7 +50,7 @@ class PassesListScreen extends StatelessWidget {
               ? EmptyStateView(
                   icon: Icons.badge_outlined,
                   title: 'Пропусков пока нет',
-                  subtitle: 'Оформите пропуск по грузу — копия сохранится на устройстве.',
+                  subtitle: 'Серверная история и локальные копии. Исходный JWT не перезаписывается.',
                   actionLabel: app.loadState == AppLoadState.error
                       ? 'Повторить загрузку'
                       : null,

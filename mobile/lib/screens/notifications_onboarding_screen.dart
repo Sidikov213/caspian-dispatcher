@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../state/auth_controller.dart';
 import '../state/notification_controller.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_spacing.dart';
-import '../widgets/logo_mark.dart';
 import 'home_shell.dart';
 
 /// Сначала объяснение, по «Продолжить» — системный запрос уведомлений.
@@ -23,7 +22,9 @@ class _NotificationsOnboardingScreenState
     if (_busy) return;
     setState(() => _busy = true);
     final notifications = NotificationScope.of(context);
+    final auth = AuthScope.of(context);
     await notifications.requestFromOnboarding();
+    await auth.syncPushDevices();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -43,15 +44,11 @@ class _NotificationsOnboardingScreenState
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: LogoMark(size: 40),
-              ),
-              const Spacer(),
               Icon(
                 Icons.notifications_active_outlined,
                 size: 64,
@@ -78,7 +75,7 @@ class _NotificationsOnboardingScreenState
                   height: 1.45,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 28),
               FilledButton(
                 onPressed: _busy ? null : _continue,
                 child: _busy
@@ -91,12 +88,6 @@ class _NotificationsOnboardingScreenState
                         ),
                       )
                     : const Text('Продолжить'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'После нажатия система спросит разрешение',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.muted, fontSize: 12),
               ),
             ],
           ),

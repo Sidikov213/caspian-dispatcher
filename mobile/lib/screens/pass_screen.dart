@@ -25,14 +25,14 @@ class PassScreen extends StatelessWidget {
 
     final token = stored?.token ?? cargo?.passToken;
     final status = stored?.status ?? cargo?.passStatus ?? PassStatus.none;
-    final port = stored?.checkpointLabel ?? cargo?.passPort ?? '—';
-    final until = stored?.validUntilLabel ?? cargo?.passValidUntil ?? '—';
-    final record = stored?.id ?? cargo?.passRecord ?? '—';
+    final port = stored?.checkpointLabel ?? cargo?.passPort ?? '-';
+    final until = stored?.validUntilLabel ?? cargo?.passValidUntil ?? '-';
+    final record = stored?.id ?? cargo?.passRecord ?? '-';
     final hash = stored != null
         ? (stored.docHash.length > 8
               ? '${stored.docHash.substring(0, 4)}…${stored.docHash.substring(stored.docHash.length - 4)}'
               : stored.docHash)
-        : (cargo?.passHash ?? '—');
+        : (cargo?.passHash ?? '-');
 
     if (token == null || token.isEmpty || status == PassStatus.none) {
       return Scaffold(
@@ -122,7 +122,7 @@ class PassScreen extends StatelessWidget {
                       if (status == PassStatus.reissued) ...[
                         const SizedBox(height: 10),
                         SoftBadge(
-                          label: 'Переоформлен — историческая копия',
+                          label: 'Переоформлен, историческая копия',
                           background: AppColors.infoBg,
                           foreground: AppColors.primary,
                         ),

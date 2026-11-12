@@ -5,18 +5,24 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/api_client.dart';
 import '../models/auth_user.dart';
+import '../services/push_devices.dart';
 
 /// Сессия как на сайте: token + user, проверка через GET /auth/me.
 class AuthController extends ChangeNotifier {
-  AuthController({ApiClient? api, FlutterSecureStorage? storage})
-    : _api = api ?? ApiClient(),
-      _storage = storage ?? const FlutterSecureStorage();
+  AuthController({
+    ApiClient? api,
+    FlutterSecureStorage? storage,
+    PushDevices? pushDevices,
+  }) : _api = api ?? ApiClient(),
+       _storage = storage ?? const FlutterSecureStorage(),
+       _push = pushDevices ?? PushDevices();
 
   static const _tokenKey = 'caspian.auth.token';
   static const _userKey = 'caspian.auth.user';
 
   final ApiClient _api;
   final FlutterSecureStorage _storage;
+  final PushDevices _push;
 
   String? _token;
   AuthUser? _user;
@@ -56,11 +62,11 @@ class AuthController extends ChangeNotifier {
       final me = await _api.authMe(token);
       _user = me;
       await _persist(token, me);
+      await syncPushDevices();
     } on ApiException catch (e) {
       if (e.statusCode == 401 || e.code == 'invalid_token') {
         await clearSession();
       }
-      // Нет сети — оставляем кэш, как AuthGate на сайте.
     } catch (_) {
       // Нет сети — кэш.
     }
@@ -97,6 +103,8 @@ class AuthController extends ChangeNotifier {
   Future<void> logout() => clearSession();
 
   Future<void> clearSession() async {
+    final prev = _token;
+    await _push.stop(bearerToken: prev);
     _token = null;
     _user = null;
     notifyListeners();
@@ -106,12 +114,20 @@ class AuthController extends ChangeNotifier {
     ]);
   }
 
+  /// После входа / разрешения уведомлений: getToken → POST /devices.
+  Future<void> syncPushDevices() async {
+    final token = _token;
+    if (token == null || token.isEmpty) return;
+    await _push.start(bearerToken: token);
+  }
+
   Future<void> _apply(AuthSession session) async {
     _token = session.token;
     _user = session.user;
     _ready = true;
     notifyListeners();
     await _persist(session.token, session.user);
+    await syncPushDevices();
   }
 
   Future<void> _persist(String token, AuthUser user) async {

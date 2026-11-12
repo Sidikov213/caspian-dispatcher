@@ -1,29 +1,17 @@
+import '../models/alert_card.dart';
 import '../models/cargo.dart';
 
-const nodeRu = <String, String>{
-  'moscow': 'Москва',
-  'samara': 'Самара',
-  'saratov': 'Саратов',
-  'volgograd': 'Волгоград',
-  'astrakhan': 'Астрахань',
-  'olya': 'Оля',
-  'makhachkala': 'Махачкала',
-  'samur': 'Самур',
-  'baku': 'Баку',
-  'astara': 'Астара',
-  'rasht': 'Решт',
-  'anzali': 'Энзели',
-  'amirabad': 'Амирабад',
-  'aktau': 'Актау',
-  'incheh': 'Инче-Бурун',
-  'tehran': 'Тегеран',
-  'bandar_abbas': 'Бендер-Аббас',
-  'mumbai': 'Мумбаи',
-};
+/// Пока бэк не отдаёт `card`, показываем заглушку (ледовый сценарий).
+/// Выключить: `--dart-define=ALERT_CARD_STUB=0`.
+const _alertCardStubEnabled = bool.fromEnvironment(
+  'ALERT_CARD_STUB',
+  defaultValue: true,
+);
 
+/// Имя узла только из `/api/graph`. Без локального словаря.
 String nodeLabel(String id, [Map<String, String>? fromGraph]) {
   if (fromGraph != null && fromGraph.containsKey(id)) return fromGraph[id]!;
-  return nodeRu[id] ?? id;
+  return id;
 }
 
 CargoStatus mapDisplayStatus(String? raw) => switch (raw) {
@@ -32,7 +20,7 @@ CargoStatus mapDisplayStatus(String? raw) => switch (raw) {
   'at_risk' => CargoStatus.atRisk,
   'rerouted' => CargoStatus.rerouted,
   'delivered' => CargoStatus.delivered,
-  _ => CargoStatus.inTransit,
+  _ => CargoStatus.unknown,
 };
 
 PassStatus mapPassState(String? raw) => switch (raw) {
@@ -41,14 +29,14 @@ PassStatus mapPassState(String? raw) => switch (raw) {
   'reissued' => PassStatus.reissued,
   'revoked' => PassStatus.invalid,
   'none' || null || '' => PassStatus.none,
-  _ => PassStatus.none,
+  _ => PassStatus.unknown,
 };
 
 PassStatus mapPassApiStatus(String? raw) => switch (raw) {
   'active' => PassStatus.active,
   'reissued' => PassStatus.reissued,
   'revoked' => PassStatus.invalid,
-  _ => PassStatus.active,
+  _ => PassStatus.unknown,
 };
 
 String fmtTons(num t) {
@@ -58,14 +46,9 @@ String fmtTons(num t) {
   return '$v т';
 }
 
+/// Как на бэке `k_rub`: «597 тыс ₽».
 String fmtRub(num n) {
-  final s = n.round().toString();
-  final buf = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
-    buf.write(s[i]);
-  }
-  return '${buf.toString()} ₽';
+  return '${(n / 1000).round()} тыс ₽';
 }
 
 String fmtCargoHours(num hours) {
@@ -81,16 +64,18 @@ String? fmtCo2SavedPct(num? pct) {
   return '−$raw% CO₂';
 }
 
+/// Москва (UTC+3), месяц «мая», формат «12 ноя, 14:30».
 String fmtDt(String? iso) {
-  if (iso == null || iso.isEmpty) return '—';
-  final dt = DateTime.tryParse(iso)?.toLocal();
-  if (dt == null) return iso;
+  if (iso == null || iso.isEmpty) return '-';
+  final parsed = DateTime.tryParse(iso);
+  if (parsed == null) return iso;
+  final dt = parsed.toUtc().add(const Duration(hours: 3));
   const months = [
     'янв',
     'фев',
     'мар',
     'апр',
-    'май',
+    'мая',
     'июн',
     'июл',
     'авг',
@@ -105,7 +90,7 @@ String fmtDt(String? iso) {
 }
 
 String shortHash(String? h) {
-  if (h == null || h.isEmpty) return '—';
+  if (h == null || h.isEmpty) return '-';
   if (h.length <= 8) return h;
   return '${h.substring(0, 4)}…${h.substring(h.length - 4)}';
 }
@@ -147,7 +132,7 @@ List<RouteStage> stagesFromRoute(
 String routeLabel(Map<String, dynamic>? route, Map<String, String> nodes) {
   final legs =
       (route?['legs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-  if (legs.isEmpty) return '—';
+  if (legs.isEmpty) return '-';
   final ids = <String>[
     '${legs.first['from']}',
     ...legs.map((l) => '${l['to']}'),
@@ -252,24 +237,18 @@ Cargo shipmentToCargo(
   );
 }
 
+/// Все точки из `/weather.points`, имена из graph.
 List<WavePort> wavesFromWeather(
   Map<String, dynamic> weather,
   Map<String, String> nodes,
 ) {
-  const want = ['astrakhan', 'makhachkala', 'anzali'];
   final points =
       (weather['points'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
   return [
-    for (final id in want)
+    for (final point in points)
       () {
-        Map<String, dynamic>? point;
-        for (final p in points) {
-          if (p['node_id'] == id) {
-            point = p;
-            break;
-          }
-        }
-        final h = (point?['wave_height_m'] as num?)?.toDouble() ?? 0;
+        final id = '${point['node_id'] ?? ''}';
+        final h = (point['wave_height_m'] as num?)?.toDouble() ?? 0;
         return WavePort(
           nodeId: id,
           name: nodeLabel(id, nodes),
@@ -289,16 +268,16 @@ OverviewData buildOverview({
 }) {
   final waves = wavesFromWeather(weather, nodes);
   final updated = fmtDt(weather['updated_at']?.toString());
-  final source = '${weather['source'] ?? '—'}';
+  final source = '${weather['source'] ?? '-'}';
   final stale = weather['stale'] == true;
 
   String? title;
   String? body;
   String? cargoId;
   String? decision;
+  AlertCardData? card;
 
   if (alerts.isNotEmpty) {
-    // Сначала new, иначе последний
     final sorted = [...alerts]
       ..sort((a, b) {
         final sa = '${a['status']}';
@@ -315,7 +294,17 @@ OverviewData buildOverview({
     if (items.isNotEmpty) {
       cargoId = items.first['shipment_id']?.toString();
     }
-    decision = decisionSummaryFromAlert(a, nodes);
+    decision = decisionSummaryFromAlert(a);
+
+    final rawCard = a['card'];
+    if (rawCard is Map<String, dynamic>) {
+      card = AlertCardData.fromJson(rawCard);
+    } else if (rawCard is Map) {
+      card = AlertCardData.fromJson(Map<String, dynamic>.from(rawCard));
+    } else if (_alertCardStubEnabled) {
+      // Временная вёрстка до появления card на бэке.
+      card = AlertCardData.stub();
+    }
   }
 
   return OverviewData(
@@ -335,97 +324,92 @@ OverviewData buildOverview({
     lastAlertBody: body,
     lastAlertCargoId: cargoId,
     decisionNote: decision,
+    lastAlertCard: card,
   );
 }
 
-bool _routeTouchesNode(Map<String, dynamic>? route, String nodeId) {
-  final legs =
-      (route?['legs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-  for (final leg in legs) {
-    if (leg['from'] == nodeId || leg['to'] == nodeId) return true;
-  }
-  return false;
-}
-
-String? decisionSummaryFromAlert(
-  Map<String, dynamic> alert,
-  Map<String, String> nodes,
-) {
+/// Текст решения только из полей API (`options`, `accepted_by`, `status_note`).
+String? decisionSummaryFromAlert(Map<String, dynamic> alert) {
   final status = '${alert['status']}';
-  final sourceTag = switch (alert['source']?.toString()) {
-    'forecast' => ' · прогноз',
-    'scenario' => ' · сценарий',
-    _ => '',
-  };
+  final options =
+      (alert['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+
+  Map<String, dynamic>? recommendedOption() {
+    for (final o in options) {
+      if (o['recommended'] == true) return o;
+    }
+    return options.isEmpty ? null : options.first;
+  }
+
   if (status == 'new') {
     final starts = (alert['starts_in_h'] as num?)?.toDouble();
     final when = starts == null ? '' : ' · через ${starts.round()} ч';
-    return 'Ожидает решения логиста$when$sourceTag';
+    final opt = recommendedOption();
+    final optTitle = opt?['title']?.toString();
+    if (optTitle != null && optTitle.isNotEmpty) {
+      return 'Ожидает решения · $optTitle$when';
+    }
+    return 'Ожидает решения логиста$when';
   }
-  if (status == 'rejected') return 'Решение: ждать следующий рейс';
+
+  if (status == 'rejected') {
+    for (final o in options) {
+      if (o['id']?.toString() == 'wait') {
+        final t = o['title']?.toString();
+        if (t != null && t.isNotEmpty) return t;
+      }
+    }
+    final note = alert['status_note']?.toString();
+    if (note != null && note.isNotEmpty) return note;
+    return null;
+  }
+
   if (status == 'superseded') {
     final note = alert['status_note']?.toString();
-    if (note == 'угроза снята') return 'Угроза снята — решение не нужно';
     if (note != null && note.isNotEmpty) return note;
-    return 'Алерт устарел';
+    return null;
   }
+
   if (status != 'accepted') return null;
 
-  final items =
-      (alert['items'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-  double? delay;
-  var viaMkh = false;
-  var viaWest = false;
-  var waitOnly = false;
-  if (items.isNotEmpty) {
-    delay = (items.first['delay_vs_plan_h'] as num?)?.toDouble();
-    for (final item in items) {
-      if (item['action']?.toString() == 'wait' || item['to_route'] == null) {
-        waitOnly = true;
-      }
-      final toRoute = item['to_route'] as Map<String, dynamic>?;
-      if (_routeTouchesNode(toRoute, 'makhachkala')) viaMkh = true;
-      if (_routeTouchesNode(toRoute, 'samur') ||
-          _routeTouchesNode(toRoute, 'baku')) {
-        viaWest = true;
-      }
-    }
+  final opt = recommendedOption();
+  final title = opt?['title']?.toString();
+  final delay = (opt?['delay_vs_plan_h'] as num?)?.toDouble() ??
+      (() {
+        final items =
+            (alert['items'] as List?)?.cast<Map<String, dynamic>>() ??
+            const [];
+        if (items.isEmpty) return null;
+        return (items.first['delay_vs_plan_h'] as num?)?.toDouble();
+      })();
+
+  final parts = <String>[];
+  if (title != null && title.isNotEmpty) {
+    parts.add(title);
+  }
+  if (delay != null) {
+    parts.add('+${delay.round()} ч к плану');
   }
 
-  // Fallback: рекомендованный / принятый option (id после accept обновляется).
-  if (!viaMkh && !viaWest) {
-    final options =
-        (alert['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-    for (final o in options) {
-      if (o['recommended'] != true) continue;
-      if (o['id'] == 'mkh') viaMkh = true;
-      if (o['id'] == 'west') viaWest = true;
-      if (o['id'] == 'wait') waitOnly = true;
-    }
+  final by = alert['accepted_by'];
+  if (by is Map && by['name'] != null && '${by['name']}'.isNotEmpty) {
+    parts.add('${by['name']}');
+  } else {
+    final via = switch (alert['accepted_via']?.toString()) {
+      'web' => 'сайт',
+      'telegram' => 'Telegram',
+      _ => null,
+    };
+    if (via != null) parts.add(via);
   }
 
-  if (waitOnly && !viaMkh && !viaWest) {
-    return 'Решение: ждать следующий рейс';
-  }
-
-  final via = viaMkh
-      ? 'через Махачкалу'
-      : viaWest
-      ? 'западной веткой'
-      : 'принятым маршрутом';
-  final delayPart = delay == null ? '' : ', +${delay.round()} ч к плану';
-  final acceptedVia = switch (alert['accepted_via']?.toString()) {
-    'web' => ' · сайт',
-    'telegram' => ' · Telegram',
-    _ => '',
-  };
-  return 'Решение диспетчера: $via$delayPart$acceptedVia';
+  if (parts.isEmpty) return null;
+  return parts.join(' · ');
 }
 
 DispatcherDecision decisionForCargo({
   required Cargo cargo,
   required List<Map<String, dynamic>> alerts,
-  Map<String, String> nodes = const {},
 }) {
   for (final a in alerts) {
     final items =
@@ -436,18 +420,13 @@ DispatcherDecision decisionForCargo({
     if (status == 'new') {
       return DispatcherDecision(
         waiting: true,
-        summary: 'Ожидает решения логиста',
+        summary: decisionSummaryFromAlert(a) ?? 'Ожидает решения логиста',
         alertId: a['id']?.toString(),
       );
     }
-    final summary = decisionSummaryFromAlert(a, nodes);
     return DispatcherDecision(
       waiting: false,
-      summary:
-          summary ??
-          (cargo.routeChanged
-              ? 'Решение диспетчера принято'
-              : 'Решение зафиксировано'),
+      summary: decisionSummaryFromAlert(a),
       alertId: a['id']?.toString(),
     );
   }
@@ -455,18 +434,6 @@ DispatcherDecision decisionForCargo({
     return const DispatcherDecision(
       waiting: true,
       summary: 'Ожидает решения логиста',
-    );
-  }
-  if (cargo.routeChanged || cargo.displayStatus == CargoStatus.rerouted) {
-    final viaMkh =
-        cargo.route.contains('Махачкала') ||
-        cargo.passPort == 'Махачкала' ||
-        (cargo.nextPoint == 'Махачкала');
-    return DispatcherDecision(
-      waiting: false,
-      summary: viaMkh
-          ? 'Решение диспетчера: через Махачкалу'
-          : 'Решение диспетчера принято',
     );
   }
   return const DispatcherDecision(waiting: false, summary: null);
@@ -529,3 +496,16 @@ StoredPass storedPassFromApi({
     cargoTitle: cargo.title,
   );
 }
+
+/// Маппинг ключей `error.fields` → ключи формы документа.
+String? invoiceFieldKeyFromApi(String apiKey) => switch (apiKey) {
+  'goods' => 'product',
+  'hs_code' => 'hsCode',
+  'weight_kg' => 'weight',
+  'value' => 'amount',
+  'origin_country' => 'origin',
+  'seller' => 'seller',
+  'buyer' => 'buyer',
+  'currency' => 'currency',
+  _ => null,
+};

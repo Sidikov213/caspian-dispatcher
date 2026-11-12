@@ -53,7 +53,7 @@ void main() {
       destination: 'Энзели',
       status: CargoStatus.planned,
       nextPoint: 'Энзели',
-      arrival: '—',
+      arrival: '-',
     );
     controller.updateInvoice(
       const InvoiceFields(

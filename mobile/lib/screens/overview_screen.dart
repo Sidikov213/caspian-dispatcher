@@ -6,6 +6,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_chrome.dart';
 import '../widgets/info_sheet.dart';
+import '../widgets/last_event_card.dart';
 import '../widgets/logo_mark.dart';
 import 'cargo_detail_screen.dart';
 import 'settings_screen.dart';
@@ -160,8 +161,7 @@ class OverviewScreen extends StatelessWidget {
                   body:
                       'Источник: ${stats.weatherSource}\n'
                       'Обновлено: ${stats.weatherUpdatedLabel}'
-                      '${stats.weatherStale ? '\nДанные устарели (>1 ч)' : ''}\n\n'
-                      'Порог парома — 2,5 м.',
+                      '${stats.weatherStale ? '\nДанные устарели (>1 ч)' : ''}',
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,7 +179,7 @@ class OverviewScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     for (final w in stats.waves) ...[
-                      _wave(w.name, w.heightLabel, dangerous: w.dangerous),
+                      _wave(w.name, w.heightLabel),
                       const SizedBox(height: 8),
                     ],
                     Text(
@@ -190,7 +190,11 @@ class OverviewScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              AppCard(
+              LastEventCard(
+                card: stats.lastAlertCard,
+                fallbackTitle: stats.lastAlertTitle,
+                fallbackBody: stats.lastAlertBody,
+                fallbackDecision: stats.decisionNote,
                 onTap: stats.lastAlertCargoId == null
                     ? null
                     : () {
@@ -202,47 +206,6 @@ class OverviewScreen extends StatelessWidget {
                           ),
                         );
                       },
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SectionLabel('Последнее событие'),
-                    const SizedBox(height: 10),
-                    if (stats.lastAlertTitle == null)
-                      Text(
-                        'Алертов нет',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      )
-                    else ...[
-                      Text(
-                        stats.lastAlertTitle!,
-                        style: TextStyle(
-                          color: AppColors.text,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        stats.lastAlertBody ?? '',
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                      if (stats.decisionNote != null) ...[
-                        const SizedBox(height: 10),
-                        SoftBadge(
-                          label: stats.decisionNote!,
-                          background: AppColors.infoBg,
-                          foreground: AppColors.primary,
-                        ),
-                      ],
-                    ],
-                  ],
-                ),
               ),
             ],
           ),
@@ -251,7 +214,7 @@ class OverviewScreen extends StatelessWidget {
     );
   }
 
-  Widget _wave(String port, String height, {required bool dangerous}) {
+  Widget _wave(String port, String height) {
     return Row(
       children: [
         Expanded(
@@ -266,8 +229,8 @@ class OverviewScreen extends StatelessWidget {
         ),
         SoftBadge(
           label: height,
-          background: dangerous ? AppColors.dangerBg : AppColors.successBg,
-          foreground: dangerous ? AppColors.danger : AppColors.success,
+          background: AppColors.infoBg,
+          foreground: AppColors.primary,
         ),
       ],
     );

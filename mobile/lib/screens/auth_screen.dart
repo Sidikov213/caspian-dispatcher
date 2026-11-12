@@ -29,6 +29,19 @@ class _AuthScreenState extends State<AuthScreen> {
   final _password = TextEditingController();
   AuthRole _role = AuthRole.logist;
 
+  @override
+  void initState() {
+    super.initState();
+    _name.addListener(_clearError);
+    _email.addListener(_clearError);
+    _password.addListener(_clearError);
+  }
+
+  void _clearError() {
+    if (_error == null || !mounted) return;
+    setState(() => _error = null);
+  }
+
   void _switchMode() {
     _dismissKeyboard();
     setState(() {
@@ -40,6 +53,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    _name.removeListener(_clearError);
+    _email.removeListener(_clearError);
+    _password.removeListener(_clearError);
     _name.dispose();
     _email.dispose();
     _password.dispose();
@@ -160,6 +176,11 @@ class _AuthScreenState extends State<AuthScreen> {
                                       textInputAction: TextInputAction.next,
                                       textCapitalization:
                                           TextCapitalization.words,
+                                      style: TextStyle(
+                                        color: AppColors.text,
+                                        fontSize: 15,
+                                        height: 1.25,
+                                      ),
                                       decoration: const InputDecoration(
                                         hintText: 'Иванов Иван Иванович',
                                       ),
@@ -189,6 +210,11 @@ class _AuthScreenState extends State<AuthScreen> {
                                     keyboardType: TextInputType.emailAddress,
                                     autocorrect: false,
                                     textInputAction: TextInputAction.next,
+                                    style: TextStyle(
+                                      color: AppColors.text,
+                                      fontSize: 15,
+                                      height: 1.25,
+                                    ),
                                     decoration: const InputDecoration(
                                       hintText: 'name@company.ru',
                                     ),
@@ -202,6 +228,11 @@ class _AuthScreenState extends State<AuthScreen> {
                                     obscureText: _obscurePassword,
                                     textInputAction: TextInputAction.done,
                                     onSubmitted: (_) => _submit(),
+                                    style: TextStyle(
+                                      color: AppColors.text,
+                                      fontSize: 15,
+                                      height: 1.25,
+                                    ),
                                     decoration: InputDecoration(
                                       hintText: _register
                                           ? 'Не меньше 6 символов'
@@ -210,6 +241,12 @@ class _AuthScreenState extends State<AuthScreen> {
                                         tooltip: _obscurePassword
                                             ? 'Показать пароль'
                                             : 'Скрыть пароль',
+                                        padding: EdgeInsets.zero,
+                                        visualDensity: VisualDensity.compact,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 44,
+                                          minHeight: 44,
+                                        ),
                                         onPressed: () {
                                           setState(
                                             () => _obscurePassword =
@@ -221,6 +258,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                               ? Icons.visibility_outlined
                                               : Icons.visibility_off_outlined,
                                           color: AppColors.muted,
+                                          size: 22,
                                         ),
                                       ),
                                     ),

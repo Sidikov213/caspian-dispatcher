@@ -104,7 +104,7 @@ class AppPalette {
     border: Color(0xFF24304A),
     borderStrong: Color(0xFF30425C),
     primary: Color(0xFF2F80ED),
-    cyan: Color(0xFF73D9EE),
+    cyan: Color(0xFF3FE0C5),
     text: Color(0xFFE6EDF7),
     textSecondary: Color(0xFFCBD5E1),
     muted: Color(0xFF8A97AD),
@@ -119,7 +119,7 @@ class AppPalette {
     neutralBg: Color(0x268A97AD),
     skeleton: Color(0xFF1A2438),
     overlay: Color(0x990B1220),
-    deliveredAccent: Color(0xFF69E6A0),
+    deliveredAccent: Color(0xFF8A97AD),
   );
 
   /// Светлая: белый фон, контрастный текст и границы.
@@ -131,7 +131,7 @@ class AppPalette {
     border: Color(0xFFD0D8E4),
     borderStrong: Color(0xFF94A3B8),
     primary: Color(0xFF1D4ED8),
-    cyan: Color(0xFF0F766E),
+    cyan: Color(0xFF3FE0C5),
     text: Color(0xFF0B1220),
     textSecondary: Color(0xFF334155),
     muted: Color(0xFF64748B),
@@ -146,7 +146,7 @@ class AppPalette {
     neutralBg: Color(0xFFE2E8F0),
     skeleton: Color(0xFFD8E0EB),
     overlay: Color(0x660B1220),
-    deliveredAccent: Color(0xFF15803D),
+    deliveredAccent: Color(0xFF64748B),
   );
 
   Color statusFg(CargoStatusTone tone) => switch (tone) {
@@ -155,6 +155,7 @@ class AppPalette {
     CargoStatusTone.atRisk => danger,
     CargoStatusTone.rerouted => success,
     CargoStatusTone.delivered => deliveredAccent,
+    CargoStatusTone.unknown => muted,
   };
 
   Color statusBg(CargoStatusTone tone) => switch (tone) {
@@ -163,7 +164,15 @@ class AppPalette {
     CargoStatusTone.atRisk => dangerBg,
     CargoStatusTone.rerouted => successBg,
     CargoStatusTone.delivered => neutralBg,
+    CargoStatusTone.unknown => neutralBg,
   };
 }
 
-enum CargoStatusTone { planned, inTransit, atRisk, rerouted, delivered }
+enum CargoStatusTone {
+  planned,
+  inTransit,
+  atRisk,
+  rerouted,
+  delivered,
+  unknown,
+}

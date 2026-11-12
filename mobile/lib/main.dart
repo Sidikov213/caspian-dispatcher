@@ -26,11 +26,11 @@ Future<void> main() async {
     // ignore: avoid_print
     print('Firebase init skipped: $e');
   }
-  await ApiConfig.load();
   // ignore: avoid_print
   print(
     'API config: baseUrl=${ApiConfig.baseUrl}, '
-    'apiKey=${ApiConfig.hasApiKey ? "set" : "MISSING"}',
+    'apiKey=${ApiConfig.hasApiKey ? "set" : "MISSING"} '
+    '(нужен --dart-define-from-file=.env)',
   );
   final themeController = ThemeController();
   final notificationController = NotificationController();

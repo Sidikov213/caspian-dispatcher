@@ -88,10 +88,11 @@ class _SplashScreenState extends State<SplashScreen>
                 const LogoMark(size: 88),
                 const SizedBox(height: 18),
                 Text(
-                  'Диспетчер',
+                  'Каспийский диспетчер',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.text,
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.3,
                   ),

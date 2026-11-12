@@ -65,10 +65,10 @@ class _AuthScreenState extends State<AuthScreen> {
   String _mapError(Object err) {
     if (err is! ApiException) return 'Не удалось выполнить запрос';
     return switch (err.code) {
-      'email_taken' => 'Этот email уже зарегистрирован',
-      'invalid_credentials' => 'Неверный email или пароль',
+      'email_taken' => 'Эта почта уже зарегистрирована',
+      'invalid_credentials' => 'Неверная почта или пароль',
       'weak_password' => 'Пароль должен быть не короче 6 символов',
-      'invalid_email' => 'Проверьте формат email',
+      'invalid_email' => 'Проверьте формат почты',
       'validation_error' || 'invalid_name' =>
         err.message.isNotEmpty ? err.message : 'Проверьте заполненные поля',
       _ => err.message.isNotEmpty ? err.message : 'Ошибка авторизации',
@@ -204,7 +204,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   const SizedBox(height: 14),
                                 ],
                                 _Field(
-                                  label: 'Email',
+                                  label: 'Эл. почта',
                                   child: TextField(
                                     controller: _email,
                                     keyboardType: TextInputType.emailAddress,

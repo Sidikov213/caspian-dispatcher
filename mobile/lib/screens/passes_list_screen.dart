@@ -50,7 +50,8 @@ class PassesListScreen extends StatelessWidget {
               ? EmptyStateView(
                   icon: Icons.badge_outlined,
                   title: 'Пропусков пока нет',
-                  subtitle: 'Серверная история и локальные копии. Исходный JWT не перезаписывается.',
+                  subtitle:
+                      'История с сервера и копии на устройстве. Старый пропуск не затирается.',
                   actionLabel: app.loadState == AppLoadState.error
                       ? 'Повторить загрузку'
                       : null,

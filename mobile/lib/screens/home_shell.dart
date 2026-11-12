@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -31,11 +33,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final app = AppScope.of(context);
+    // Не гасим WS на inactive — на iOS это мигание (шторка, фокус IDE),
+    // из‑за него сокет рвётся и включается HTTP-опрос каждые 3 с.
     if (state == AppLifecycleState.resumed) {
       app.startPolling();
-      app.onAppResumed();
-    } else if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
+      unawaited(app.onAppResumed());
+    } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       app.stopPolling();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/cargo.dart';
+import '../services/camera_permission.dart';
 import '../state/app_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -161,21 +162,12 @@ class CargoDetailScreen extends StatelessWidget {
                 children: [
                   const SectionLabel('Этапы перевозки'),
                   const SizedBox(height: 10),
-                  for (var i = 0; i < cargo.stages.length; i++) ...[
-                    _StageRow(stage: cargo.stages[i]),
-                    if (i != cargo.stages.length - 1)
-                      Padding(
-                        padding: EdgeInsets.only(left: 11, top: 2, bottom: 2),
-                        child: SizedBox(
-                          height: 14,
-                          child: VerticalDivider(
-                            width: 2,
-                            thickness: 2,
-                            color: AppColors.cyan,
-                          ),
-                        ),
-                      ),
-                  ],
+                  for (var i = 0; i < cargo.stages.length; i++)
+                    _StageRow(
+                      stage: cargo.stages[i],
+                      isFirst: i == 0,
+                      isLast: i == cargo.stages.length - 1,
+                    ),
                 ],
               ),
             ),
@@ -200,15 +192,6 @@ class CargoDetailScreen extends StatelessWidget {
                   'Состояние',
                   hasPass ? cargo.passStatus.label : 'Ещё не оформлен',
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Внутренний демонстрационный пропуск сервиса, не официальный портовый документ.',
-                  style: TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
               ],
             ),
           ),
@@ -225,22 +208,24 @@ class CargoDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               if (hasPass) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => PassScreen(cargoId: cargo.id),
                   ),
                 );
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DocumentCaptureScreen(cargoId: cargo.id),
-                  ),
-                );
+                return;
               }
+              final allowed = await ensureCameraPermission(context);
+              if (!allowed || !context.mounted) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DocumentCaptureScreen(cargoId: cargo.id),
+                ),
+              );
             },
-            child: Text(hasPass ? 'Показать QR' : 'Оформить пропуск'),
+            child: Text(hasPass ? 'Показать пропуск' : 'Оформить пропуск'),
           ),
           if (cargo.passStatus == PassStatus.awaitingReissue) ...[
             const SizedBox(height: 10),
@@ -282,9 +267,15 @@ class CargoDetailScreen extends StatelessWidget {
 }
 
 class _StageRow extends StatelessWidget {
-  const _StageRow({required this.stage});
+  const _StageRow({
+    required this.stage,
+    required this.isFirst,
+    required this.isLast,
+  });
 
   final RouteStage stage;
+  final bool isFirst;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
@@ -295,47 +286,86 @@ class _StageRow extends StatelessWidget {
         : stage.done
         ? AppColors.success
         : AppColors.muted;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color.withValues(alpha: 0.18),
-            border: Border.all(color: color),
-          ),
-          child: Icon(
-            stage.done ? Icons.check : Icons.circle,
-            size: stage.done ? 12 : 6,
-            color: color,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                stage.title,
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontWeight: FontWeight.w700,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 22,
+            child: Column(
+              children: [
+                Expanded(
+                  child: isFirst
+                      ? const SizedBox.shrink()
+                      : Center(
+                          child: Container(
+                            width: 2,
+                            color: AppColors.cyan,
+                          ),
+                        ),
                 ),
-              ),
-              Text(
-                stage.subtitle,
-                style: TextStyle(color: AppColors.muted, fontSize: 12),
-              ),
-              Text(
-                'План ${stage.planned} · прогноз ${stage.forecast}',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-              ),
-            ],
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color.withValues(alpha: 0.18),
+                    border: Border.all(color: color),
+                  ),
+                  child: Icon(
+                    stage.done ? Icons.check : Icons.circle,
+                    size: stage.done ? 12 : 6,
+                    color: color,
+                  ),
+                ),
+                Expanded(
+                  child: isLast
+                      ? const SizedBox.shrink()
+                      : Center(
+                          child: Container(
+                            width: 2,
+                            color: AppColors.cyan,
+                          ),
+                        ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: isFirst ? 0 : 8,
+                bottom: isLast ? 0 : 8,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    stage.title,
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    stage.subtitle,
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                  Text(
+                    'План ${stage.planned} · прогноз ${stage.forecast}',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

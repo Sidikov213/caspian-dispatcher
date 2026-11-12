@@ -61,7 +61,7 @@ String? fmtCo2SavedPct(num? pct) {
   final raw = pct % 1 == 0
       ? pct.toInt().toString()
       : pct.toString().replaceAll('.', ',');
-  return '−$raw% CO₂';
+  return '−$raw% выбросов CO₂';
 }
 
 /// Москва (UTC+3), месяц «мая», формат «12 ноя, 14:30».
@@ -268,7 +268,13 @@ OverviewData buildOverview({
 }) {
   final waves = wavesFromWeather(weather, nodes);
   final updated = fmtDt(weather['updated_at']?.toString());
-  final source = '${weather['source'] ?? '-'}';
+  final sourceRaw = '${weather['source'] ?? ''}';
+  final source = switch (sourceRaw) {
+    'open-meteo' => 'Метеосервис',
+    'cache' => 'Кэш',
+    '' || '-' => '—',
+    _ => sourceRaw,
+  };
   final stale = weather['stale'] == true;
 
   String? title;
@@ -396,7 +402,7 @@ String? decisionSummaryFromAlert(Map<String, dynamic> alert) {
   } else {
     final via = switch (alert['accepted_via']?.toString()) {
       'web' => 'сайт',
-      'telegram' => 'Telegram',
+      'telegram' => 'Телеграм',
       _ => null,
     };
     if (via != null) parts.add(via);

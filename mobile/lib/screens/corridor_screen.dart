@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/camera_permission.dart';
 import '../state/app_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -30,10 +31,10 @@ class CorridorScreen extends StatelessWidget {
 
     final p = app.corridorProgress(cargo);
     final steps = [
-      ('Документ загружен', 'Инвойс на сервере', p.documentUploaded),
+      ('Документ загружен', 'Счёт на сервере', p.documentUploaded),
       ('Поля проверены', 'Подтверждение экспедитором', p.fieldsChecked),
-      ('Пропуск выдан', 'JWT на пункт пропуска', p.passIssued),
-      ('Запись в реестре', 'block_hash в цепочке', p.ledgerRecorded),
+      ('Пропуск выдан', 'Электронный код для пункта пропуска', p.passIssued),
+      ('Запись в реестре', 'Отпечаток записи в цепочке', p.ledgerRecorded),
     ];
 
     return Scaffold(
@@ -51,7 +52,7 @@ class CorridorScreen extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Один документ: инвойс. Статусы по фактическим данным.',
+            'Один документ: счёт. Статусы по фактическим данным.',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 18),
@@ -117,14 +118,16 @@ class CorridorScreen extends StatelessWidget {
           const SizedBox(height: 20),
           if (!p.passIssued)
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
+                final allowed = await ensureCameraPermission(context);
+                if (!allowed || !context.mounted) return;
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => DocumentCaptureScreen(cargoId: cargo.id),
                   ),
                 );
               },
-              child: const Text('Загрузить инвойс'),
+              child: const Text('Загрузить счёт'),
             )
           else
             FilledButton(

@@ -1,4 +1,6 @@
 PODS:
+  - camera_avfoundation (0.0.1):
+    - Flutter
   - Firebase/CoreOnly (12.19.3):
     - FirebaseCore (~> 12.19.3)
   - Firebase/Messaging (12.19.3):
@@ -74,6 +76,7 @@ PODS:
   - PromisesObjC (2.4.1)
 
 DEPENDENCIES:
+  - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/darwin`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
@@ -94,6 +97,8 @@ SPEC REPOS:
     - PromisesObjC
 
 EXTERNAL SOURCES:
+  camera_avfoundation:
+    :path: ".symlinks/plugins/camera_avfoundation/darwin"
   firebase_core:
     :path: ".symlinks/plugins/firebase_core/ios"
   firebase_messaging:
@@ -108,6 +113,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
 
 SPEC CHECKSUMS:
+  camera_avfoundation: 968a9a5323c79a99c166ad9d7866bfd2047b5a9b
   Firebase: e3c5ab38229ae085490d02398d97b9f5374bbe6e
   firebase_core: 80d50cac10fc9dff2597c55ed43e296d9a0bc90a
   firebase_messaging: 378a914df459aea513c6642ebb531fe7d7200c94
@@ -124,6 +130,6 @@ SPEC CHECKSUMS:
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
 
-PODFILE CHECKSUM: 0d1854e54b276a67c832f26722f5dc850aabf0bd
+PODFILE CHECKSUM: cafa2d8a82a01bd031dbb483750a3f65aeb7e84c
 
 COCOAPODS: 1.17.0

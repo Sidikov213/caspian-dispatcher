@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "ru.gadzhilaev.caspian.dispatcher"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

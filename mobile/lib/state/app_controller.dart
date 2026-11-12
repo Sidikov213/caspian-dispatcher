@@ -52,7 +52,10 @@ class AppController extends ChangeNotifier {
   String? _errorMessage;
   bool _refreshing = false;
   Timer? _pollTimer;
+  Timer? _eventDebounce;
   bool _pollInFlight = false;
+  int _pollFailStreak = 0;
+  int _silentPassTick = 0;
 
   /// Кэш пропусков, чтобы silent-poll не долбил /passes/* каждые N секунд.
   final Map<String, Map<String, dynamic>> _passById = {};
@@ -97,13 +100,20 @@ class AppController extends ChangeNotifier {
     _syncPolling();
   }
 
+  Duration get _pollInterval {
+    // После 502/сбоев не долбим API каждые 3 с — backoff до 15 с.
+    if (_pollFailStreak <= 0) return _pollFallback;
+    final sec = (3 * (1 << (_pollFailStreak.clamp(0, 3)))).clamp(3, 15);
+    return Duration(seconds: sec);
+  }
+
   void _syncPolling() {
     _pollTimer?.cancel();
     if (_realtime.isConnected) {
       _pollTimer = null;
       return;
     }
-    _pollTimer = Timer.periodic(_pollFallback, (_) {
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
       if (_loadState == AppLoadState.ready) {
         refresh(silent: true);
       }
@@ -112,20 +122,15 @@ class AppController extends ChangeNotifier {
 
   Future<void> _onRealtimeEvent(String type, Object? payload) async {
     _syncPolling();
-    switch (type) {
-      case 'demo.reset':
-        await _handleDemoReset();
-      case 'weather.updated':
-        await refresh(silent: true, forceGraph: false);
-      case 'shipment.updated':
-      case 'alert.created':
-      case 'alert.updated':
-      case 'stats.updated':
-      case 'ledger.appended':
-        await refresh(silent: true);
-      default:
-        await refresh(silent: true);
+    if (type == 'demo.reset') {
+      await _handleDemoReset();
+      return;
     }
+    // Схлопываем пачку WS-событий в один refresh, иначе flood HTTP.
+    _eventDebounce?.cancel();
+    _eventDebounce = Timer(const Duration(milliseconds: 400), () {
+      unawaited(refresh(silent: true, forceGraph: false));
+    });
   }
 
   Future<void> _handleDemoReset() async {
@@ -192,15 +197,21 @@ class AppController extends ChangeNotifier {
       final weather = results[2] as Map<String, dynamic>;
       _alerts = results[3] as List<Map<String, dynamic>>;
 
+      // Silent-poll: /passes не на каждый тик (раз в ~5 циклов ≈ 15 с).
       List<Map<String, dynamic>> remotePasses = const [];
-      try {
-        remotePasses = await _api.fetchPasses();
-      } catch (_) {
-        // Локальная история остаётся.
-      }
-      for (final p in remotePasses) {
-        final id = p['id']?.toString();
-        if (id != null) _passById[id] = p;
+      final wantPasses = forceLoading || !silent || (_silentPassTick % 5 == 0);
+      if (!silent) _silentPassTick = 0;
+      if (silent) _silentPassTick++;
+      if (wantPasses) {
+        try {
+          remotePasses = await _api.fetchPasses();
+        } catch (_) {
+          // Локальная история остаётся.
+        }
+        for (final p in remotePasses) {
+          final id = p['id']?.toString();
+          if (id != null) _passById[id] = p;
+        }
       }
 
       final mapped = <Cargo>[];
@@ -211,7 +222,8 @@ class AppController extends ChangeNotifier {
         if (pid != null && pid.isNotEmpty) {
           seenPassIds.add(pid);
           pass = _passById[pid];
-          if (pass == null || forceLoading) {
+          // Уже есть из GET /passes — не долбим /passes/{id} повторно.
+          if (pass == null) {
             try {
               pass = await _api.fetchPass(pid);
               _passById[pid] = pass;
@@ -247,9 +259,19 @@ class AppController extends ChangeNotifier {
       await _syncStoredStatuses(mapped);
       _loadState = AppLoadState.ready;
       _errorMessage = null;
-      _syncPolling();
+      if (_pollFailStreak != 0) {
+        _pollFailStreak = 0;
+        _syncPolling();
+      } else {
+        _syncPolling();
+      }
     } catch (e) {
       _errorMessage = e is ApiException ? e.message : e.toString();
+      final code = e is ApiException ? e.statusCode : null;
+      if (code == 502 || code == 503 || code == 504 || code == null) {
+        _pollFailStreak = (_pollFailStreak + 1).clamp(0, 4);
+        _syncPolling();
+      }
       if (_loadState != AppLoadState.ready) {
         _loadState = AppLoadState.error;
         _cargos = [];

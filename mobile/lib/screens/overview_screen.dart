@@ -5,7 +5,6 @@ import '../state/app_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_chrome.dart';
-import '../widgets/info_sheet.dart';
 import '../widgets/last_event_card.dart';
 import '../widgets/logo_mark.dart';
 import 'cargo_detail_screen.dart';
@@ -64,6 +63,16 @@ class OverviewScreen extends StatelessWidget {
                 ),
               IconButton(
                 tooltip: 'Настройки',
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                style: IconButton.styleFrom(
+                  overlayColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  hoverColor: Colors.transparent,
+                  focusColor: Colors.transparent,
+                ),
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -155,14 +164,6 @@ class OverviewScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               AppCard(
-                onTap: () => showInfoSheet(
-                  context,
-                  title: 'Волна в портах',
-                  body:
-                      'Источник: ${stats.weatherSource}\n'
-                      'Обновлено: ${stats.weatherUpdatedLabel}'
-                      '${stats.weatherStale ? '\nДанные устарели (>1 ч)' : ''}',
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

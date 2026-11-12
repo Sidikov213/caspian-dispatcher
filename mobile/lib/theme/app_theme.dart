@@ -76,11 +76,22 @@ ThemeData buildAppTheme(Brightness brightness) {
       scrolledUnderElevation: 0,
       centerTitle: false,
       systemOverlayStyle: overlayStyle,
+      surfaceTintColor: Colors.transparent,
+      iconTheme: IconThemeData(color: p.text),
+      actionsIconTheme: IconThemeData(color: p.text),
       titleTextStyle: TextStyle(
         fontFamily: family,
         color: p.text,
         fontSize: 17,
         fontWeight: FontWeight.w700,
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: ButtonStyle(
+        overlayColor: noOverlay,
+        splashFactory: NoSplash.splashFactory,
+        shadowColor: noOverlay,
+        surfaceTintColor: noOverlay,
       ),
     ),
     cardTheme: CardThemeData(

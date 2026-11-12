@@ -37,21 +37,44 @@ class RealtimeService {
 
   Future<void> _connect() async {
     if (!_wanted) return;
-    await _tearDown();
-    if (!ApiConfig.hasApiKey) return;
+    await _tearDown(notify: false);
+    if (!_wanted) return;
+    if (!ApiConfig.hasApiKey) {
+      // ignore: avoid_print
+      print('WS skip: no API key');
+      return;
+    }
     try {
       final uri = ApiConfig.wsUri();
+      // ignore: avoid_print
+      print('WS connect $uri');
       final channel = WebSocketChannel.connect(uri);
       _channel = channel;
       await channel.ready.timeout(const Duration(seconds: 8));
+      if (!_wanted) {
+        await _tearDown(notify: false);
+        return;
+      }
       _setConnected(true);
+      // ignore: avoid_print
+      print('WS connected');
       _sub = channel.stream.listen(
         _onMessage,
-        onError: (_) => _onLost(),
-        onDone: _onLost,
+        onError: (e) {
+          // ignore: avoid_print
+          print('WS error: $e');
+          _onLost();
+        },
+        onDone: () {
+          // ignore: avoid_print
+          print('WS closed');
+          _onLost();
+        },
         cancelOnError: true,
       );
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('WS connect failed: $e');
       _setConnected(false);
       _scheduleReconnect();
     }
@@ -90,13 +113,17 @@ class RealtimeService {
     });
   }
 
-  Future<void> _tearDown() async {
+  Future<void> _tearDown({bool notify = true}) async {
     await _sub?.cancel();
     _sub = null;
     try {
       await _channel?.sink.close();
     } catch (_) {}
     _channel = null;
-    _setConnected(false);
+    if (notify) {
+      _setConnected(false);
+    } else {
+      _connected = false;
+    }
   }
 }

@@ -212,7 +212,7 @@ class ForecastScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Маршрут выбирает логист на сайте или в Telegram.',
+                  'Маршрут выбирает логист на сайте или в Телеграме.',
                   style: TextStyle(color: AppColors.muted, fontSize: 12),
                 ),
               ],

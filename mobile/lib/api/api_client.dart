@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/auth_user.dart';
 import 'api_config.dart';
+import 'api_messages.dart';
 
 class ApiException implements Exception {
   ApiException(
@@ -256,19 +257,32 @@ class ApiClient {
         : jsonDecode(utf8.decode(res.bodyBytes));
     _logResponse(method, uri, res, raw);
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      String msg = 'HTTP ${res.statusCode}';
+      String msg = switch (res.statusCode) {
+        400 => 'Некорректный запрос',
+        401 => 'Нужна повторная авторизация',
+        403 => 'Недостаточно прав',
+        404 => 'Данные не найдены',
+        408 || 504 => 'Сервер не ответил вовремя',
+        429 => 'Слишком много запросов. Подождите немного',
+        502 || 503 =>
+          'Сервер временно недоступен. Попробуйте через несколько секунд.',
+        _ => 'Ошибка сервера (${res.statusCode})',
+      };
       String? code;
       Map<String, String>? fields;
       if (raw is Map) {
         final err = raw['error'];
         if (err is Map) {
-          if (err['message'] != null) msg = '${err['message']}';
           if (err['code'] != null) code = '${err['code']}';
+          if (err['message'] != null) msg = '${err['message']}';
           final rawFields = err['fields'];
           if (rawFields is Map) {
             fields = {
               for (final e in rawFields.entries)
-                '${e.key}': '${e.value}',
+                '${e.key}': apiReasonRu(
+                  '${e.value}',
+                  fallback: 'Проверьте это поле',
+                ),
             };
           }
         } else if (raw['detail'] != null) {
@@ -276,7 +290,7 @@ class ApiClient {
         }
       }
       throw ApiException(
-        msg,
+        apiErrorRu(msg, code: code),
         statusCode: res.statusCode,
         code: code,
         fields: fields,

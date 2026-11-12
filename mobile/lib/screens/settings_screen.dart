@@ -59,6 +59,16 @@ class _SettingsScreenState extends State<SettingsScreen>
       appBar: AppBar(
         title: const Text('Настройки'),
         leading: IconButton(
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          focusColor: Colors.transparent,
+          style: IconButton.styleFrom(
+            overlayColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            focusColor: Colors.transparent,
+          ),
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),
         ),

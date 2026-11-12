@@ -44,6 +44,7 @@ dependencies:
   firebase_messaging: ^17.0.1
   web_socket_channel: ^3.0.3
   flutter_dotenv: ^6.0.1
+  camera: ^0.12.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -15,7 +15,46 @@
       "ferry": 1.6,
       "road": 4.0,
       "ocean": 0.5
-    }
+    },
+    "ferry_edges": [
+      "e-astrakhan-anzali",
+      "e-olya-anzali",
+      "e-olya-amirabad",
+      "e-makhachkala-anzali",
+      "e-aktau-baku"
+    ],
+    "handling_h": {
+      "ferry_before_h": 8,
+      "ferry_after_h": 12,
+      "ocean_before_h": 12,
+      "border_h": 24
+    },
+    "rail_departures_msk": {
+      "e-astrakhan-makhachkala": [
+        "20:00"
+      ]
+    },
+    "customs_h": 1,
+    "port_capacity_t_per_day": 2000,
+    "ferry_forbidden_cargo": [
+      "explosives"
+    ],
+    "sailing_labels": {
+      "sl-ast-anz-1114": "паром А",
+      "sl-ast-anz-1116": "паром Б",
+      "sl-mkh-anz-1115": "паром М"
+    },
+    "via_names": {
+      "makhachkala": "Махачкалу",
+      "olya": "Олю",
+      "astrakhan": "Астрахань",
+      "aktau": "Актау",
+      "baku": "Баку",
+      "samur": "Самур",
+      "astara": "Астару"
+    },
+    "pass_valid_until": "2026-11-29T21:00:00Z",
+    "owner_tg_id": 100000001
   },
   "nodes": [
     {
@@ -1186,6 +1225,44 @@
       "hash": "e05cdf2355983ee6fada7a8a0c984ae28e3fbb36d9e04b78a1cacaf8b7f14759"
     }
   ],
+  "demo_drafts": {
+    "sh-05": {
+      "id": "doc-05",
+      "shipment_id": "sh-05",
+      "type": "invoice",
+      "source_lang": "fa",
+      "image_url": "mock://invoice-sh-05.jpg",
+      "fields": {
+        "seller": "ООО «АстраханьАгроХим»",
+        "buyer": "Компания «Кешт Гостар Гилян»",
+        "goods": "Удобрения азотные (карбамид)",
+        "hs_code": "3102 10",
+        "weight_kg": 30000,
+        "value": 10500,
+        "currency": "USD",
+        "origin_country": "RU"
+      },
+      "checks": [
+        {
+          "name": "required_fields",
+          "ok": true,
+          "note": "Все обязательные поля заполнены"
+        },
+        {
+          "name": "weight_match",
+          "ok": true,
+          "note": "Вес 30 000 кг совпадает с заявкой (30 т)"
+        },
+        {
+          "name": "hs_code",
+          "ok": true,
+          "note": "Код ТН ВЭД 3102 10"
+        }
+      ],
+      "status": "draft",
+      "hash": null
+    }
+  },
   "passes": [
     {
       "id": "pass-01",

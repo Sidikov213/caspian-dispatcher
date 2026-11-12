@@ -10,8 +10,8 @@
       "buyer": "Shree Grain Imports Pvt Ltd",
       "goods": "Пшеница продовольственная 3 класса",
       "hs_code": "1001 99",
-      "weight_kg": 60000,
-      "value": 15000,
+      "weight_kg": 60000.0,
+      "value": 15000.0,
       "currency": "USD",
       "origin_country": "RU"
     },
@@ -46,8 +46,8 @@
       "buyer": "Bharat Steel Traders",
       "goods": "Прокат стальной горячекатаный",
       "hs_code": "7208 51",
-      "weight_kg": 40000,
-      "value": 28000,
+      "weight_kg": 40000.0,
+      "value": 28000.0,
       "currency": "USD",
       "origin_country": "RU"
     },
@@ -82,8 +82,8 @@
       "buyer": "Pune Engineering Works Ltd",
       "goods": "Насосное оборудование",
       "hs_code": "8413 70",
-      "weight_kg": 20000,
-      "value": 96000,
+      "weight_kg": 20000.0,
+      "value": 96000.0,
       "currency": "USD",
       "origin_country": "RU"
     },
@@ -118,8 +118,8 @@
       "buyer": "Mumbai Fabrics Co.",
       "goods": "Ткани хлопчатобумажные",
       "hs_code": "5208 52",
-      "weight_kg": 25000,
-      "value": 62000,
+      "weight_kg": 25000.0,
+      "value": 62000.0,
       "currency": "USD",
       "origin_country": "AZ"
     },

@@ -1,16 +1,19 @@
 """Генератор data/seed.json и data/mock/*.json.
 
-Все числа выводятся формулами из docs/DEMO_SCENARIO.md: поправили расстояние или тариф
-в таблицах ниже — перезапустили скрипт, моки пересчитались.
+1. Сид: узлы, рёбра, рейсы, грузы с плановыми маршрутами, документы, пропуска, реестр, параметры.
+   Поправили расстояние, тариф или рейс в таблицах ниже — перезапустили скрипт.
+2. Сверка: независимый расчёт по формулам docs/DEMO_SCENARIO.md (CALC, ROUTES) и тот же набор
+   17 чисел, посчитанный движком (app/dispatcher.py), сравниваются с числами сценария.
+3. Моки: движок прогоняет демо с фиксированными часами — initial → инвойс №05 → storm → accepted,
+   и каждый ответ пишется в data/mock/ через Pydantic-модели контракта. Поэтому файлы моков
+   совпадают с тем, что отдаёт сервер.
 
 Запуск из backend/:  python scripts/gen_mocks.py
-
 Время сценария — московское (UTC+3), в JSON — UTC.
-Фазы моков: initial (шторм не запущен) → storm (алерт) → accepted (через Махачкалу).
 """
+import asyncio
 import copy
 import json
-import math
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -24,8 +27,10 @@ from app import models as M  # noqa: E402
 from app.config import DATA_DIR, MOCK_DIR, MOCK_JWT_SECRET  # noqa: E402
 from app.documents import doc_hash  # noqa: E402
 from app.ledger import append_block, verify_chain  # noqa: E402
+from app.weather import WEATHER_BASE  # noqa: E402
 
 MSK = timezone(timedelta(hours=3))
+
 
 
 def T(day: int, h: int, m: int = 0) -> datetime:
@@ -132,54 +137,6 @@ for sid, f, t, dep, cut, dur, cap, booked, st in SAILING_DEFS:
                      "capacity_t": cap, "booked_t": booked, "status": st, "cancel_reason": None}
 FERRY_A, FERRY_B, FERRY_M = "sl-ast-anz-1114", "sl-ast-anz-1116", "sl-mkh-anz-1115"
 
-# ---------------- Сценарий ----------------
-STORM_START, STORM_END = T(14, 2), T(14, 21)
-BLOCKED = ["e-astrakhan-anzali", "e-olya-anzali", "e-olya-amirabad"]
-SCENARIO = {"id": "scn-storm-north", "type": "storm", "title": "Шторм на Северном Каспии",
-            "blocked_edges": BLOCKED, "affected_nodes": ["astrakhan", "olya"],
-            "start": iso(STORM_START), "end": iso(STORM_END),
-            "params": {"wave_height_m": 3.4, "wind_ms": 18}}
-
-
-# ---------------- Погода ----------------
-WEATHER_BASE = {"astrakhan": 0.7, "olya": 0.8, "makhachkala": 1.0, "baku": 1.1,
-                "aktau": 1.0, "anzali": 0.8, "amirabad": 0.7}
-WIND = {"astrakhan": 6.5, "olya": 7.0, "makhachkala": 7.5, "baku": 8.0,
-        "aktau": 7.0, "anzali": 5.5, "amirabad": 5.0}
-H_START, H_END = hours(NOW, STORM_START), hours(NOW, STORM_END)  # 36, 55
-
-
-def wave(node: str, h: float, storm: bool) -> float:
-    i = list(WEATHER_BASE).index(node)
-    calm = WEATHER_BASE[node] + 0.25 * math.sin(2 * math.pi * h / 24 + i)
-    if not storm:
-        return round(calm, 2)
-    if node in ("astrakhan", "olya"):
-        if H_START <= h <= H_END:  # выше предела ровно в окне шторма, пик 3,4 м
-            return round(2.6 + 0.8 * math.sin(math.pi * (h - H_START) / (H_END - H_START)), 2)
-        if H_START - 6 <= h < H_START:
-            return round(calm + (2.45 - calm) * (h - (H_START - 6)) / 6, 2)
-        if H_END < h <= H_END + 6:
-            return round(2.45 - (2.45 - calm) * (h - H_END) / 6, 2)
-    if node == "makhachkala":
-        return round(calm + 0.7 * math.exp(-(((h - 50) / 12) ** 2)), 2)
-    return round(calm, 2)
-
-
-def weather(storm: bool) -> dict:
-    pts = []
-    for node in WEATHER_BASE:
-        fc = [{"ts": iso(NOW + timedelta(hours=h)), "wave_height_m": wave(node, h, storm)}
-              for h in range(168)]
-        pts.append({"node_id": node, "wave_height_m": fc[0]["wave_height_m"],
-                    "wind_ms": WIND[node], "forecast": fc})
-    return {"updated_at": iso(NOW - timedelta(minutes=12)), "stale": False,
-            "source": "open-meteo", "points": pts}
-
-
-MKH_WAVE = wave("makhachkala", hours(NOW, T(15, 6)), True)  # волна в Махачкале при отправлении парома М
-assert MKH_WAVE < WAVE_LIMIT
-
 
 # ---------------- Маршруты ----------------
 def tail_from_anzali(arr: datetime) -> list:
@@ -215,19 +172,6 @@ def route_end(r: dict) -> datetime:
     return parse(r["legs"][-1]["planned_end"])
 
 
-def storm_route(r: dict, delay: float) -> dict:
-    """Плановый маршрут под штормом: морской участок заблокирован, дальше +delay ч, если рейс отменят."""
-    r = copy.deepcopy(r)
-    hit = False
-    for leg in r["legs"]:
-        if leg["edge_id"] in BLOCKED and leg["status"] == "pending":
-            leg["status"] = "blocked"
-            hit = True
-        if hit:
-            leg["predicted_delay_h"] = delay
-    return r
-
-
 # ---------------- Риск ----------------
 def level(p: float) -> str:
     return "high" if p >= 0.6 else "medium" if p >= 0.3 else "low"
@@ -248,22 +192,6 @@ def low_ast(p):
                     ("port_congestion", "Загрузка порта 62%", 1),
                     ("customs_queue", "Очередь на таможне", 1)])
 
-
-def storm_risk(p):
-    return risk(p, [("wave_height", "Волна 3,4 м", 11),
-                    ("port_congestion", "Загрузка порта 85%", 5),
-                    ("customs_queue", "Очередь на таможне", 2)], shift=18, delay=48)
-
-
-def mkh_risk(p):
-    return risk(p, [("wave_height", f"Волна в Махачкале {ru(MKH_WAVE)} м", 0),
-                    ("port_congestion", "Загрузка порта 61%", 1),
-                    ("customs_queue", "Очередь на таможне", 1)])
-
-
-def west_risk(p):
-    return risk(p, [("border_queue", "Очередь на погранпереходах Самур и Астара", 4),
-                    ("customs_queue", "Таможня Азербайджана", 2)])
 
 
 # ---------------- Грузы ----------------
@@ -310,9 +238,7 @@ BASE = {b[0]: dict(zip(("id", "title", "cargo_type", "weight_t", "origin", "dest
 FIRST_LEG = {"sh-01": ("e-moscow-astrakhan", T(12, 4), None),
              "sh-02": ("e-samara-astrakhan", T(12, 9), None),
              "sh-03": ("e-saratov-astrakhan", T(12, 12), None)}
-P_STORM = {"sh-01": 0.82, "sh-02": 0.74, "sh-03": 0.68}
 P_LOW = {"sh-01": 0.07, "sh-02": 0.06, "sh-03": 0.05}
-P_MKH = {"sh-01": 0.12, "sh-02": 0.11, "sh-03": 0.10}
 AFFECTED = ["sh-01", "sh-02", "sh-03"]
 
 ROUTES = {}
@@ -365,14 +291,6 @@ TOT_CO2_PCT = round(TOT_CO2 / sum(c["co2_plan"] for c in CALC.values()) * 100, 1
 TOT_W = sum(c["w"] for c in CALC.values())
 
 
-def signed(x: float) -> str:
-    return ru(x).replace("-", "−")
-
-
-def k_rub(x: float) -> str:
-    return f"{round(x / 1000)} тыс ₽"
-
-
 # ---------------- Документы, пропуска, реестр ----------------
 DOC_FIELDS = {
     "sh-01": ("ООО «Волга-Агро»", "Shree Grain Imports Pvt Ltd", "Пшеница продовольственная 3 класса",
@@ -416,23 +334,15 @@ def make_pass(pid: str, sid: str, block: dict) -> dict:
 
 DOCS = {sid: document(sid, "confirmed") for sid in ("sh-01", "sh-02", "sh-03", "sh-04")}
 DOC05_DRAFT = document("sh-05", "draft")
-DOC05 = document("sh-05", "confirmed")
 
 CHAIN: list[dict] = []
 PASSES: dict[str, dict] = {}
 for i, sid in enumerate(("sh-01", "sh-02", "sh-03", "sh-04")):
     b = append_block(CHAIN, iso(T(11, 10 + i)), "issued", sid, CHECKPOINT[sid], DOCS[sid]["hash"])
     PASSES[f"pass-{sid[3:]}"] = make_pass(f"pass-{sid[3:]}", sid, b)
-b5 = append_block(CHAIN, iso(DOC05_TS), "issued", "sh-05", "astrakhan", DOC05["hash"])
-PASSES["pass-05"] = make_pass("pass-05", "sh-05", b5)
-REISSUED_BLOCKS = []
-for sid in AFFECTED:
-    b = append_block(CHAIN, iso(ACCEPT_TS), "reissued", sid, "makhachkala", DOCS[sid]["hash"])
-    REISSUED_BLOCKS.append(b)
-    PASSES[f"pass-{sid[3:]}-r1"] = make_pass(f"pass-{sid[3:]}-r1", sid, b)
 assert verify_chain(CHAIN) is None
 
-# ---------------- Сборка фаз ----------------
+
 def ship_initial(sid):
     r = ROUTES[sid]["plan"]
     if sid in AFFECTED:
@@ -447,135 +357,153 @@ def ship_initial(sid):
     return shipment(BASE[sid], r, rk, pass_id=pid)
 
 
-def ship_storm(sid):
-    if sid not in AFFECTED:
-        return ship_initial(sid)
-    r = storm_route(ROUTES[sid]["plan"], DO_NOTHING_H)
-    return shipment(BASE[sid], r, storm_risk(P_STORM[sid]), eta_shift=DO_NOTHING_H,
-                    pass_id=f"pass-{sid[3:]}")
-
-
-def ship_accepted(sid):
-    if sid not in AFFECTED:
-        s = ship_initial(sid)
-        if sid == "sh-05":  # в моках принятие идёт после съёмки инвойса №05
-            s["pass_id"], s["pass_state"] = "pass-05", "active"
-        return s
-    plan_eta = iso(route_end(ROUTES[sid]["plan"]))
-    return shipment(BASE[sid], ROUTES[sid]["mkh"], mkh_risk(P_MKH[sid]), rerouted=True,
-                    planned_eta=plan_eta, eta_shift=CALC[sid]["alt_delay"],
-                    pass_id=f"pass-{sid[3:]}-r1")
-
-
 IDS = list(BASE)
-SHIP = {ph: [f(s) for s in IDS] for ph, f in
-        (("initial", ship_initial), ("storm", ship_storm), ("accepted", ship_accepted))}
 
 
-def alt(route, rk, hours_, rub, co2, rec):
-    return {"route": route, "risk": rk, "delta": {"hours": hours_, "rub": rub, "co2_kg": co2},
-            "recommended": rec}
+# ---------------- Сид для движка ----------------
+SEED_META = {
+    "now": iso(NOW), "timezone_note": "время сценария — МСК (UTC+3), в JSON — UTC",
+    "hour_cost_rub_per_t": HOUR_COST, "wave_limit_m": WAVE_LIMIT,
+    "co2_g_per_tkm": {k: v[2] for k, v in KINDS.items()},
+    "rate_rub_per_tkm": {k: v[1] for k, v in KINDS.items()},
+    # паромные рёбра: нужен рейс из расписания; остальные морские — океанское судно без расписания
+    "ferry_edges": [e for e, d in EDGES.items() if d["co2_g_per_tkm"] == KINDS["ferry"][2]
+                    and d["mode"] == "sea"],
+    "handling_h": {"ferry_before_h": 8, "ferry_after_h": 12, "ocean_before_h": 12, "border_h": 24},
+    # поезд Астрахань → Махачкала ходит раз в сутки (МСК); остальные плечи — по готовности
+    "rail_departures_msk": {"e-astrakhan-makhachkala": ["20:00"]},
+    "customs_h": 1,                     # обычная очередь на таможне в порту, ч
+    "port_capacity_t_per_day": 2000,      # для строки «загрузка порта до → после»
+    "ferry_forbidden_cargo": ["explosives"],
+    "sailing_labels": {FERRY_A: "паром А", FERRY_B: "паром Б", FERRY_M: "паром М"},
+    "via_names": {"makhachkala": "Махачкалу", "olya": "Олю", "astrakhan": "Астрахань",
+                  "aktau": "Актау", "baku": "Баку",
+                  "samur": "Самур", "astara": "Астару"},
+    "pass_valid_until": iso(VALID_UNTIL),
+    "owner_tg_id": OWNER_TG_ID,
+}
+SEED = {"meta": SEED_META, "nodes": None, "edges": list(EDGES.values()),
+        "sailings": copy.deepcopy(list(SAILINGS.values())),
+        "shipments": None, "documents": list(DOCS.values()),
+        # закэшированный результат распознавания демо-инвойса (запасной путь вместо vision-LLM)
+        "demo_drafts": {"sh-05": DOC05_DRAFT},
+        "passes": None, "ledger": CHAIN[:4]}
 
 
-def alternatives(phase: str) -> dict:
-    out = {}
-    for sid in IDS:
-        cur = next(s for s in SHIP[phase] if s["id"] == sid)
-        if sid not in AFFECTED:
-            out[sid] = [alt(cur["route"], cur["risk"], 0, 0, 0, True)]
-            continue
-        R, c = ROUTES[sid], CALC[sid]
-        plan, mkh, west = R["plan"], R["mkh"], R["west"]
-        west_d = (hours(route_end(plan), route_end(west)), west["total_cost_rub"] - plan["total_cost_rub"],
-                  round(west["total_co2_kg"] - plan["total_co2_kg"], 1))
-        a_mkh = (mkh, mkh_risk(P_MKH[sid]), c["alt_delay"], c["surcharge"], c["co2_delta"])
-        a_west = (west, west_risk(0.15), *west_d)
-        if phase == "initial":
-            out[sid] = [alt(plan, low_ast(P_LOW[sid]), 0, 0, 0, True),
-                        alt(*a_mkh, False), alt(*a_west, False)]
-        else:
-            out[sid] = [alt(*a_mkh, True),
-                        alt(storm_route(plan, DO_NOTHING_H), storm_risk(P_STORM[sid]), DO_NOTHING_H, 0, 0, False),
-                        alt(*a_west, False)]
-    return out
+
+# ---------------- Сверка ----------------
+def reference_numbers() -> dict:
+    """17 чисел независимым расчётом по формулам сценария."""
+    c1 = CALC["sh-01"]
+    return {
+        "№01 бездействие, ₽": c1["loss"], "№01 остаточная, ₽": c1["residual"],
+        "№01 доплата, ₽": c1["surcharge"], "№01 экономия, ₽": c1["saved_rub"],
+        "№02 экономия, ₽": CALC["sh-02"]["saved_rub"], "№03 экономия, ₽": CALC["sh-03"]["saved_rub"],
+        "№01 CO₂ план, кг": c1["co2_plan"], "№01 CO₂ Махачкала, кг": c1["co2_alt"],
+        "№01 CO₂ %": round(c1["co2_delta"] / c1["co2_plan"] * 100, 1),
+        "Итого груз-часы": TOT_SAVED_H, "Итого экономия, ₽": TOT_SAVED_RUB,
+        "Бездействие 3 груза, ₽": TOT_LOSS, "Махачкала 3 груза, ₽": TOT_ALT,
+        "CO₂ 3 груза, кг": TOT_CO2, "CO₂ 3 груза, %": TOT_CO2_PCT,
+        "Бездействие, ч": DO_NOTHING_H, "Через Махачкалу, ч": c1["alt_delay"],
+    }
 
 
-def alert(status: str) -> dict:
-    items = []
+def engine_numbers(st, alert: dict) -> dict:
+    """Те же 17 чисел, посчитанные движком по алерту."""
+    hc = st.meta["hour_cost_rub_per_t"]
+    internal = st.alert_internal[alert["id"]]
+    item = {i["shipment_id"]: i for i in alert["items"]}
+    c = {}
     for sid in AFFECTED:
-        c = CALC[sid]
-        items.append({"shipment_id": sid, "action": "reroute",
-                      "from_route": storm_route(ROUTES[sid]["plan"], DO_NOTHING_H),
-                      "to_route": ROUTES[sid]["mkh"], "sailing_id": FERRY_M,
-                      "delay_vs_plan_h": c["alt_delay"], "saved_hours": c["saved_hours"],
-                      "saved_rub": c["saved_rub"], "co2_delta_kg": c["co2_delta"]})
-    text = (
-        f"⚠️ Шторм на Северном Каспии: 14 ноя 02:00–21:00, волна до 3,4 м (предел парома {ru(WAVE_LIMIT)} м).\n"
-        f"Под риском паром А Астрахань → Энзели (14 ноя, 10:00): 3 груза, {TOT_W:g} т.\n"
-        f"Риск срыва стыковки до {round(max(P_STORM.values()) * 100)}%: отправление на 18 ч позже планового рейса.\n\n"
-        f"Ничего не делать: если рейс А отменят, ждать рейс Б — прибытие +{DO_NOTHING_H:g} ч, "
-        f"задержка обойдётся в {k_rub(TOT_LOSS)} по трём грузам.\n"
-        f"Через Махачкалу (паром М, 15 ноя, 06:00): прибытие +{CALC['sh-01']['alt_delay']:g} ч к плану, "
-        f"{k_rub(TOT_ALT)}.\n\n"
-        f"Расчётная экономия по 3 грузам: {TOT_SAVED_H:g} груз-часов, {k_rub(TOT_SAVED_RUB)}, "
-        f"{signed(TOT_CO2 / 1000)} т CO₂ ({signed(TOT_CO2_PCT)}%)."
-    )
-    return {"id": "alert-001", "scenario_id": SCENARIO["id"], "created_at": iso(NOW), "severity": "high",
-            "title": "Шторм на Северном Каспии: 3 груза под риском", "text": text, "items": items,
-            "totals": {"saved_hours": TOT_SAVED_H, "saved_rub": TOT_SAVED_RUB,
-                       "co2_delta_kg": TOT_CO2, "co2_delta_pct": TOT_CO2_PCT},
-            "do_nothing": {"delay_hours": DO_NOTHING_H, "loss_rub": TOT_LOSS},
-            "port_load": {"node_id": "makhachkala", "before": 0.55, "after": 0.61},
-            "status": status,
-            "accepted_at": iso(ACCEPT_TS) if status == "accepted" else None,
-            "accepted_via": "web" if status == "accepted" else None}
+        it, w = item[sid], st.shipments[sid]["weight_t"]
+        c[sid] = {"loss": internal[sid]["loss"], "residual": it["delay_vs_plan_h"] * w * hc,
+                  "surcharge": it["to_route"]["total_cost_rub"] - it["from_route"]["total_cost_rub"],
+                  "saved_rub": it["saved_rub"], "co2_plan": it["from_route"]["total_co2_kg"],
+                  "co2_alt": it["to_route"]["total_co2_kg"], "co2_delta": it["co2_delta_kg"],
+                  "alt_delay": it["delay_vs_plan_h"]}
+    c1 = c["sh-01"]
+    return {
+        "№01 бездействие, ₽": c1["loss"], "№01 остаточная, ₽": c1["residual"],
+        "№01 доплата, ₽": c1["surcharge"], "№01 экономия, ₽": c1["saved_rub"],
+        "№02 экономия, ₽": c["sh-02"]["saved_rub"], "№03 экономия, ₽": c["sh-03"]["saved_rub"],
+        "№01 CO₂ план, кг": c1["co2_plan"], "№01 CO₂ Махачкала, кг": c1["co2_alt"],
+        "№01 CO₂ %": round(c1["co2_delta"] / c1["co2_plan"] * 100, 1),
+        "Итого груз-часы": alert["totals"]["saved_hours"], "Итого экономия, ₽": alert["totals"]["saved_rub"],
+        "Бездействие 3 груза, ₽": alert["do_nothing"]["loss_rub"],
+        "Махачкала 3 груза, ₽": sum(internal[s]["alt_cost"] for s in AFFECTED),
+        "CO₂ 3 груза, кг": alert["totals"]["co2_delta_kg"],
+        "CO₂ 3 груза, %": alert["totals"]["co2_delta_pct"],
+        "Бездействие, ч": alert["do_nothing"]["delay_hours"], "Через Махачкалу, ч": c1["alt_delay"],
+    }
 
 
-DECISION = {"id": "dec-001", "alert_id": "alert-001", "ts": iso(ACCEPT_TS), "accepted_via": "web",
-            "items": [{"shipment_id": sid, "saved_hours": CALC[sid]["saved_hours"],
-                       "saved_rub": CALC[sid]["saved_rub"], "co2_delta_kg": CALC[sid]["co2_delta"],
-                       "sailing_id": FERRY_M} for sid in AFFECTED]}
-
-
-def stats(phase):
-    acc = phase == "accepted"
-    return {"saved_hours": TOT_SAVED_H if acc else 0, "saved_rub": TOT_SAVED_RUB if acc else 0,
-            "co2_saved_kg": -TOT_CO2 if acc else 0, "decisions": 1 if acc else 0,
-            "shipments_total": len(IDS),
-            "at_risk": sum(s["display_status"] == "at_risk" for s in SHIP[phase])}
-
-
-def sailings(phase):
-    out = copy.deepcopy(list(SAILINGS.values()))
-    if phase == "accepted":
-        for s in out:
-            if s["id"] == FERRY_A:
-                s["booked_t"] -= TOT_W
-            if s["id"] == FERRY_M:
-                s["booked_t"] += TOT_W
-    return out
-
-
-def passes(phase):
-    ids = ["pass-01", "pass-02", "pass-03", "pass-04"]
-    if phase == "accepted":
-        ids += ["pass-05", "pass-01-r1", "pass-02-r1", "pass-03-r1"]
-    out = [copy.deepcopy(PASSES[i]) for i in ids]
-    if phase == "accepted":
-        for p in out:
-            if p["id"] in ("pass-01", "pass-02", "pass-03"):
-                p["status"] = "reissued"
-    return out
+SCENARIO_DOC = {  # числа прямо из docs/DEMO_SCENARIO.md
+    "№01 бездействие, ₽": 360000, "№01 остаточная, ₽": 45000, "№01 доплата, ₽": 16680,
+    "№01 экономия, ₽": 298320, "№02 экономия, ₽": 198880, "№03 экономия, ₽": 99440,
+    "№01 CO₂ план, кг": 13590, "№01 CO₂ Махачкала, кг": 12678, "№01 CO₂ %": -6.7,
+    "Итого груз-часы": 126, "Итого экономия, ₽": 596640, "Бездействие 3 груза, ₽": 720000,
+    "Махачкала 3 груза, ₽": 123360, "CO₂ 3 груза, кг": -1824, "CO₂ 3 груза, %": -6.9,
+    "Бездействие, ч": 48, "Через Махачкалу, ч": 6,
+}
 
 
 # ---------------- Запись ----------------
+def ser(model, obj):
+    return model.model_validate(obj).model_dump(mode="json", by_alias=True)
+
+
 def dump(name: str, obj, model=None, many=False):
-    if model is not None:  # моки обязаны проходить модели контракта
-        for o in (obj if many else [obj]):
-            model.model_validate(o)
+    """Мок проходит модель контракта и пишется так же, как его сериализует сервер."""
+    if model is not None:
+        obj = [ser(model, o) for o in obj] if many else ser(model, obj)
     path = MOCK_DIR / f"{name}.json" if name != "seed" else DATA_DIR / "seed.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def snapshot(st, suffix: str):
+    dump(f"shipments{suffix}", st.shipments_list(), M.Shipment, many=True)
+    dump(f"alternatives{suffix}", {sid: [ser(M.AlternativeOut, a) for a in st.alternatives(sid)]
+                                   for sid in st.shipments})
+    dump(f"stats{suffix}", st.stats(), M.StatsOut)
+    dump(f"alerts{suffix}", st.alerts_list(), M.Alert, many=True)
+    dump(f"sailings{suffix}", st.sailings_list(None, None), M.Sailing, many=True)
+    dump(f"ledger{suffix}", st.ledger_list(), M.Block, many=True)
+    dump(f"passes{suffix}", list(st.passes.values()), M.Pass, many=True)
+    dump(f"weather{suffix}", st.weather_out(), M.WeatherOut)
+
+
+def run_engine() -> dict:
+    """Демо-прогон движком с фиксированными часами. Пропуска в моках — публичным ключом моков."""
+    from app import state as state_mod
+    from app.clock import FixedClock
+    state_mod.PASS_SECRET = MOCK_JWT_SECRET
+    st = state_mod.State(DATA_DIR / "seed.json", clock=FixedClock(iso(NOW)))
+
+    dump("graph", st.graph_out(), M.GraphOut)
+    dump("scenario_presets", st.presets(), M.PresetOut, many=True)
+    dump("documents", list(st.documents.values()), M.Document, many=True)
+    snapshot(st, "")
+
+    st.clock.set(DOC05_TS)                       # инвойс №05 снимают до шторма
+    draft = st.upload_document("sh-05")
+    dump("document_draft", draft, M.Document)
+    confirmed = asyncio.run(st.confirm(draft["id"], draft["fields"]))
+    dump("document_confirm", confirmed, M.DocumentConfirmOut)
+    dump("ledger.doc", st.ledger_list(), M.Block, many=True)
+
+    st.clock.set(NOW)
+    out = asyncio.run(st.run_scenario("storm_north"))
+    dump("scenario_storm_north", out, M.ScenarioCreateOut)
+    numbers = engine_numbers(st, out["alert"])
+    snapshot(st, ".storm")
+
+    st.clock.set(ACCEPT_TS)                      # «Уже принято, 14:32»
+    acc = asyncio.run(st.accept(out["alert"]["id"], "web"))
+    dump("accept", acc, M.AcceptOut)
+    dump("decision", acc["decision"], M.Decision)
+    snapshot(st, ".accepted")
+    return numbers
 
 
 def main():
@@ -583,70 +511,20 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8")
     for f in MOCK_DIR.glob("*.json"):
         f.unlink()
-    graph = {"nodes": [dict(zip(("id", "name", "country", "type", "lat", "lon", "congestion"), n)) for n in NODES],
-             "edges": list(EDGES.values())}
-    dump("graph", graph, M.GraphOut)
-    for ph, suf in (("initial", ""), ("storm", ".storm"), ("accepted", ".accepted")):
-        dump(f"shipments{suf}", SHIP[ph], M.Shipment, many=True)
-        alts = alternatives(ph)
-        for v in alts.values():
-            for a in v:
-                M.AlternativeOut.model_validate(a)
-        dump(f"alternatives{suf}", alts)
-        dump(f"stats{suf}", stats(ph), M.StatsOut)
-    dump("alerts", [])
-    dump("alerts.storm", [alert("new")], M.Alert, many=True)
-    dump("alerts.accepted", [alert("accepted")], M.Alert, many=True)
-    dump("weather", weather(False), M.WeatherOut)
-    dump("weather.storm", weather(True), M.WeatherOut)
-    dump("scenario_presets", [{"key": "storm_north", "title": "Шторм на Северном Каспии"},
-                              {"key": "storm_full", "title": "Шторм на всём море"},
-                              {"key": "congestion_astrakhan", "title": "Затор в порту Астрахань"}],
-         M.PresetOut, many=True)
-    dump("scenario_storm_north", {"scenario": SCENARIO, "alert": alert("new")}, M.ScenarioCreateOut)
-    dump("sailings", sailings("initial"), M.Sailing, many=True)
-    dump("sailings.accepted", sailings("accepted"), M.Sailing, many=True)
-    dump("ledger", CHAIN[:4], M.Block, many=True)
-    dump("ledger.doc", CHAIN[:5], M.Block, many=True)
-    dump("ledger.accepted", CHAIN, M.Block, many=True)
-    dump("passes", passes("initial"), M.Pass, many=True)
-    dump("passes.accepted", passes("accepted"), M.Pass, many=True)
-    dump("documents", list(DOCS.values()), M.Document, many=True)
-    dump("document_draft", DOC05_DRAFT, M.Document)
-    dump("document_confirm", {"document": DOC05, "pass": PASSES["pass-05"], "block": CHAIN[4]},
-         M.DocumentConfirmOut)
-    dump("decision", DECISION, M.Decision)
-    dump("accept", {"alert": alert("accepted"),
-                    "shipments": [s for s in SHIP["accepted"] if s["id"] in AFFECTED],
-                    "blocks": REISSUED_BLOCKS, "decision": DECISION, "already_accepted": False},
-         M.AcceptOut)
-    dump("seed", {"meta": {"now": iso(NOW), "timezone_note": "время сценария — МСК (UTC+3), в JSON — UTC",
-                           "hour_cost_rub_per_t": HOUR_COST, "wave_limit_m": WAVE_LIMIT,
-                           "co2_g_per_tkm": {k: v[2] for k, v in KINDS.items()},
-                           "rate_rub_per_tkm": {k: v[1] for k, v in KINDS.items()}},
-                  "nodes": graph["nodes"], "edges": graph["edges"], "sailings": sailings("initial"),
-                  "shipments": SHIP["initial"], "documents": list(DOCS.values()),
-                  "passes": passes("initial"), "ledger": CHAIN[:4]})
+    SEED.update(nodes=[dict(zip(("id", "name", "country", "type", "lat", "lon", "congestion"), n))
+                       for n in NODES],
+                shipments=[ship_initial(s) for s in IDS], passes=list(PASSES.values()))
+    M.GraphOut.model_validate({"nodes": SEED["nodes"], "edges": SEED["edges"]})
+    dump("seed", SEED)
+    eng = run_engine()
 
-    # ---- сверка с DEMO_SCENARIO ----
-    c1 = CALC["sh-01"]
-    checks = [
-        ("№01 бездействие, ₽", c1["loss"], 360000), ("№01 остаточная, ₽", c1["residual"], 45000),
-        ("№01 доплата, ₽", c1["surcharge"], 16680), ("№01 экономия, ₽", c1["saved_rub"], 298320),
-        ("№02 экономия, ₽", CALC["sh-02"]["saved_rub"], 198880),
-        ("№03 экономия, ₽", CALC["sh-03"]["saved_rub"], 99440),
-        ("№01 CO₂ план, кг", c1["co2_plan"], 13590), ("№01 CO₂ Махачкала, кг", c1["co2_alt"], 12678),
-        ("№01 CO₂ %", round(c1["co2_delta"] / c1["co2_plan"] * 100, 1), -6.7),
-        ("Итого груз-часы", TOT_SAVED_H, 126), ("Итого экономия, ₽", TOT_SAVED_RUB, 596640),
-        ("Бездействие 3 груза, ₽", TOT_LOSS, 720000), ("Махачкала 3 груза, ₽", TOT_ALT, 123360),
-        ("CO₂ 3 груза, кг", TOT_CO2, -1824), ("CO₂ 3 груза, %", TOT_CO2_PCT, -6.9),
-        ("Бездействие, ч", DO_NOTHING_H, 48), ("Через Махачкалу, ч", c1["alt_delay"], 6),
-    ]
+    ref = reference_numbers()
     bad = 0
-    for name, got, want in checks:
-        ok = abs(got - want) < 1e-6
+    print(f"{'':4}{'':28}{'формулы':>12}{'движок':>12}{'сценарий':>12}")
+    for name, want in SCENARIO_DOC.items():
+        ok = abs(ref[name] - want) < 1e-6 and abs(eng[name] - want) < 1e-6
         bad += not ok
-        print(f"{'OK ' if ok else 'ERR'} {name:28} {got:>12g}   ожидается {want:g}")
+        print(f"{'OK ' if ok else 'ERR'} {name:28}{ref[name]:>12g}{eng[name]:>12g}{want:>12g}")
     print(f"\nМоки записаны в {MOCK_DIR}, сид — {DATA_DIR / 'seed.json'}")
     if bad:
         sys.exit(f"{bad} расхождений со сценарием")

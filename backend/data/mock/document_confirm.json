@@ -10,8 +10,8 @@
       "buyer": "Компания «Кешт Гостар Гилян»",
       "goods": "Удобрения азотные (карбамид)",
       "hs_code": "3102 10",
-      "weight_kg": 30000,
-      "value": 10500,
+      "weight_kg": 30000.0,
+      "value": 10500.0,
       "currency": "USD",
       "origin_country": "RU"
     },

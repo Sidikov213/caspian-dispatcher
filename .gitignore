@@ -6,3 +6,4 @@ build/
 .dart_tool/
 local_db.json
 *.cbm
+.pytest_cache/

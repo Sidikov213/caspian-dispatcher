@@ -1,0 +1,31 @@
+import sys
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from app import main  # noqa: E402
+from app.clock import FixedClock  # noqa: E402
+from app.config import DEMO_NOW  # noqa: E402
+from app.state import State  # noqa: E402
+
+KEY = {"X-API-Key": main.API_KEY or "caspian-dev-key"}
+
+
+@pytest.fixture
+def st() -> State:
+    """Отдельное состояние с полностью фиксированными часами."""
+    return State(clock=FixedClock(DEMO_NOW))
+
+
+@pytest.fixture
+def client():
+    main.state.clock = FixedClock(DEMO_NOW)
+    main.state.reset()
+    with TestClient(main.app, headers=KEY) as c:
+        yield c
+    main.state.reset()

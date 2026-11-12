@@ -7,21 +7,21 @@
     {
       "shipment_id": "sh-01",
       "saved_hours": 42.0,
-      "saved_rub": 298320,
+      "saved_rub": 298320.0,
       "co2_delta_kg": -912.0,
       "sailing_id": "sl-mkh-anz-1115"
     },
     {
       "shipment_id": "sh-02",
       "saved_hours": 42.0,
-      "saved_rub": 198880,
+      "saved_rub": 198880.0,
       "co2_delta_kg": -608.0,
       "sailing_id": "sl-mkh-anz-1115"
     },
     {
       "shipment_id": "sh-03",
       "saved_hours": 42.0,
-      "saved_rub": 99440,
+      "saved_rub": 99440.0,
       "co2_delta_kg": -304.0,
       "sailing_id": "sl-mkh-anz-1115"
     }

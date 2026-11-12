@@ -1,7 +1,7 @@
 {
   "updated_at": "2026-11-12T10:48:00Z",
   "stale": false,
-  "source": "open-meteo",
+  "source": "cache",
   "points": [
     {
       "node_id": "astrakhan",

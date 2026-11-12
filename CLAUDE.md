@@ -146,6 +146,7 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | GET | `/stats` | — | `{saved_hours, saved_rub, co2_saved_kg, decisions, shipments_total, at_risk}` (сумма по Decision; часы — груз-часы) |
 | POST | `/users/link` | `{telegram_id, name}` | `{ok: true}` |
 | POST | `/demo/reset` | — | `{ok: true}` |
+| POST | `/demo/fail_next_pass` (только демо) | — | `{ok: true}`; следующий выпуск пропуска сорвётся → груз получает `pass_state: reissue_pending`, старый пропуск активен, повтор через `/shipments/{id}/pass/retry` |
 
 WebSocket `/ws`, сообщения `{type, payload}`:
 `shipment.updated` (Shipment), `alert.created` (Alert), `alert.updated` (Alert), `ledger.appended` (Block), `stats.updated`, `weather.updated`.

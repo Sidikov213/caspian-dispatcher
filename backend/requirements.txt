@@ -3,3 +3,4 @@ uvicorn[standard]==0.32.1
 python-multipart==0.0.17
 PyJWT==2.10.1
 python-dotenv==1.0.1
+networkx==3.4.2

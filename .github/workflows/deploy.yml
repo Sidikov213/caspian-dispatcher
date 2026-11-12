@@ -1,0 +1,93 @@
+# Выкатка бэкенда на VPS (Timeweb, Ubuntu 24.04) и обслуживание. Запуск вручную или scripts/deploy.ps1.
+# Раннер GitHub ходит на VPS по SSH: с ноутбука тимлида сервер недоступен (сеть режет адрес).
+# Секреты репозитория: VPS_HOST, VPS_SSH_KEY, API_KEY, JWT_SECRET, BOT_TOKEN.
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "deploy — выкатить main; logs — журнал сервиса; restart — перезапуск; check — только проверки"
+        type: choice
+        options: [deploy, logs, restart, check]
+        default: deploy
+      upgrade:
+        description: "apt upgrade перед выкаткой"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      HOST: ${{ secrets.VPS_HOST }}
+      APP: /opt/caspian/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH-ключ
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -T 20 -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "DOMAIN=${HOST//./-}.sslip.io" >> "$GITHUB_ENV"
+          ssh -o BatchMode=yes root@"$HOST" 'echo "вход по ключу: $(hostname)"'
+
+      - name: Код на сервер (rsync, без .venv, .env и локальных данных)
+        if: inputs.action == 'deploy'
+        run: |
+          ssh root@"$HOST" "command -v rsync >/dev/null || (apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q rsync >/dev/null); mkdir -p $APP"
+          rsync -az --delete \
+            --exclude '.venv/' --exclude '.env' --exclude '__pycache__/' --exclude '.pytest_cache/' \
+            --exclude 'data/accounts.json' --exclude 'data/users.json' --exclude 'data/weather_cache.json' \
+            --exclude 'data/agent_keys*' --exclude '*.tmp' \
+            backend/ root@"$HOST":"$APP"/
+
+      - name: .env на сервере
+        if: inputs.action == 'deploy'
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          printf 'API_KEY=%s\nJWT_SECRET=%s\nBOT_TOKEN=%s\nWEATHER_MODE=live\nPREDICTOR=catboost\n' \
+            "$API_KEY" "$JWT_SECRET" "$BOT_TOKEN" \
+            | ssh root@"$HOST" "umask 077; cat > $APP/.env"
+
+      - name: Настройка сервера и запуск (ufw, swap, venv, systemd, Caddy)
+        if: inputs.action == 'deploy'
+        run: |
+          ssh root@"$HOST" "bash $APP/deploy/server_setup.sh $DOMAIN ${{ inputs.upgrade && '1' || '0' }}" | tee setup.log
+          if grep -q '^HTTPS_OK' setup.log; then echo "BASE=https://$DOMAIN" >> "$GITHUB_ENV"; else echo "BASE=http://$HOST" >> "$GITHUB_ENV"; fi
+
+      - name: Перезапуск
+        if: inputs.action == 'restart'
+        run: ssh root@"$HOST" 'systemctl restart caspian-backend && sleep 8 && systemctl --no-pager status caspian-backend | sed -n "1,5p"'
+
+      - name: Журнал сервиса (последние 200 строк)
+        if: inputs.action == 'logs'
+        run: ssh root@"$HOST" 'journalctl -u caspian-backend -n 200 --no-pager; echo; journalctl -u caddy -n 30 --no-pager'
+
+      - name: Проверки на сервере (Telegram, Open-Meteo, модель, demo/check)
+        if: inputs.action != 'logs'
+        run: ssh root@"$HOST" "$APP/.venv/bin/python $APP/deploy/server_check.py"
+
+      - name: Проверки снаружи (graph, вход, WebSocket, /docs)
+        if: inputs.action != 'logs'
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          if [ -z "${BASE:-}" ]; then
+            if curl -sf --max-time 10 "https://$DOMAIN/health" >/dev/null; then BASE="https://$DOMAIN"; else BASE="http://$HOST"; fi
+          fi
+          echo "адрес: $BASE"
+          python -m pip install -q httpx websockets
+          python backend/deploy/external_check.py "$BASE"

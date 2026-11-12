@@ -85,6 +85,29 @@ def test_alert_created_and_accepted_push(client, devices, fcm):
     assert accepted[0][3]["status"] == "accepted"
 
 
+def test_push_repeats_after_reset_but_not_without(client, devices, fcm):
+    """Список отправленного (алерт + статус) очищается при demo/reset: после сброса алерт снова alert-001."""
+    devices.register("u1", "phone", "android")
+
+    def run():
+        alert = client.post("/api/scenarios", json={"preset": "ice_north"}).json()["alert"]
+        client.post(f"/api/alerts/{alert['id']}/accept", json={"via": "web"})
+        return alert["id"]
+
+    def count(type_):
+        return sum(1 for s in fcm.sent if s[3]["type"] == type_)
+
+    first = run()
+    assert (count("alert.created"), count("alert.updated")) == (1, 1)       # reset → сценарий → пуш отправлен
+    assert run() == first                                                   # повтор без reset — тот же алерт
+    assert (count("alert.created"), count("alert.updated")) == (1, 1)       # и пуши не дублируются
+    assert client.post("/api/demo/reset").json() == {"ok": True}
+    assert run() == first == "alert-001"                                    # после сброса номер тот же
+    assert (count("alert.created"), count("alert.updated")) == (2, 2)       # пуш отправлен снова
+    assert run() == first
+    assert (count("alert.created"), count("alert.updated")) == (2, 2)
+
+
 def test_no_push_without_items_or_devices(client, fcm, devices):
     client.post("/api/scenarios", json={"preset": "storm_north"})
     assert fcm.sent == []                                                   # устройств нет — тишина

@@ -10,3 +10,12 @@ local_db.json
 backend/data/users.json
 backend/data/weather_cache.json
 backend/data/accounts.json
+
+# Flutter mobile
+mobile/.flutter-plugins-dependencies
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/google-services.json
+mobile/ios/Runner/GoogleService-Info.plist

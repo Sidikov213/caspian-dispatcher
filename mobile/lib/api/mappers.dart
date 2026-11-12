@@ -1,11 +1,11 @@
 import '../models/alert_card.dart';
 import '../models/cargo.dart';
 
-/// Пока бэк не отдаёт `card`, показываем заглушку (ледовый сценарий).
-/// Выключить: `--dart-define=ALERT_CARD_STUB=0`.
+/// Заглушка `Alert.card` только для вёрстки.
+/// Включить: `--dart-define=ALERT_CARD_STUB=true`. На показе по умолчанию выкл.
 const _alertCardStubEnabled = bool.fromEnvironment(
   'ALERT_CARD_STUB',
-  defaultValue: true,
+  defaultValue: false,
 );
 
 /// Имя узла только из `/api/graph`. Без локального словаря.
@@ -302,7 +302,6 @@ OverviewData buildOverview({
     } else if (rawCard is Map) {
       card = AlertCardData.fromJson(Map<String, dynamic>.from(rawCard));
     } else if (_alertCardStubEnabled) {
-      // Временная вёрстка до появления card на бэке.
       card = AlertCardData.stub();
     }
   }

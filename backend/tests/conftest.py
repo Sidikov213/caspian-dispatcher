@@ -11,6 +11,8 @@ os.environ["LLM_API_KEY"] = ""
 os.environ["WEATHER_MODE"] = "synthetic"  # тесты не ходят в сеть
 os.environ["DEMO_NOW"] = ""
 os.environ["ACCOUNTS_PATH"] = os.path.join(tempfile.mkdtemp(prefix="caspian-accounts-"), "accounts.json")  # не data/
+os.environ["DEVICES_PATH"] = os.path.join(tempfile.mkdtemp(prefix="caspian-devices-"), "devices.json")  # не data/
+os.environ["FIREBASE_CREDENTIALS"] = ""   # тесты не шлют настоящие пуши
 os.environ["PREDICTOR"] = "formula"      # старые тесты — на формуле; CatBoost проверяется явно (test_model.py)
 
 ROOT = Path(__file__).resolve().parents[1]

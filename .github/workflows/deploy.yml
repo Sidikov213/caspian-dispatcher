@@ -66,6 +66,7 @@ jobs:
           rsync -az --delete \
             --exclude '.venv/' --exclude '.env' --exclude '__pycache__/' --exclude '.pytest_cache/' \
             --exclude 'data/accounts.json' --exclude 'data/users.json' --exclude 'data/weather_cache.json' \
+            --exclude 'data/devices.json' --exclude 'secrets/' \
             --exclude 'data/agent_keys*' --exclude '*.tmp' \
             backend/ root@"$HOST":"$APP"/
 
@@ -81,9 +82,19 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          # JSON-ключ сервисного аккаунта Firebase (пуши FCM). Нет секрета — пуши выключены, остальное работает.
+          FIREBASE_ADMIN_JSON: ${{ secrets.FIREBASE_ADMIN_JSON }}
         run: |
-          printf 'API_KEY=%s\nJWT_SECRET=%s\nBOT_TOKEN=%s\nWEATHER_MODE=live\nPREDICTOR=catboost\nPUBLIC_URL=%s\n' \
-            "$API_KEY" "$JWT_SECRET" "$BOT_TOKEN" "$PUBLIC_URL" \
+          FCM_LINE=""
+          if [ -n "$FIREBASE_ADMIN_JSON" ]; then
+            printf '%s' "$FIREBASE_ADMIN_JSON" | ssh root@"$HOST" "umask 077; mkdir -p $APP/secrets && cat > $APP/secrets/firebase-admin.json && chmod 600 $APP/secrets/firebase-admin.json"
+            FCM_LINE="FIREBASE_CREDENTIALS=$APP/secrets/firebase-admin.json"
+            echo "ключ Firebase записан на сервер"
+          else
+            echo "секрета FIREBASE_ADMIN_JSON нет — пуши в приложение выключены"
+          fi
+          printf 'API_KEY=%s\nJWT_SECRET=%s\nBOT_TOKEN=%s\nWEATHER_MODE=live\nPREDICTOR=catboost\nPUBLIC_URL=%s\n%s\n' \
+            "$API_KEY" "$JWT_SECRET" "$BOT_TOKEN" "$PUBLIC_URL" "$FCM_LINE" \
             | ssh root@"$HOST" "umask 077; cat > $APP/.env"
 
       - name: Настройка сервера и запуск (ufw, swap, venv, systemd, Caddy)

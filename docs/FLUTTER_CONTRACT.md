@@ -147,6 +147,17 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 | `Alert.accepted_by` | есть, если решение принято с входом сайта, из мини-приложения или бота | «через сайт» / «через Telegram» по `accepted_via` |
 | `user.permissions` | всегда есть в `/auth/*` | экспедитор: `[]` |
 
+### Пуш-уведомления (FCM)
+
+Сервер шлёт пуши через Firebase Cloud Messaging, проект `caspian-dispatcher`, по тем же событиям, что Telegram-бот.
+
+1. После входа (`POST /auth/login`) и разрешения уведомлений: `FirebaseMessaging.instance.getToken()` → `POST /api/devices` `{token, platform: "ios" | "android"}` с `X-API-Key` **и** `Authorization: Bearer <token из /auth/login>`. Ответ `{ok, push_enabled}`; `push_enabled: false` — на сервере нет ключа Firebase, пуши не придут.
+2. `FirebaseMessaging.instance.onTokenRefresh` → тот же `POST /api/devices` с новым токеном.
+3. Выход из аккаунта → `DELETE /api/devices` `{token}` (с Bearer), потом забыть токен входа.
+4. Пуш: `notification {title, body}` + `data {type: "alert.created" | "alert.updated", alert_id, status}`. `alert.created` — новая угроза (заголовок — `Alert.title`), `alert.updated` со `status: "accepted"` — решение принято. По тапу открыть груз из алерта (`GET /alerts` → `items[].shipment_id`).
+5. Android: канал уведомлений `alerts` (high importance) создать при старте — сервер шлёт `channel_id: "alerts"`. iOS: APNs-ключ загрузить в Firebase Console → Cloud Messaging.
+6. `google-services.json` и `GoogleService-Info.plist` — из Firebase Console, в git не класть.
+
 ### Правила для экспедитора
 
 - **Согласовано:** экспедитор решений не принимает. `accept`, `reject`, `option_id` в приложении не вызываются. `Alert.options` — только показ «что предложено» (рекомендованный первый, `recommended: true`) и «что принято» (после `status: accepted` рекомендованным помечен принятый вариант, `items` и `totals` описывают его).

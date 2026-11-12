@@ -41,11 +41,8 @@ class PassesListScreen extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child:
-              app.loadState == AppLoadState.loading &&
-                  app.storedPasses.isEmpty &&
-                  app.cargos.isEmpty
-              ? const LoadingListSkeleton()
+          child: app.showDataPlaceholders
+              ? const PassesListLoadingSkeleton()
               : items.isEmpty
               ? EmptyStateView(
                   icon: Icons.badge_outlined,

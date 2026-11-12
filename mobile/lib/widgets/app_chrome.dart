@@ -277,21 +277,477 @@ class ErrorStateView extends StatelessWidget {
   }
 }
 
-class LoadingListSkeleton extends StatelessWidget {
-  const LoadingListSkeleton({super.key});
+class SkeletonBlock extends StatelessWidget {
+  const SkeletonBlock({
+    super.key,
+    this.width,
+    required this.height,
+    this.radius = AppSpacing.radiusSm,
+  });
+
+  final double? width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.skeleton,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+class _SkeletonCard extends StatelessWidget {
+  const _SkeletonCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppSpacing.radius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Обзор: метрики + экономия + волны + последнее событие.
+class OverviewLoadingSkeleton extends StatelessWidget {
+  const OverviewLoadingSkeleton({super.key, this.waveCount = 4});
+
+  final int waveCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: AppSpacing.page,
+      children: [
+        const SkeletonBlock(width: 220, height: 14),
+        const SizedBox(height: 16),
+        const Row(
+          children: [
+            Expanded(child: _MetricSkeleton()),
+            SizedBox(width: 10),
+            Expanded(child: _MetricSkeleton()),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _EconomySkeleton(),
+        const SizedBox(height: 12),
+        _WavesSkeleton(waveCount: waveCount),
+        const SizedBox(height: 12),
+        const _LastEventSkeleton(),
+      ],
+    );
+  }
+}
+
+class _MetricSkeleton extends StatelessWidget {
+  const _MetricSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SkeletonCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // MetricBlock: 32px value + 4 + 13px label
+          SkeletonBlock(width: 42, height: 34),
+          SizedBox(height: 4),
+          SkeletonBlock(width: 88, height: 13),
+        ],
+      ),
+    );
+  }
+}
+
+class _EconomySkeleton extends StatelessWidget {
+  const _EconomySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SkeletonCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBlock(width: 120, height: 12),
+          SizedBox(height: 12),
+          SkeletonBlock(height: 64, radius: AppSpacing.radiusSm),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: SkeletonBlock(height: 58, radius: AppSpacing.radiusSm),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: SkeletonBlock(height: 58, radius: AppSpacing.radiusSm),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WavesSkeleton extends StatelessWidget {
+  const _WavesSkeleton({required this.waveCount});
+
+  final int waveCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SkeletonCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SkeletonBlock(width: 100, height: 12),
+          const SizedBox(height: 10),
+          for (var i = 0; i < waveCount; i++) ...[
+            const Row(
+              children: [
+                Expanded(child: SkeletonBlock(height: 14)),
+                SizedBox(width: 12),
+                SkeletonBlock(width: 56, height: 22, radius: AppSpacing.radiusSm),
+              ],
+            ),
+            if (i != waveCount - 1) const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 8),
+          const SkeletonBlock(width: 180, height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+class _LastEventSkeleton extends StatelessWidget {
+  const _LastEventSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SkeletonCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBlock(width: 130, height: 12),
+          SizedBox(height: 10),
+          SkeletonBlock(width: 64, height: 22, radius: AppSpacing.radiusSm),
+          SizedBox(height: 10),
+          SkeletonBlock(height: 18),
+          SizedBox(height: 4),
+          SkeletonBlock(width: 200, height: 13),
+          SizedBox(height: 10),
+          SkeletonBlock(width: 160, height: 13),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              SkeletonBlock(width: 88, height: 28, radius: AppSpacing.radiusSm),
+              SizedBox(width: 8),
+              SkeletonBlock(width: 72, height: 28, radius: AppSpacing.radiusSm),
+            ],
+          ),
+          SizedBox(height: 12),
+          SkeletonBlock(height: 13),
+          SizedBox(height: 6),
+          SkeletonBlock(width: 240, height: 13),
+          SizedBox(height: 14),
+          SkeletonBlock(height: 56, radius: AppSpacing.radiusSm),
+        ],
+      ),
+    );
+  }
+}
+
+/// Список грузов: карточка ≈ title + маршрут + риск.
+class CargoListLoadingSkeleton extends StatelessWidget {
+  const CargoListLoadingSkeleton({super.key, this.itemCount = 5});
+
+  final int itemCount;
 
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
       padding: AppSpacing.page,
-      itemCount: 4,
+      itemCount: itemCount,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (_, _) => Container(
-        height: 96,
-        decoration: BoxDecoration(
-          color: AppColors.skeleton,
-          borderRadius: BorderRadius.circular(AppSpacing.radius),
+      itemBuilder: (_, _) => const _SkeletonCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: SkeletonBlock(height: 16)),
+                SizedBox(width: 10),
+                SkeletonBlock(width: 78, height: 22, radius: AppSpacing.radiusSm),
+              ],
+            ),
+            SizedBox(height: 6),
+            SkeletonBlock(height: 13),
+            SizedBox(height: 8),
+            SkeletonBlock(width: 170, height: 12),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+/// Список пропусков: title + пункт/срок + id.
+class PassesListLoadingSkeleton extends StatelessWidget {
+  const PassesListLoadingSkeleton({super.key, this.itemCount = 5});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: AppSpacing.page,
+      itemCount: itemCount,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, _) => const _SkeletonCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: SkeletonBlock(height: 15)),
+                SizedBox(width: 10),
+                SkeletonBlock(width: 92, height: 24, radius: AppSpacing.radiusSm),
+              ],
+            ),
+            SizedBox(height: 6),
+            SkeletonBlock(height: 13),
+            SizedBox(height: 4),
+            SkeletonBlock(width: 120, height: 11),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class LoadingListSkeleton extends StatelessWidget {
+  const LoadingListSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => const CargoListLoadingSkeleton();
+}
+
+/// Карточка груза (цифровой двойник).
+class TwinLoadingSkeleton extends StatelessWidget {
+  const TwinLoadingSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: AppSpacing.pageOf(context),
+      children: const [
+        SkeletonBlock(width: 120, height: 11),
+        SizedBox(height: 8),
+        SkeletonBlock(width: 180, height: 26),
+        SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: SkeletonBlock(height: 13)),
+            SizedBox(width: 10),
+            SkeletonBlock(width: 78, height: 22, radius: AppSpacing.radiusSm),
+          ],
+        ),
+        SizedBox(height: 16),
+        SkeletonBlock(height: 168, radius: AppSpacing.radius),
+        SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(child: SkeletonBlock(height: 18)),
+            SkeletonBlock(width: 90, height: 12),
+          ],
+        ),
+        SizedBox(height: 12),
+        _TwinStageSkeleton(),
+        SizedBox(height: 10),
+        _TwinStageSkeleton(),
+        SizedBox(height: 10),
+        _TwinStageSkeleton(),
+        SizedBox(height: 10),
+        _TwinStageSkeleton(),
+        SizedBox(height: 16),
+        _SkeletonCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SkeletonBlock(width: 18, height: 18, radius: 4),
+                  SizedBox(width: 8),
+                  Expanded(child: SkeletonBlock(height: 14)),
+                  SkeletonBlock(width: 72, height: 18),
+                ],
+              ),
+              SizedBox(height: 10),
+              SkeletonBlock(height: 5, radius: 99),
+              SizedBox(height: 10),
+              SkeletonBlock(width: 220, height: 12),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        SkeletonBlock(height: 74, radius: AppSpacing.radius),
+        SizedBox(height: 18),
+        SkeletonBlock(height: 48, radius: AppSpacing.radiusSm),
+        SizedBox(height: 10),
+        SkeletonBlock(height: 48, radius: AppSpacing.radiusSm),
+      ],
+    );
+  }
+}
+
+class _TwinStageSkeleton extends StatelessWidget {
+  const _TwinStageSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SkeletonBlock(width: 30, height: 30, radius: 7),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: SkeletonBlock(height: 14)),
+                  SizedBox(width: 8),
+                  SkeletonBlock(width: 110, height: 12),
+                ],
+              ),
+              SizedBox(height: 6),
+              SkeletonBlock(width: 140, height: 12),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Экран прогноза.
+class ForecastLoadingSkeleton extends StatelessWidget {
+  const ForecastLoadingSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: AppSpacing.pageOf(context),
+      children: const [
+        SkeletonBlock(width: 130, height: 11),
+        SizedBox(height: 8),
+        SkeletonBlock(width: 200, height: 22),
+        SizedBox(height: 6),
+        SkeletonBlock(width: 240, height: 13),
+        SizedBox(height: 16),
+        SkeletonBlock(height: 150, radius: AppSpacing.radius),
+        SizedBox(height: 12),
+        _SkeletonCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBlock(width: 70, height: 12),
+              SizedBox(height: 10),
+              SkeletonBlock(height: 13),
+              SizedBox(height: 6),
+              SkeletonBlock(height: 5, radius: 99),
+              SizedBox(height: 12),
+              SkeletonBlock(height: 13),
+              SizedBox(height: 6),
+              SkeletonBlock(height: 5, radius: 99),
+              SizedBox(height: 12),
+              SkeletonBlock(height: 13),
+              SizedBox(height: 6),
+              SkeletonBlock(height: 5, radius: 99),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        _SkeletonCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBlock(width: 120, height: 12),
+              SizedBox(height: 10),
+              SkeletonBlock(height: 13),
+              SizedBox(height: 6),
+              SkeletonBlock(height: 5, radius: 99),
+              SizedBox(height: 12),
+              SkeletonBlock(height: 13),
+              SizedBox(height: 6),
+              SkeletonBlock(height: 5, radius: 99),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        _SkeletonCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBlock(width: 90, height: 12),
+              SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: SkeletonBlock(
+                      height: 58,
+                      radius: AppSpacing.radiusSm,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: SkeletonBlock(
+                      height: 58,
+                      radius: AppSpacing.radiusSm,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        SkeletonBlock(height: 96, radius: AppSpacing.radius),
+      ],
+    );
+  }
+}
+
+/// Пропуск / коридор — универсальный набор карточек.
+class DetailCardsLoadingSkeleton extends StatelessWidget {
+  const DetailCardsLoadingSkeleton({super.key, this.cards = 4});
+
+  final int cards;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: AppSpacing.pageOf(context),
+      itemCount: cards,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (_, i) => SkeletonBlock(
+        height: i == 0 ? 120 : 88,
+        radius: AppSpacing.radius,
       ),
     );
   }
@@ -314,7 +770,7 @@ class AppBottomNav extends StatelessWidget {
         12,
         8,
         12,
-        8 + MediaQuery.paddingOf(context).bottom,
+        8 + MediaQuery.viewPaddingOf(context).bottom,
       ),
       child: Row(
         children: [

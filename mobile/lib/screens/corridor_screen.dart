@@ -18,6 +18,16 @@ class CorridorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final cargo = app.byId(cargoId);
+    if (app.showDataPlaceholders) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            cargo == null ? 'Цифровой коридор' : 'Коридор · ${cargo.number}',
+          ),
+        ),
+        body: const DetailCardsLoadingSkeleton(cards: 5),
+      );
+    }
     if (cargo == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Цифровой коридор')),
@@ -40,7 +50,7 @@ class CorridorScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text('Коридор · ${cargo.number}')),
       body: ListView(
-        padding: AppSpacing.page,
+        padding: AppSpacing.pageOf(context),
         children: [
           Text(
             cargo.displayName,

@@ -74,7 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
       ),
       body: ListView(
-        padding: AppSpacing.page,
+        padding: AppSpacing.pageOf(context),
         children: [
           if (user != null) ...[
             AppCard(

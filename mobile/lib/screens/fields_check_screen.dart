@@ -98,7 +98,7 @@ class _FieldsCheckScreenState extends State<FieldsCheckScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Проверка полей')),
       body: ListView(
-        padding: AppSpacing.page,
+        padding: AppSpacing.pageOf(context),
         children: [
           Text(
             'Проверьте поля перед выдачей пропуска. Обязательны: товар, ТН ВЭД, вес, стоимость, страна.',

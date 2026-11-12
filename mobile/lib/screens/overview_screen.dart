@@ -5,6 +5,7 @@ import '../state/app_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_chrome.dart';
+import '../widgets/economy_summary_card.dart';
 import '../widgets/last_event_card.dart';
 import '../widgets/logo_mark.dart';
 import 'cargo_detail_screen.dart';
@@ -17,22 +18,27 @@ class OverviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final stats = app.overview;
-
-    if (app.loadState == AppLoadState.loading && stats == null) {
-      return const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final header = BrandHeader(
+      title: 'Обзор',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          BrandHeader(title: 'Обзор'),
-          Expanded(child: LoadingListSkeleton()),
+          if (app.refreshing)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          _settingsButton(context),
         ],
-      );
-    }
+      ),
+    );
 
     if (app.loadState == AppLoadState.error && stats == null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const BrandHeader(title: 'Обзор'),
+          header,
           Expanded(
             child: ErrorStateView(
               message: app.errorMessage ?? 'Ошибка',
@@ -43,49 +49,20 @@ class OverviewScreen extends StatelessWidget {
       );
     }
 
-    if (stats == null) {
-      return const SizedBox.shrink();
+    if (app.showDataPlaceholders || stats == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header,
+          const Expanded(child: OverviewLoadingSkeleton()),
+        ],
+      );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        BrandHeader(
-          title: 'Обзор',
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (app.refreshing)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              IconButton(
-                tooltip: 'Настройки',
-                splashColor: Colors.transparent,
-                highlightColor: Colors.transparent,
-                hoverColor: Colors.transparent,
-                focusColor: Colors.transparent,
-                style: IconButton.styleFrom(
-                  overlayColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
-                  hoverColor: Colors.transparent,
-                  focusColor: Colors.transparent,
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                },
-                icon: Icon(
-                  Icons.settings_outlined,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
+        header,
         Expanded(
           child: ListView(
             padding: AppSpacing.page,
@@ -124,71 +101,16 @@ class OverviewScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SectionLabel('Расчётная экономия'),
-                    const SizedBox(height: 10),
-                    Text(
-                      stats.economyRub,
-                      style: TextStyle(
-                        color: AppColors.success,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      stats.economyCargoHours,
-                      style: TextStyle(
-                        color: AppColors.text,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (stats.economyCo2Pct != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        stats.economyCo2Pct!,
-                        style: TextStyle(
-                          color: AppColors.cyan,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              EconomySummaryCard(
+                rub: stats.economyRub,
+                cargoHours: stats.economyCargoHours,
+                co2Pct: stats.economyCo2Pct,
               ),
               const SizedBox(height: 12),
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(child: SectionLabel('Волна в портах')),
-                        if (stats.weatherStale)
-                          SoftBadge(
-                            label: 'Устарело',
-                            background: AppColors.warningBg,
-                            foreground: AppColors.warning,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    for (final w in stats.waves) ...[
-                      _wave(w.name, w.heightLabel),
-                      const SizedBox(height: 8),
-                    ],
-                    Text(
-                      '${stats.weatherSource} · ${stats.weatherUpdatedLabel}',
-                      style: TextStyle(color: AppColors.muted, fontSize: 12),
-                    ),
-                  ],
-                ),
+              _PortWavesCard(
+                waves: stats.waves,
+                weatherStale: stats.weatherStale,
+                footer: '${stats.weatherSource} · ${stats.weatherUpdatedLabel}',
               ),
               const SizedBox(height: 12),
               LastEventCard(
@@ -215,7 +137,134 @@ class OverviewScreen extends StatelessWidget {
     );
   }
 
-  Widget _wave(String port, String height) {
+  Widget _settingsButton(BuildContext context) {
+    return IconButton(
+      tooltip: 'Настройки',
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
+      focusColor: Colors.transparent,
+      style: IconButton.styleFrom(
+        overlayColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        focusColor: Colors.transparent,
+      ),
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+        );
+      },
+      icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+    );
+  }
+
+}
+
+class _PortWavesCard extends StatefulWidget {
+  const _PortWavesCard({
+    required this.waves,
+    required this.weatherStale,
+    required this.footer,
+  });
+
+  final List<WavePort> waves;
+  final bool weatherStale;
+  final String footer;
+
+  static const _collapsedCount = 4;
+
+  @override
+  State<_PortWavesCard> createState() => _PortWavesCardState();
+}
+
+class _PortWavesCardState extends State<_PortWavesCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final waves = widget.waves;
+    final canToggle = waves.length > _PortWavesCard._collapsedCount;
+    final visible = !canToggle || _expanded
+        ? waves
+        : waves.take(_PortWavesCard._collapsedCount).toList(growable: false);
+    final hidden = canToggle
+        ? waves.length - _PortWavesCard._collapsedCount
+        : 0;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: SectionLabel('Волна в портах')),
+              if (widget.weatherStale)
+                SoftBadge(
+                  label: 'Устарело',
+                  background: AppColors.warningBg,
+                  foreground: AppColors.warning,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (var i = 0; i < visible.length; i++) ...[
+            _waveRow(visible[i].name, visible[i].heightLabel),
+            if (i != visible.length - 1) const SizedBox(height: 8),
+          ],
+          if (canToggle) ...[
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _expanded
+                        ? 'Свернуть'
+                        : 'Ещё $hidden ${_portWord(hidden)}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            widget.footer,
+            style: TextStyle(color: AppColors.muted, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _portWord(int n) {
+    final mod10 = n % 10;
+    final mod100 = n % 100;
+    if (mod10 == 1 && mod100 != 11) return 'порт';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+      return 'порта';
+    }
+    return 'портов';
+  }
+
+  Widget _waveRow(String port, String height) {
     return Row(
       children: [
         Expanded(

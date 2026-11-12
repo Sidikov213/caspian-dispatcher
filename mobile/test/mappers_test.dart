@@ -106,7 +106,7 @@ void main() {
 
   test('fmtRub и fmtDt по контракту', () {
     expect(fmtRub(597000), '597 тыс ₽');
-    expect(fmtCo2SavedPct(6.9), '−6,9% CO₂');
+    expect(fmtCo2SavedPct(6.9), '−6,9%');
     expect(fmtCo2SavedPct(0), isNull);
     // 2026-05-12 11:30 UTC → 14:30 МСК, месяц «мая»
     expect(fmtDt('2026-05-12T11:30:00Z'), '12 мая, 14:30');

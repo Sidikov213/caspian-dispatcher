@@ -60,6 +60,12 @@ class _PassScreenState extends State<PassScreen> {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
+    if (app.showDataPlaceholders) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Цифровой пропуск')),
+        body: const DetailCardsLoadingSkeleton(cards: 3),
+      );
+    }
     final cargo = app.byId(widget.cargoId);
     final stored = widget.storedPassId == null
         ? null
@@ -113,7 +119,7 @@ class _PassScreenState extends State<PassScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Цифровой пропуск')),
       body: ListView(
-        padding: AppSpacing.page,
+        padding: AppSpacing.pageOf(context),
         children: [
           if (status == PassStatus.awaitingReissue)
             Padding(

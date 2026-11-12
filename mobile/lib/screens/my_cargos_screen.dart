@@ -46,8 +46,8 @@ class MyCargosScreen extends StatelessWidget {
   }
 
   Widget _body(BuildContext context, AppController app, List<Cargo> list) {
-    if (app.loadState == AppLoadState.loading && app.cargos.isEmpty) {
-      return const LoadingListSkeleton();
+    if (app.showDataPlaceholders) {
+      return const CargoListLoadingSkeleton();
     }
     if (app.loadState == AppLoadState.error && app.cargos.isEmpty) {
       return ErrorStateView(

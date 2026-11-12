@@ -120,6 +120,8 @@ class RouteStage {
     required this.subtitle,
     required this.planned,
     required this.forecast,
+    this.mode = 'rail',
+    this.timeLine = '',
     this.done = false,
     this.current = false,
     this.warning = false,
@@ -129,9 +131,29 @@ class RouteStage {
   final String subtitle;
   final String planned;
   final String forecast;
+
+  /// `rail` / `sea` / `road`
+  final String mode;
+
+  /// «14 ноя, 17:00 → 15 ноя, 11:00» или «12 ноя, 11:00 ✓»
+  final String timeLine;
   final bool done;
   final bool current;
   final bool warning;
+}
+
+class GraphEdgeInfo {
+  const GraphEdgeInfo({
+    required this.id,
+    required this.mode,
+    required this.distanceKm,
+    required this.co2GPerTkm,
+  });
+
+  final String id;
+  final String mode;
+  final double distanceKm;
+  final double co2GPerTkm;
 }
 
 class WavePort {
@@ -177,6 +199,14 @@ class Cargo {
     this.passToken,
     this.passDocHash,
     this.passBlockHash,
+    this.cargoType = '',
+    this.cargoTypeLabel = '',
+    this.riskLevel = 'low',
+    this.hasFerry = false,
+    this.totalCo2Kg = 0,
+    this.co2RailKg = 0,
+    this.co2SeaKg = 0,
+    this.co2RoadKg = 0,
     this.stages = const [],
     this.cancellationForecast = false,
     this.cancellationFact = false,
@@ -187,6 +217,8 @@ class Cargo {
   final String title;
   final String weight;
   final double weightTons;
+  final String cargoType;
+  final String cargoTypeLabel;
   final String route;
   final String origin;
   final String destination;
@@ -194,6 +226,9 @@ class Cargo {
   final String nextPoint;
   final String arrival;
   final double missProbability;
+
+  /// `low` / `medium` / `high`
+  final String riskLevel;
   final double? departureShiftH;
   final double? arrivalDelayH;
   final List<RiskFactor> riskFactors;
@@ -209,6 +244,11 @@ class Cargo {
   final String? passToken;
   final String? passDocHash;
   final String? passBlockHash;
+  final bool hasFerry;
+  final double totalCo2Kg;
+  final double co2RailKg;
+  final double co2SeaKg;
+  final double co2RoadKg;
   final List<RouteStage> stages;
   final bool cancellationForecast;
   final bool cancellationFact;
@@ -244,6 +284,14 @@ class Cargo {
     List<RiskFactor>? riskFactors,
     List<ProbabilityDriver>? probabilityDrivers,
     List<RouteStage>? stages,
+    bool? hasFerry,
+    double? totalCo2Kg,
+    double? co2RailKg,
+    double? co2SeaKg,
+    double? co2RoadKg,
+    String? cargoType,
+    String? cargoTypeLabel,
+    String? riskLevel,
     bool? cancellationForecast,
     bool? cancellationFact,
   }) {
@@ -253,6 +301,8 @@ class Cargo {
       title: title,
       weight: weight,
       weightTons: weightTons,
+      cargoType: cargoType ?? this.cargoType,
+      cargoTypeLabel: cargoTypeLabel ?? this.cargoTypeLabel,
       route: route ?? this.route,
       origin: origin,
       destination: destination,
@@ -260,6 +310,7 @@ class Cargo {
       nextPoint: nextPoint ?? this.nextPoint,
       arrival: arrival ?? this.arrival,
       missProbability: missProbability ?? this.missProbability,
+      riskLevel: riskLevel ?? this.riskLevel,
       departureShiftH: departureShiftH ?? this.departureShiftH,
       arrivalDelayH: arrivalDelayH ?? this.arrivalDelayH,
       riskFactors: riskFactors ?? this.riskFactors,
@@ -275,6 +326,11 @@ class Cargo {
       passToken: passToken ?? this.passToken,
       passDocHash: passDocHash ?? this.passDocHash,
       passBlockHash: passBlockHash ?? this.passBlockHash,
+      hasFerry: hasFerry ?? this.hasFerry,
+      totalCo2Kg: totalCo2Kg ?? this.totalCo2Kg,
+      co2RailKg: co2RailKg ?? this.co2RailKg,
+      co2SeaKg: co2SeaKg ?? this.co2SeaKg,
+      co2RoadKg: co2RoadKg ?? this.co2RoadKg,
       stages: stages ?? this.stages,
       cancellationForecast: cancellationForecast ?? this.cancellationForecast,
       cancellationFact: cancellationFact ?? this.cancellationFact,
@@ -351,9 +407,11 @@ class OverviewData {
   final int shipmentsTotal;
   final int atRisk;
   final String economyRub;
+
+  /// Число груз-часов, напр. «126».
   final String economyCargoHours;
 
-  /// Из `stats.co2_saved_pct`, напр. «−6,9% CO₂»; null если 0.
+  /// Из `stats.co2_saved_pct`, напр. «−6,9%»; null если 0.
   final String? economyCo2Pct;
   final List<WavePort> waves;
   final String weatherUpdatedLabel;

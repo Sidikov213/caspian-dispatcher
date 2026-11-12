@@ -34,6 +34,7 @@ class AppController extends ChangeNotifier {
   OverviewData? _overview;
   List<StoredPass> _storedPasses = [];
   Map<String, String> _nodes = {};
+  Map<String, GraphEdgeInfo> _edges = {};
 
   InvoiceFields _invoice = const InvoiceFields();
   bool _recognizing = false;
@@ -51,11 +52,18 @@ class AppController extends ChangeNotifier {
   AppLoadState _loadState = AppLoadState.idle;
   String? _errorMessage;
   bool _refreshing = false;
+  bool _showPlaceholders = false;
+  DateTime? _placeholdersShownAt;
   Timer? _pollTimer;
   Timer? _eventDebounce;
   bool _pollInFlight = false;
+  bool _refreshQueued = false;
+  bool _queuedForceGraph = false;
+  bool _queuedPlaceholders = false;
   int _pollFailStreak = 0;
   int _silentPassTick = 0;
+  Map<String, dynamic> _lastStats = const {};
+  Map<String, dynamic> _lastWeather = const {};
 
   /// Кэш пропусков, чтобы silent-poll не долбил /passes/* каждые N секунд.
   final Map<String, Map<String, dynamic>> _passById = {};
@@ -72,6 +80,11 @@ class AppController extends ChangeNotifier {
   AppLoadState get loadState => _loadState;
   String? get errorMessage => _errorMessage;
   bool get refreshing => _refreshing;
+
+  /// Скелетоны контента: первая загрузка или обновление после события/ручного refresh.
+  bool get showDataPlaceholders =>
+      _showPlaceholders ||
+      (_loadState == AppLoadState.loading && _overview == null);
   bool get isReady => _loadState == AppLoadState.ready;
   bool get realtimeConnected => _realtime.isConnected;
 
@@ -129,13 +142,16 @@ class AppController extends ChangeNotifier {
     // Схлопываем пачку WS-событий в один refresh, иначе flood HTTP.
     _eventDebounce?.cancel();
     _eventDebounce = Timer(const Duration(milliseconds: 400), () {
-      unawaited(refresh(silent: true, forceGraph: false));
+      unawaited(
+        refresh(silent: true, forceGraph: false, showPlaceholders: true),
+      );
     });
   }
 
   Future<void> _handleDemoReset() async {
     _passById.clear();
     _nodes = {};
+    _edges = {};
     _pendingDocId = null;
     _documentUploaded = false;
     _fieldsConfirmed = false;
@@ -167,35 +183,78 @@ class AppController extends ChangeNotifier {
     bool silent = false,
     bool forceLoading = false,
     bool forceGraph = false,
+    bool showPlaceholders = false,
   }) async {
-    if (_pollInFlight) return;
+    if (_pollInFlight) {
+      _refreshQueued = true;
+      _queuedForceGraph = _queuedForceGraph || forceGraph;
+      _queuedPlaceholders = _queuedPlaceholders || showPlaceholders;
+      return;
+    }
     _pollInFlight = true;
+    final wantPlaceholders =
+        showPlaceholders ||
+        forceLoading ||
+        (!silent && _loadState != AppLoadState.ready);
     if (forceLoading || (!silent && _loadState != AppLoadState.ready)) {
       _loadState = AppLoadState.loading;
       _errorMessage = null;
+      _showPlaceholders = true;
+      _placeholdersShownAt = DateTime.now();
       notifyListeners();
-    } else if (!silent) {
+    } else if (wantPlaceholders || !silent) {
       _refreshing = true;
+      if (wantPlaceholders) {
+        _showPlaceholders = true;
+        _placeholdersShownAt = DateTime.now();
+      }
       notifyListeners();
     }
 
     try {
-      if (_nodes.isEmpty || forceGraph) {
-        final graph = await _api.fetchGraph();
-        _nodes = nodesFromGraph(graph);
+      if (_nodes.isEmpty || _edges.isEmpty || forceGraph) {
+        try {
+          final graph = await _api.fetchGraph();
+          _nodes = nodesFromGraph(graph);
+          _edges = edgesFromGraph(graph);
+        } catch (_) {
+          if (_nodes.isEmpty) rethrow;
+        }
       }
 
-      final results = await Future.wait([
-        _api.fetchShipments(),
-        _api.fetchStats(),
-        _api.fetchWeather(),
-        _api.fetchAlerts(),
+      // По отдельности: таймаут weather не должен блокировать stats/алерты.
+      Object? shipErr;
+      Object? statsErr;
+      Object? weatherErr;
+      Object? alertsErr;
+      List<Map<String, dynamic>>? shipments;
+      Map<String, dynamic>? stats;
+      Map<String, dynamic>? weather;
+      List<Map<String, dynamic>>? alerts;
+
+      await Future.wait([
+        _api.fetchShipments().then<void>((v) => shipments = v).catchError((e) {
+          shipErr = e;
+        }),
+        _api.fetchStats().then<void>((v) => stats = v).catchError((e) {
+          statsErr = e;
+        }),
+        _api.fetchWeather().then<void>((v) => weather = v).catchError((e) {
+          weatherErr = e;
+        }),
+        _api.fetchAlerts().then<void>((v) => alerts = v).catchError((e) {
+          alertsErr = e;
+        }),
       ]);
 
-      final shipments = results[0] as List<Map<String, dynamic>>;
-      final stats = results[1] as Map<String, dynamic>;
-      final weather = results[2] as Map<String, dynamic>;
-      _alerts = results[3] as List<Map<String, dynamic>>;
+      final gotCore = shipments != null || stats != null || alerts != null;
+      if (!gotCore && _loadState != AppLoadState.ready) {
+        throw shipErr ?? statsErr ?? alertsErr ?? weatherErr ?? Exception('Нет данных');
+      }
+
+      if (stats != null) _lastStats = stats!;
+      if (weather != null) _lastWeather = weather!;
+      if (alerts != null) _alerts = alerts!;
 
       // Silent-poll: /passes не на каждый тик (раз в ~5 циклов ≈ 15 с).
       List<Map<String, dynamic>> remotePasses = const [];
@@ -214,49 +273,59 @@ class AppController extends ChangeNotifier {
         }
       }
 
-      final mapped = <Cargo>[];
-      final seenPassIds = <String>{};
-      for (final sh in shipments) {
-        Map<String, dynamic>? pass;
-        final pid = sh['pass_id']?.toString();
-        if (pid != null && pid.isNotEmpty) {
-          seenPassIds.add(pid);
-          pass = _passById[pid];
-          // Уже есть из GET /passes — не долбим /passes/{id} повторно.
-          if (pass == null) {
-            try {
-              pass = await _api.fetchPass(pid);
-              _passById[pid] = pass;
-            } catch (_) {
-              pass = _passById[pid];
+      List<Cargo> mapped = _cargos;
+      if (shipments != null) {
+        mapped = <Cargo>[];
+        final seenPassIds = <String>{};
+        for (final sh in shipments!) {
+          Map<String, dynamic>? pass;
+          final pid = sh['pass_id']?.toString();
+          if (pid != null && pid.isNotEmpty) {
+            seenPassIds.add(pid);
+            pass = _passById[pid];
+            // Уже есть из GET /passes — не долбим /passes/{id} повторно.
+            if (pass == null) {
+              try {
+                pass = await _api.fetchPass(pid);
+                _passById[pid] = pass;
+              } catch (_) {
+                pass = _passById[pid];
+              }
+            }
+          }
+          final cargo = shipmentToCargo(
+            sh,
+            nodes: _nodes,
+            edges: _edges,
+            pass: pass,
+          );
+          mapped.add(cargo);
+          if (pass != null && pass['token'] != null) {
+            await _ingestPass(pass, cargo);
+          }
+          for (final p in remotePasses) {
+            if (p['shipment_id']?.toString() != cargo.id) continue;
+            final id = p['id']?.toString();
+            if (id != null) seenPassIds.add(id);
+            if (p['token'] != null) {
+              await _ingestPass(p, cargo);
             }
           }
         }
-        final cargo = shipmentToCargo(sh, nodes: _nodes, pass: pass);
-        mapped.add(cargo);
-        if (pass != null && pass['token'] != null) {
-          await _ingestPass(pass, cargo);
-        }
-        for (final p in remotePasses) {
-          if (p['shipment_id']?.toString() != cargo.id) continue;
-          final id = p['id']?.toString();
-          if (id != null) seenPassIds.add(id);
-          if (p['token'] != null) {
-            await _ingestPass(p, cargo);
-          }
-        }
+        _passById.removeWhere((id, _) => !seenPassIds.contains(id));
+        _cargos = mapped;
+        await _syncStoredStatuses(mapped);
       }
-      _passById.removeWhere((id, _) => !seenPassIds.contains(id));
 
-      _cargos = mapped;
-      _overview = buildOverview(
-        stats: stats,
-        weather: weather,
-        alerts: _alerts,
-        cargos: mapped,
-        nodes: _nodes,
-      );
-      await _syncStoredStatuses(mapped);
+      if (_lastStats.isNotEmpty || _alerts.isNotEmpty || mapped.isNotEmpty) {
+        _overview = buildOverview(
+          stats: _lastStats,
+          weather: _lastWeather,
+          alerts: _alerts,
+          cargos: mapped,
+          nodes: _nodes,
+        );
+      }
       _loadState = AppLoadState.ready;
       _errorMessage = null;
       if (_pollFailStreak != 0) {
@@ -278,9 +347,33 @@ class AppController extends ChangeNotifier {
         _overview = null;
       }
     } finally {
+      final shownAt = _placeholdersShownAt;
+      if (shownAt != null) {
+        final left =
+            const Duration(milliseconds: 320) - DateTime.now().difference(shownAt);
+        if (left > Duration.zero) {
+          await Future<void>.delayed(left);
+        }
+      }
       _refreshing = false;
+      _showPlaceholders = false;
+      _placeholdersShownAt = null;
       _pollInFlight = false;
       notifyListeners();
+      if (_refreshQueued) {
+        final againGraph = _queuedForceGraph;
+        final againPlaceholders = _queuedPlaceholders;
+        _refreshQueued = false;
+        _queuedForceGraph = false;
+        _queuedPlaceholders = false;
+        unawaited(
+          refresh(
+            silent: true,
+            forceGraph: againGraph,
+            showPlaceholders: againPlaceholders,
+          ),
+        );
+      }
     }
   }
 
@@ -448,7 +541,7 @@ class AppController extends ChangeNotifier {
         final pid = pass['id']?.toString();
         if (pid != null) _passById[pid] = pass;
       }
-      await refresh(silent: true);
+      await refresh(silent: true, showPlaceholders: true);
       final cargo = byId(cargoId);
       if (pass != null && cargo != null) {
         await _ingestPass(pass, cargo);
@@ -478,7 +571,7 @@ class AppController extends ChangeNotifier {
         final pid = pass['id']?.toString();
         if (pid != null) _passById[pid] = pass;
       }
-      await refresh(silent: true);
+      await refresh(silent: true, showPlaceholders: true);
       final cargo = byId(cargoId);
       if (pass != null && cargo != null) {
         await _ingestPass(pass, cargo);

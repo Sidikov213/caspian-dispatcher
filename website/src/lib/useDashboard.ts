@@ -78,11 +78,55 @@ export function useDashboard(): Dashboard {
 
   const fail = useCallback((e: unknown) => setError(e instanceof Error ? e.message : String(e)), []);
 
-  const loadPasses = useCallback(async (list: Shipment[]) => {
-    const ids = list.map((s) => s.pass_id).filter((id): id is string => !!id);
-    const loaded = await Promise.all(ids.map((id) => api.getPass(id).catch(() => null)));
-    setPasses(new Map(loaded.filter((p): p is Pass => !!p).map((p) => [p.id, p])));
+  // Кэш пропусков: id → Pass. Запрашиваем только новые id и пропуск груза из события WS;
+  // одинаковые запросы в полёте объединяются.
+  const passCache = useRef<Map<string, Pass>>(new Map());
+  const passInflight = useRef<Map<string, Promise<Pass | null>>>(new Map());
+  const passIds = useRef<string[]>([]);
+
+  const publishPasses = useCallback(() => {
+    const m = new Map<string, Pass>();
+    for (const id of passIds.current) {
+      const p = passCache.current.get(id);
+      if (p) m.set(id, p);
+    }
+    setPasses(m);
   }, []);
+
+  const fetchPass = useCallback((id: string): Promise<Pass | null> => {
+    const running = passInflight.current.get(id);
+    if (running) return running;
+    const req = api
+      .getPass(id)
+      .then((p) => {
+        passCache.current.set(id, p);
+        return p;
+      })
+      .catch(() => null)
+      .finally(() => passInflight.current.delete(id));
+    passInflight.current.set(id, req);
+    return req;
+  }, []);
+
+  const loadPasses = useCallback(
+    async (list: Shipment[]) => {
+      passIds.current = list.map((s) => s.pass_id).filter((id): id is string => !!id);
+      await Promise.all(passIds.current.filter((id) => !passCache.current.has(id)).map(fetchPass));
+      publishPasses();
+    },
+    [fetchPass, publishPasses],
+  );
+
+  /** Пропуск груза из события: запросить только его и только если такого id ещё не видели
+   *  (у выпущенного пропуска статус меняется лишь вместе с выпуском нового, то есть с новым pass_id). */
+  const refreshPass = useCallback(
+    async (id: string) => {
+      if (passCache.current.has(id)) return;
+      await fetchPass(id);
+      publishPasses();
+    },
+    [fetchPass, publishPasses],
+  );
 
   const verifyLedger = useCallback(async () => {
     setVerifying(true);
@@ -160,6 +204,27 @@ export function useDashboard(): Dashboard {
     };
   }, [refreshLive, refreshWeather, fail]);
 
+  // События WS идут пачками (accept — десятки сообщений): обновляем список не чаще раза в секунду,
+  // последнее событие пачки всегда даёт финальный перезапрос.
+  const liveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveLast = useRef(0);
+  const liveRef = useRef(refreshLive);
+  useEffect(() => {
+    liveRef.current = refreshLive;
+  }, [refreshLive]);
+  const scheduleLive = useCallback(() => {
+    if (liveTimer.current) return;
+    const wait = Math.max(0, liveLast.current + 1000 - Date.now());
+    liveTimer.current = setTimeout(() => {
+      liveTimer.current = null;
+      liveLast.current = Date.now();
+      liveRef.current().catch(fail);
+    }, wait);
+  }, [fail]);
+  useEffect(() => () => {
+    if (liveTimer.current) clearTimeout(liveTimer.current);
+  }, []);
+
   const reloadRef = useRef(reload);
   useEffect(() => {
     reloadRef.current = reload;
@@ -179,10 +244,16 @@ export function useDashboard(): Dashboard {
         if (!closed) retry = setTimeout(connect, 5000);
       };
       ws.onmessage = (ev) => {
-        const msg = JSON.parse(ev.data as string) as { type: string };
-        if (msg.type === "demo.reset") reloadRef.current().catch(fail);
-        else if (msg.type === "weather.updated") refreshWeather().catch(fail);
-        else refreshLive().catch(fail);
+        const msg = JSON.parse(ev.data as string) as { type: string; payload?: { pass_id?: string | null } | null };
+        if (msg.type === "demo.reset") {
+          passCache.current.clear();
+          reloadRef.current().catch(fail);
+        } else if (msg.type === "weather.updated") refreshWeather().catch(fail);
+        else {
+          const pid = msg.type === "shipment.updated" ? msg.payload?.pass_id : null;
+          if (pid) refreshPass(pid).catch(fail);
+          scheduleLive();
+        }
       };
     };
     connect();
@@ -191,7 +262,7 @@ export function useDashboard(): Dashboard {
       clearTimeout(retry);
       ws?.close();
     };
-  }, [refreshLive, refreshWeather, fail]);
+  }, [refreshWeather, refreshPass, scheduleLive, fail]);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -216,6 +287,7 @@ export function useDashboard(): Dashboard {
   const resetDemo = useCallback(async () => {
     try {
       await api.resetDemo();
+      passCache.current.clear();
       await reload();
     } catch (e) {
       fail(e);

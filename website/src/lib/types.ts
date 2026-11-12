@@ -89,6 +89,22 @@ export type Stage = "planned" | "in_transit" | "delivered";
 export type DisplayStatus = "planned" | "in_transit" | "at_risk" | "rerouted" | "delivered";
 export type PassState = "none" | "active" | "reissue_pending";
 
+export interface ShipmentPosition {
+  lat: number;
+  lon: number;
+  edge_id: string;
+  mode: Mode;
+  /** Доля пройденного пути ребра; в ожидании — 0. */
+  progress: number;
+  heading_deg: number;
+  from_node: string;
+  to_node: string;
+  eta_next_node: string;
+  waiting: boolean;
+  waiting_reason?: "sailing" | "border" | "transfer" | "blocked" | null;
+  waiting_label?: string | null;
+}
+
 export interface Shipment {
   id: string;
   title: string;
@@ -101,7 +117,8 @@ export interface Shipment {
   risk_level: RiskLevel;
   rerouted: boolean;
   display_status: DisplayStatus;
-  position: { lat: number; lon: number } | null;
+  /** Где груз на карте; считает сервер. null — ещё не выехал или доставлен. */
+  position: ShipmentPosition | null;
   current_leg: number | null;
   route: Route;
   planned_eta: string;

@@ -114,7 +114,8 @@ jobs:
 
       - name: Журнал сервиса (последние 200 строк)
         if: inputs.action == 'logs'
-        run: ssh root@"$HOST" 'journalctl -u caspian-backend -n 200 --no-pager; echo; journalctl -u caddy -n 30 --no-pager'
+        run: |
+          ssh root@"$HOST" 'echo "== строки запуска с последней загрузки (предиктор, пуши, бот) =="; journalctl -u caspian-backend --no-pager -b | grep -E "Пуш:|Активен предиктор|Бот|Сценарий: sim_now" | tail -n 12; echo; journalctl -u caspian-backend -n 200 --no-pager; echo; journalctl -u caddy -n 30 --no-pager'
 
       - name: Проверки на сервере (Telegram, Open-Meteo, модель, demo/check)
         if: inputs.action != 'logs'

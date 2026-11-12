@@ -89,12 +89,23 @@ Shipment  {id, title, cargo_type, weight_t, owner_tg_id, origin, destination,
            stage: planned|in_transit|delivered,
            risk_level: low|medium|high, rerouted: bool,
            display_status: planned|in_transit|at_risk|rerouted|delivered,
-           position: {lat, lon}, current_leg, route: Route,
+           position: Position | null, current_leg, route: Route,
            planned_eta, eta, risk: Risk, pass_id,
            pass_state: none|active|reissue_pending,
            manual?: bool}    # создан вручную (POST /shipments); при reset исчезает
            # display_status считает бэкенд: delivered → at_risk (risk_level=high)
            # → rerouted → in_transit → planned. Клиенты сами его не выводят.
+Position  {lat, lon, edge_id, mode: rail|road|sea, progress: 0..1, heading_deg, from_node, to_node,
+           eta_next_node, waiting: bool, waiting_reason?: sailing|border|transfer|blocked,
+           waiting_label?}
+           # считает сервер от sim_now по planned_start/planned_end этапов (те же, что для ETA),
+           # точка — на линии ребра (узел → Edge.path → узел) на доле progress длины пути.
+           # Стоит в узле (ждёт рейс, граница, перегрузка, участок закрыт) — точка в узле,
+           # progress 0, edge_id и mode — следующего этапа, waiting: true, waiting_label —
+           # «Ждёт рейс» | «Граница и таможня» | «Перегрузка» | «Участок закрыт».
+           # eta_next_node = planned_end этапа + predicted_delay_h. heading_deg — курс по линии
+           # ребра, от севера по часовой. Ещё не выехал (planned) или доставлен — null.
+           # После перестроения сразу считается по новому маршруту. Клиент только сглаживает.
 Sailing   {id, from, to, departure, cutoff, duration_h, capacity_t, booked_t,
            status: scheduled|cancelled|departed, cancel_reason}
 Decision  {id, alert_id, ts, accepted_via: web|telegram, accepted_by?: {name, role}, items: [{shipment_id,

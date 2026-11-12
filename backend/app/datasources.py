@@ -85,6 +85,7 @@ ICE_NOTE = ("Сценарий задан вручную по историчес�
             "живого источника ледовой обстановки нет")
 SRC_MINTRANS = "https://mintrans.gov.ru/file/396731"
 SRC_MKH = "https://www.alta.ru/logistics_news/128638/"
+SRC_PORTNEWS = "https://en.portnews.ru/news/359334"
 
 
 def ice_block(bt: dict | None) -> dict:
@@ -93,7 +94,7 @@ def ice_block(bt: dict | None) -> dict:
         {"text": "Астрахань — замерзающий порт: зимой ледокольная проводка судов", "source": SRC_MINTRANS},
         {"text": "Выход в море — по Волго-Каспийскому морскому каналу, 101,5 мили (≈188 км)", "source": SRC_MINTRANS},
         {"text": "Ледокольные проводки сезона 2022/23: с 6 декабря 2022 по 7 марта 2023, 690 судов",
-         "source": None},
+         "source": SRC_PORTNEWS},
         {"text": "Махачкала — единственный незамерзающий глубоководный порт России на Каспии", "source": SRC_MKH},
     ]
     conclusion = None

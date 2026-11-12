@@ -30,6 +30,8 @@ interface Props {
   onNode?(id: string): void;
   /** Зона угрозы активного сценария (Scenario.zone); сайт её не угадывает. */
   zone?: LatLng[] | null;
+  /** Тип угрозы зоны (Scenario.hazard): лёд — синим, шторм — красным, затор — жёлтым. */
+  zoneHazard?: string | null;
   /** Алерты: исходный маршрут перестроенного груза берётся из принятого алерта (from_route). */
   alerts?: Alert[];
   /** Прежняя SVG-схема — запасной вариант, если подложка не загрузилась. */
@@ -211,7 +213,8 @@ export function RealMap(props: Props) {
 
     // 1. зона угрозы — из Scenario.zone
     if (zone && zone.length >= 3) {
-      lib.polygon(zone, { color: "var(--color-risk)", weight: 2, dashArray: "6 6", fillColor: "var(--color-risk)", fillOpacity: 0.14, interactive: false }).addTo(g);
+      const zc = props.zoneHazard === "ice" ? "var(--color-transit)" : props.zoneHazard === "congestion" || props.zoneHazard === "customs" ? "var(--color-warn)" : "var(--color-risk)";
+      lib.polygon(zone, { color: zc, weight: 2, dashArray: "6 6", fillColor: zc, fillOpacity: props.zoneHazard === "ice" ? 0.2 : 0.14, interactive: false }).addTo(g);
     }
 
     // 2. вся сеть коридора: тонко и приглушённо, стиль по виду транспорта
@@ -281,13 +284,14 @@ export function RealMap(props: Props) {
         .on("click", () => onSelectRef.current(s.id))
         .addTo(g);
     }
-  }, [ready, theme, nodes, edges, shipments, weather, focus, focusId, preview, calmWaves, checkpointNode, zone, alerts]);
+  }, [ready, theme, nodes, edges, shipments, weather, focus, focusId, preview, calmWaves, checkpointNode, zone, alerts, props.zoneHazard]);
 
   if (stage === "svg") {
     // подложка не пришла ни с CARTO, ни с OSM — прежняя схема, демо от тайлов не зависит
-    const { zone: _z, alerts: _a, ...rest } = props;
+    const { zone: _z, alerts: _a, zoneHazard: _h, ...rest } = props;
     void _z;
     void _a;
+    void _h;
     return <CorridorMap {...rest} />;
   }
 

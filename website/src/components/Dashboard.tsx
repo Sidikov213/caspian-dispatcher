@@ -286,6 +286,7 @@ export function Dashboard() {
               preview={previewRoute}
               stormZone={zone}
               zone={d.scenario && d.alerts.some((a) => a.scenario_id === d.scenario?.id) ? d.scenario.zone : null}
+              zoneHazard={d.scenario?.hazard ?? d.scenario?.type ?? null}
               alerts={d.alerts}
               calmWaves={calm}
               checkpointNode={checkpointNode}

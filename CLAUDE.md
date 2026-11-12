@@ -110,7 +110,8 @@ Risk      {miss_probability: 0..1, level: low|medium|high,
            probability_drivers?: [{name, label, impact_pp}]}
            # необязательно: три главных признака по SHAP классификатора CatBoost, вклад в
            # вероятность срыва в п. п.; у формулы и сухопутных маршрутов — null
-Scenario  {id, type: storm|congestion|customs, title, blocked_edges: [id],
+Scenario  {id, type: ice|storm|congestion|customs, hazard?: ice|storm|congestion|customs, note?,
+           title, blocked_edges: [id],
            affected_nodes: [id], start, end, starts_in_h, params: {wave_height_m, wind_ms},
            zone?: [[lat, lon]]}   # полигон зоны угрозы для карты; клиенты его не угадывают
            # starts_in_h — через сколько часов от sim_now начинается угроза (storm_north — 36)
@@ -125,6 +126,13 @@ Alert     {id, scenario_id, created_at, starts_in_h, severity, title, text,
            status: new|accepted|rejected|superseded, accepted_at, accepted_via,
            accepted_by?: {name, role: logist|expeditor},   # кто принял: Bearer входа сайта, мини-приложение, бот
            source?: forecast|scenario,   # откуда угроза: наблюдатель нашёл в прогнозе или сценарий
+           hazard?: ice|storm|congestion|customs,   # тип угрозы; тексты по нему — app/hazards.py
+           card?: {kind, headline, subtitle, period, metrics: [{key, label, value}],
+                   route: {sailing_label, from, to, departure} | null,
+                   impact: {shipments, weight_t, max_risk_pct}, note,
+                   decision: null | {status: accepted|rejected, title, detail, via, via_label, accepted_by_name}},
+           # card — компактная карточка из тех же данных, что text/items/options/accepted_*; готовые
+           # строки по разделу 9, клиент рисует как есть. text не меняется. note у шторма — «Стресс-тест: …»
            status_note?}                 # почему закрыт: «угроза снята», «прогноз изменился…»
            # все деньги и часы до наступления события — расчётные
            # options — до трёх вариантов решения, рекомендованный первый; числа — сумма по грузам
@@ -154,9 +162,9 @@ Block     {index, ts, event: issued|reissued|verified, shipment_id,
 | GET | `/shipments/{id}/alternatives` | — | `[{route: Route, risk: Risk, delta: {hours, rub, co2_kg}, recommended: bool}]` |
 | POST | `/shipments/{id}/reroute` | `{route_id}` | `Shipment` |
 | GET | `/weather` | — | `{updated_at, stale: bool, source: "open-meteo" \| "cache", points: [{node_id, wave_height_m, wind_ms, forecast: [{ts, wave_height_m}]}]}` |
-| GET | `/scenarios/presets` | — | `[{key, title}]` |
+| GET | `/scenarios/presets` | — | `[{key, title, hazard, main, note}]`; `main: true` — главный сценарий (`ice_north`), у шторма `note` «Стресс-тест: …» |
 | GET | `/scenarios` | — | `[Scenario]` — активные сценарии (после reset пусто), только чтение; нужен клиентам для `Scenario.zone` после перезагрузки страницы |
-| POST | `/scenarios` | `{preset: "storm_north" \| "storm_full" \| "congestion_astrakhan"}` | `{scenario: Scenario, alert: Alert}` |
+| POST | `/scenarios` | `{preset: "ice_north" \| "storm_north" \| "storm_full" \| "congestion_astrakhan"}` | `{scenario: Scenario, alert: Alert}`; главный — `ice_north` (лёд), шторм — стресс-тест |
 | GET | `/alerts?status=` | — | `[Alert]` |
 | POST | `/alerts/{id}/accept` | `{via: "web" \| "telegram", option_id?: string}` | `{alert: Alert, shipments: [Shipment], blocks: [Block], decision: Decision}`; без `option_id` — рекомендованный вариант; повтор → 200 с тем же результатом и `already_accepted: true`; устарел → 409 `superseded`; нет варианта → 404 `option_not_found`; `option_id: "wait"` → 422 `use_reject` |
 | GET | `/sailings?from=&to=` | — | `[Sailing]` |
@@ -232,9 +240,11 @@ website/  mobile/   docs/{PLAN.md,DEMO_SCENARIO.md,FLUTTER_CONTRACT.md,design/,p
 
 ## 9. Демо-данные и единые подписи
 
+Главный сценарий — лёд на Северном Каспии (`ice_north`), шторм — стресс-тест: за 12 месяцев волна у Астрахани не превышала 1,44 м (`docs/DEMO_SCENARIO.md`, раздел 0). Слова для льда: «Лёд на Северном Каспии», «канал закрыт для проводки»; в ледовых текстах нет «волна» и «шторм». Тексты по типу угрозы — только из `app/hazards.py`.
+
 Грузы (как в макете): №01 Зерно 60 т Москва → Мумбаи; №02 Металл 40 т Самара → Мумбаи; №03 Оборудование 20 т Саратов → Мумбаи; №04 Текстиль Баку → Мумбаи; №05 Удобрения Астрахань → Энзели (этап `planned`, пропуска нет — на нём показываем съёмку инвойса). Грузы №01–03 идут на один паром А Астрахань → Энзели.
 
-Расписание, шторм, деньги и CO₂ — строго по `docs/DEMO_SCENARIO.md`. Ключевые числа для груза №01: риск 82%, отправление на 18 ч позже планового рейса, бездействие +48 ч, через Махачкалу +6 ч, расчётная экономия 298 320 ₽. По трём грузам: 126 груз-часов, 596 640 ₽.
+Расписание, лёд, деньги и CO₂ — строго по `docs/DEMO_SCENARIO.md`. Ключевые числа для груза №01: риск 99% на льду (CatBoost; формула — 82%, шторм — 82%), отправление на 18 ч позже планового рейса, бездействие +48 ч, через Махачкалу +6 ч, расчётная экономия 298 320 ₽. По трём грузам: 126 груз-часов, 596 640 ₽.
 
 Подписи одинаковые на всех платформах:
 - статусы: Запланирован ⚪, В пути 🔵, Под риском 🔴, Перестроен 🟢, Доставлен ✅;

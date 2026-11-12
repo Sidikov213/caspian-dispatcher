@@ -5,7 +5,7 @@ import { formatInt, shipmentNumber, formatHoursDelta, formatRub, formatSignedPct
 import { stormLeadHours, stormScope } from "@/lib/derive";
 import type { Alert, GraphNode, Scenario, Shipment, Weather } from "@/lib/types";
 import { AlertDecisionNote } from "./AlertDecisionNote";
-import { CheckIcon, CloseIcon, StormIcon } from "./icons";
+import { CheckIcon, CloseIcon, HazardIcon } from "./icons";
 
 interface Props {
   alert: Alert;
@@ -30,10 +30,19 @@ function name(nodes: Map<string, GraphNode>, id: string) {
 
 /** «Шторм закроет переправу Астрахань — Энзели» по заблокированному этапу рекомендованного плана. */
 function headline(alert: Alert, scenario: Scenario | null, weather: Weather | null, nodes: Map<string, GraphNode>): string {
-  if ((!scenario || scenario.type === "storm") && stormScope(weather) === "full") return "Шторм остановит паромы\nна всём Каспии";
+  const hz = alert.hazard ?? scenario?.hazard ?? scenario?.type ?? "storm";
+  if (hz === "storm" && stormScope(weather) === "full") return "Шторм остановит паромы\nна всём Каспии";
   const blocked = alert.items.flatMap((i) => i.from_route?.legs ?? []).find((l) => l.status === "blocked");
-  if (!blocked || (scenario && scenario.type !== "storm")) return alert.title;
-  return `Шторм закроет ${blocked.mode === "sea" ? "переправу" : "участок"}\n${name(nodes, blocked.from)} — ${name(nodes, blocked.to)}`;
+  if (!blocked || (hz !== "storm" && hz !== "ice")) return alert.card?.headline ?? alert.title;
+  const what = hz === "ice" ? "Лёд закроет" : "Шторм закроет";
+  return `${what} ${blocked.mode === "sea" ? "переправу" : "участок"}\n${name(nodes, blocked.from)} — ${name(nodes, blocked.to)}`;
+}
+
+/** Подзаголовок угрозы над заголовком. */
+function kicker(hz: string): string {
+  if (hz === "ice") return "Ледовая обстановка";
+  if (hz === "storm") return "Прогноз шторма";
+  return "Угроза";
 }
 
 function shortOptionTitle(title: string) {
@@ -54,6 +63,7 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, c
   const choices = alert.options.filter((o) => o.id !== "wait");
   const [picked, setPicked] = useState<string | null>(null);
   const best = choices.find((o) => o.id === picked) ?? choices.find((o) => o.recommended) ?? choices[0] ?? null;
+  const hz = alert.hazard ?? scenario?.hazard ?? scenario?.type ?? "storm";
   const lead = alert.starts_in_h != null ? Math.round(alert.starts_in_h) : stormLeadHours(alert, weather, scenario);
   const affected = alert.items
     .map((i) => shipments.find((s) => s.id === i.shipment_id))
@@ -80,10 +90,10 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, c
 
       <div className="flex pt-[17px]">
         <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[10px] bg-risk-soft text-risk-text">
-          <StormIcon size={18} />
+          <HazardIcon hazard={hz} size={18} />
         </span>
         <div className="caps mt-[2px] ml-[13px] text-[10.5px] leading-[13px] font-bold text-risk-text">
-          {scenario && scenario.type !== "storm" ? "Угроза" : "Прогноз шторма"}
+          {kicker(hz)}
           {lead !== null && <> &nbsp;/&nbsp; через {lead}&nbsp;ч</>}
           {alert.source && <> &nbsp;/&nbsp; {alert.source === "forecast" ? "найдено в прогнозе" : "сценарий"}</>}
         </div>
@@ -94,6 +104,19 @@ export function AlertModal({ alert, scenario, weather, shipments, nodes, busy, c
         Под риском {count}&nbsp;{plural(count, "груз", "груза", "грузов")}
         {affected.map((s) => ` · ${shipmentNumber(s.id)} ${s.title}`).join("")}
       </p>
+      {alert.card && (
+        <div className="mt-[10px] flex flex-wrap gap-[6px]">
+          {alert.card.period && (
+            <span className="rounded-[6px] bg-tile px-[8px] py-[3px] text-[11.5px] text-muted">{alert.card.period}</span>
+          )}
+          {alert.card.metrics.map((m) => (
+            <span key={m.key} className="rounded-[6px] bg-tile px-[8px] py-[3px] text-[11.5px]">
+              <span className="text-muted">{m.label}:</span> <b>{m.value}</b>
+            </span>
+          ))}
+        </div>
+      )}
+      {alert.card?.note && <p className="mt-[8px] text-[11.5px] font-semibold text-warn-text">{alert.card.note}</p>}
 
       <div className="mt-[17px] flex gap-[7px]">
         <div className="h-[111px] flex-1 rounded-[12px] border border-[var(--color-risk-line)] bg-risk-soft px-[13px] pt-[10px]">

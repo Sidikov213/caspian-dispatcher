@@ -26,14 +26,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
+from .hazards import closure_factor
 from .util import MSK, H, hours, ru
 from .weather import Weather
 
 log = logging.getLogger("caspian")
 
-# Логистическая формула: logit = A0 + B·превышение волны + Q·(очередь+таможня, ч) − C·ln(запас + K).
+# Логистическая формула: logit = A0 + «порт закрыт» + Q·(очередь+таможня, ч) − C·ln(запас + K).
 # Подобрана так, чтобы на шторме у №01–03 (запас 2/8/18 ч, волна 3,4 м) выходило 82/74/68%.
+# «Порт закрыт» — одно слагаемое для любой причины: при волне это B·превышение предела, при льде —
+# тот же вклад, что даёт закрытие штормом 3,4 м (B·0,9 = +2,3 к логиту). Причина закрытия на срыв
+# стыковки не влияет; коэффициент не подбирался под ледовый сценарий.
 A0, B_WAVE, Q_DELAY, C_SLACK, K_SLACK = -2.569, 2.56, 0.3, 0.3709, 0.35
+PORT_CLOSED_LOGIT = round(B_WAVE * (3.4 - 2.5), 3)   # 2,304 — закрытие порта льдом
 QUEUE_H_PER_LOAD = 20      # очередь судов: 20 ч на каждые 100% загрузки сверх 60%
 QUEUE_FREE_LOAD = 0.6
 LAND_SLACK_H = 24          # для сухопутного маршрута «запас» — сутки
@@ -42,7 +47,8 @@ LAND_SLACK_H = 24          # для сухопутного маршрута «з
 FEATURES = ["wave_height_m", "wind_ms", "port_congestion", "customs_queue_h", "buffer_hours",
             "month", "weekday", "cargo_type", "port_id", "ice"]
 CAT_FEATURES = ["cargo_type", "port_id"]
-# Лёд: в прототипе по календарю — Астрахань и Оля, декабрь–март. Махачкала не замерзает.
+# Лёд (признак ice модели) — флаг сценария, а не календарь: живого источника ледовой обстановки нет.
+# В истории для обучения лёд бывает у Астрахани и Оли в декабре–марте; Махачкала не замерзает.
 ICE_PORTS = {"astrakhan", "olya"}
 ICE_MONTHS = {12, 1, 2, 3}
 
@@ -90,7 +96,7 @@ class PredictContext:
                 "buffer_hours": max(hours(self.ready_at, self.cutoff), 0.0),
                 "month": local.month, "weekday": local.weekday(),
                 "cargo_type": self.cargo_type, "port_id": self.port,
-                "ice": int(self.port in ICE_PORTS and local.month in ICE_MONTHS)}
+                "ice": int(self.weather.iced_between(self.port, self.ready_at, self.departure))}
 
 
 @dataclass
@@ -124,6 +130,7 @@ class Timing:
     delay_h: float          # очередь судов + таможня
     wave_max: float
     slack_h: float
+    closed_by: str | None = None   # причина закрытия порта в момент отправления: ice | storm | None
 
 
 def timing(ctx: PredictContext) -> Timing:
@@ -132,8 +139,9 @@ def timing(ctx: PredictContext) -> Timing:
     delay = q + ctx.customs_h
     w = ctx.weather
     dep = ctx.departure
-    closed = w.wave(ctx.port, dep) >= ctx.wave_limit
-    port_open = (w.first_calm(ctx.port, dep, ctx.wave_limit) or dep + H(168)) if closed else dep
+    closed_by = w.closure(ctx.port, dep, ctx.wave_limit)
+    closed = closed_by is not None
+    port_open = (w.first_open(ctx.port, dep, ctx.wave_limit) or dep + H(168)) if closed else dep
     wave_delay = hours(dep, port_open)
     handling_buffer = hours(ctx.cutoff, dep)       # окончание приёма → отправление
     earliest = max(dep, ctx.ready_at + H(delay + handling_buffer))
@@ -141,12 +149,12 @@ def timing(ctx: PredictContext) -> Timing:
         earliest = max(earliest, port_open + H(delay))
     wave_max = w.max_wave(ctx.port, ctx.ready_at, port_open)
     factors = [
-        {"name": "wave_height", "label": f"Волна {ru(wave_max)} м", "impact_hours": wave_delay},
+        closure_factor(closed_by, wave_max, wave_delay),
         {"name": "port_congestion", "label": f"Загрузка порта {round(ctx.congestion * 100)}%",
          "impact_hours": q},
         {"name": "customs_queue", "label": "Очередь на таможне", "impact_hours": ctx.customs_h},
     ]
-    return Timing(earliest, factors, q, delay, wave_max, max(hours(ctx.ready_at, ctx.cutoff), 0.0))
+    return Timing(earliest, factors, q, delay, wave_max, max(hours(ctx.ready_at, ctx.cutoff), 0.0), closed_by)
 
 
 def land_result(ctx: PredictContext) -> PredictorResult:
@@ -166,8 +174,9 @@ class FormulaPredictor:
         if ctx.port is None:
             return land_result(ctx)
         t = timing(ctx)
-        z = (A0 + B_WAVE * max(0.0, t.wave_max - ctx.wave_limit) + Q_DELAY * t.delay_h
-             - C_SLACK * math.log(t.slack_h + K_SLACK))
+        closed = max(B_WAVE * max(0.0, t.wave_max - ctx.wave_limit),
+                     PORT_CLOSED_LOGIT if t.closed_by == "ice" else 0.0)
+        z = A0 + closed + Q_DELAY * t.delay_h - C_SLACK * math.log(t.slack_h + K_SLACK)
         return PredictorResult(round(_sigmoid(z), 2), t.earliest, t.factors, ctx.features())
 
 

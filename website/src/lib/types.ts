@@ -147,9 +147,15 @@ export interface Stats {
   at_risk: number;
 }
 
+export type Hazard = "ice" | "storm" | "congestion" | "customs";
+
 export interface Scenario {
   id: string;
-  type: "storm" | "congestion" | "customs";
+  type: Hazard;
+  /** Тип угрозы; у старых сценариев может не быть — тогда по type. */
+  hazard?: Hazard | null;
+  /** У шторма — «Стресс-тест: …». */
+  note?: string | null;
   title: string;
   blocked_edges: string[];
   affected_nodes: string[];
@@ -165,6 +171,10 @@ export interface Scenario {
 export interface ScenarioPreset {
   key: string;
   title: string;
+  hazard?: Hazard | null;
+  /** Главный сценарий демо (ice_north). */
+  main?: boolean;
+  note?: string | null;
 }
 
 export interface AlertItem {
@@ -213,6 +223,28 @@ export interface Alert {
   source?: "forecast" | "scenario" | null;
   /** Почему алерт закрыт: «угроза снята», «заменён алертом …», «по этим грузам решение уже принято». */
   status_note?: string | null;
+  hazard?: Hazard | null;
+  /** Компактная карточка: готовые строки с сервера, рисуем как есть. */
+  card?: AlertCard | null;
+}
+
+export interface AlertCard {
+  kind: Hazard;
+  headline: string;
+  subtitle: string;
+  period: string | null;
+  metrics: { key: string; label: string; value: string }[];
+  route: { sailing_label: string; from: string; to: string; departure: string } | null;
+  impact: { shipments: number; weight_t: number; max_risk_pct: number };
+  note: string | null;
+  decision: {
+    status: "accepted" | "rejected";
+    title: string;
+    detail: string;
+    via: "web" | "telegram" | null;
+    via_label: string | null;
+    accepted_by_name: string | null;
+  } | null;
 }
 
 export interface AcceptedBy {
@@ -387,4 +419,6 @@ export interface DataSources {
   sources: DataSource[];
   corridor_facts: { text: string; source: string }[];
   backtest: Backtest | null;
+  /** Почему главный сценарий — лёд: факты, честная пометка об источнике, вывод ретроспективы. */
+  ice?: { title: string; facts: { text: string; source: string | null }[]; note: string; conclusion: string | null } | null;
 }

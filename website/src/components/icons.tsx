@@ -93,6 +93,20 @@ export const WavesIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const IceIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 2v20M4.2 6.5l15.6 9M4.2 17.5l15.6-9" />
+    <path d="m9.5 3.8 2.5 2 2.5-2M9.5 20.2l2.5-2 2.5 2M3.6 9.6l3.1-.5-1-3M20.4 14.4l-3.1.5 1 3M3.6 14.4l3.1.5-1 3M20.4 9.6l-3.1-.5 1-3" />
+  </Icon>
+);
+
+/** Значок угрозы по Alert.hazard / Scenario.hazard. */
+export function HazardIcon({ hazard, ...p }: IconProps & { hazard?: string | null }) {
+  if (hazard === "ice") return <IceIcon {...p} />;
+  if (hazard === "congestion" || hazard === "customs") return <TriangleAlertIcon {...p} />;
+  return <StormIcon {...p} />;
+}
+
 export const StormIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M6 16.33A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.97" />

@@ -18,6 +18,7 @@ from pathlib import Path
 import jwt
 
 from . import dispatcher as D
+from .card import build_card
 from .clock import Clock
 from .config import (DEMO_NOW, PASS_SECRET, SCENARIO_ANCHOR, SEED_PATH, USERS_PATH, WEATHER_CACHE_PATH,
                      WEATHER_MODE)
@@ -382,6 +383,7 @@ class State:
                 raise ApiError(409, "already_accepted", "Алерт уже принят")
             if a["status"] == "new":
                 a["status"] = "rejected"
+                a["card"] = build_card(self, a)
                 self.emit("alert.updated", a)
             return copy.deepcopy(a)
 

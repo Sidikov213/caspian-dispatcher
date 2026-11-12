@@ -79,6 +79,34 @@ export function DataSection() {
             ))}
           </Table>
 
+          {data.ice && (
+            <Card className="mt-[16px] px-[20px] py-[20px]">
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-[18px] font-bold">{data.ice.title}</h2>
+                <Pill tone="warn">лёд — смоделирован</Pill>
+              </div>
+              {data.ice.conclusion && <p className="mt-[10px] text-[15px] leading-[21px]">{data.ice.conclusion}</p>}
+              <ul className="mt-[12px] grid grid-cols-2 gap-x-[24px] gap-y-[8px] text-[14px] leading-[19px]">
+                {data.ice.facts.map((f) => (
+                  <li key={f.text} className="flex gap-[8px]">
+                    <span className="mt-[7px] size-[5px] shrink-0 rounded-full bg-transit" />
+                    <span>
+                      {f.text}
+                      {f.source ? (
+                        <a href={f.source} target="_blank" rel="noreferrer" className="ml-[6px] text-[12px] text-transit-text hover:underline">
+                          {host(f.source)}
+                        </a>
+                      ) : (
+                        <span className="ml-[6px] text-[12px] text-muted">источник уточняется</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-[12px] text-[13px] text-warn-text">{data.ice.note}</p>
+            </Card>
+          )}
+
           <div className="mt-[16px] grid grid-cols-[1fr_2fr] gap-[16px]">
             <Card className="px-[20px] py-[20px]">
               <h2 className="text-[18px] font-bold">Коридор «Север–Юг» в 2025 году</h2>

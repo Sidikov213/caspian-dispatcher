@@ -68,8 +68,9 @@ def first_sailing(ctx: Ctx, eid: str, ready, weight_t: float, not_before=None,
         if ctx.edge_blocked_at(eid, dep):
             reason = reason or "edge_blocked"
             continue
-        if check_wave and ctx.weather.wave(s["from"], dep) >= ctx.wave_limit:
-            reason = reason or "wave_above_limit"
+        closed = ctx.weather.closure(s["from"], dep, ctx.wave_limit) if check_wave else None
+        if closed:
+            reason = reason or ("ice" if closed == "ice" else "wave_above_limit")
             continue
         if ctx.free_t(s["id"]) < weight_t:
             reason = reason or "no_capacity"

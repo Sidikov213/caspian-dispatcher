@@ -7,7 +7,7 @@ import { formatDecimal, formatInt, formatRub, formatSignedPct } from "@/lib/form
 import { ROLE_LABEL, can, clearSession, useSessionUser } from "@/lib/session";
 import { setSiteTheme, useSiteTheme } from "@/lib/theme";
 import type { ScenarioPreset, Stats } from "@/lib/types";
-import { ChevronDownIcon, ClockIcon, CloseIcon, LeafIcon, LogoWordmark, RouteIcon, StormIcon, WavesIcon } from "./icons";
+import { ChevronDownIcon, ClockIcon, CloseIcon, HazardIcon, LeafIcon, LogoWordmark, RouteIcon, StormIcon, WavesIcon } from "./icons";
 
 interface Props {
   stats: Stats | null;
@@ -61,6 +61,10 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
   const user = useSessionUser();
   const canScenario = can(user, "run_scenario");
   const canReset = can(user, "reset_demo");
+  // Главный сценарий — по флагу main с сервера (ice_north); шторм — стресс-тест, второй ряд с подписью.
+  const main = presets.find((p) => p.main) ?? presets[0] ?? null;
+  const stress = presets.filter((p) => p !== main && p.hazard === "storm");
+  const others = presets.filter((p) => p !== main && p.hazard !== "storm");
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -137,28 +141,47 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
           {open && (
             <div
               role="menu"
-              className="absolute top-[47px] right-[-49px] w-[223px] rounded-[12px] border border-line bg-panel pt-px pb-[11px] shadow-[0_16px_40px_var(--color-shadow)]"
+              className="absolute top-[47px] right-[-49px] w-[280px] rounded-[12px] border border-line bg-panel pt-px pb-[11px] shadow-[0_16px_40px_var(--color-shadow)]"
             >
-              {canScenario && presets.map((p, i) => (
+              {canScenario && main && (
+                <div className="px-[10px] pt-[10px] pb-[6px]">
+                  <div className="caps px-[2px] pb-[6px] text-[9.5px] font-bold text-muted">Главный сценарий</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onScenario(main.key);
+                    }}
+                    className="flex h-[44px] w-full items-center gap-[10px] rounded-[8px] bg-action px-[12px] text-left text-[13px] font-bold text-white transition-colors hover:bg-action-hover"
+                  >
+                    <HazardIcon hazard={main.hazard} size={16} />
+                    {main.title}
+                  </button>
+                </div>
+              )}
+              {canScenario && stress.length > 0 && (
+                <div className="border-t border-line px-[12px] pt-[8px] pb-[2px]">
+                  <div className="caps text-[9.5px] font-bold text-muted">Стресс-тесты</div>
+                  {stress[0].note && <div className="mt-[3px] text-[10.5px] leading-[13px] text-warn-text">{stress[0].note}</div>}
+                </div>
+              )}
+              {canScenario && [...stress, ...others].map((p, i) => (
+                <div key={p.key} className={i === stress.length && i > 0 ? "mt-[4px] border-t border-line pt-[4px]" : undefined}>
                 <button
-                  key={p.key}
                   type="button"
                   role="menuitem"
+                  title={p.note ?? undefined}
                   onClick={() => {
                     setOpen(false);
                     onScenario(p.key);
                   }}
-                  className={`flex h-[36px] w-full items-center gap-[9px] px-[12px] text-left text-[11px] transition-colors hover:bg-tile ${
-                    i === 0 ? "font-bold text-text" : "font-medium text-muted"
-                  }`}
+                  className="flex h-[34px] w-full items-center gap-[9px] px-[12px] text-left text-[11.5px] font-medium text-muted transition-colors hover:bg-tile hover:text-text"
                 >
-                  {p.key === "storm_north" ? (
-                    <StormIcon size={14} className="text-risk-text" />
-                  ) : (
-                    <WavesIcon size={14} className="text-muted" />
-                  )}
+                  <HazardIcon hazard={p.hazard} size={14} className={p.hazard === "storm" ? "text-risk-text" : "text-muted"} />
                   {p.title}
                 </button>
+                </div>
               ))}
               {canReset && <button
                 type="button"

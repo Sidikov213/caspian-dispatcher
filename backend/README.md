@@ -120,17 +120,19 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 
 Постоянный адрес для команды, сайта, приложения и бота:
 
+- **Сайт (логист):** `https://129-101-122-103.sslip.io/`
 - **API:** `https://129-101-122-103.sslip.io/api`, заголовок `X-API-Key: <ключ из чата>` (это не `caspian-dev-key`).
 - **WebSocket:** `wss://129-101-122-103.sslip.io/ws?api_key=<ключ>`.
 - **Swagger:** https://129-101-122-103.sslip.io/docs
+- **Telegram mini-app (позже):** `https://129-101-122-103.sslip.io/tg/`
 
-Сервер: VPS Timeweb (Амстердам), Ubuntu 24.04, 1 ГБ памяти + 2 ГБ подкачки. HTTPS — Caddy с сертификатом Let's Encrypt на домен `sslip.io` (он сам указывает на IP, покупать домен не нужно). Наружу открыты только 22, 80, 443 (ufw); uvicorn слушает `127.0.0.1:8000`, один процесс, сервис systemd `caspian-backend` с автозапуском и перезапуском при падении. Код лежит в `/opt/caspian/backend`, `.env` собирается из секретов репозитория при выкатке.
+Сервер: VPS Timeweb (Амстердам), Ubuntu 24.04, 1 ГБ памяти + 2 ГБ подкачки. HTTPS — Caddy с сертификатом Let's Encrypt на домен `sslip.io` (он сам указывает на IP, покупать домен не нужно). Наружу открыты только 22, 80, 443 (ufw); uvicorn слушает `127.0.0.1:8000`, один процесс, сервис systemd `caspian-backend` с автозапуском и перезапуском при падении. Код бэкенда — `/opt/caspian/backend`, статика сайта — `/opt/caspian/website`, `.env` собирается из секретов репозитория при выкатке. Caddy: `/` → сайт, `/api` и `/ws` → backend.
 
 **Telegram-бот работает только здесь.** Один токен — одно место: в локальном `.env` `BOT_TOKEN` пустой. Привязки пользователей (`data/users.json`) на сервер не переносились — после переезда каждый один раз жмёт `/start`. Аккаунты сайта (`data/accounts.json`) на сервере свои; демо-аккаунты `logist@demo.ru` / `expeditor@demo.ru` созданы при первом старте.
 
 ### Выкатка и обслуживание — одной командой
 
-Выкатка идёт через GitHub Actions (`.github/workflows/deploy.yml`): раннер GitHub заходит на сервер по SSH, копирует `backend/` через rsync (без `.venv`, `.env`, кэшей и локальных данных), пишет `.env`, ставит зависимости, перезапускает сервис и прогоняет проверки. Выкатывается то, что запушено в `main`.
+Выкатка идёт через GitHub Actions (`.github/workflows/deploy.yml`): раннер GitHub заходит на сервер по SSH, собирает `website/` (Next static export с `NEXT_PUBLIC_API_URL=https://129-101-122-103.sslip.io`), копирует `backend/` и `website/out/` через rsync, пишет `.env`, ставит зависимости, настраивает Caddy, перезапускает сервис и прогоняет проверки (в т.ч. главная страница снаружи). Выкатывается то, что запушено в `main`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1            # выкатить main

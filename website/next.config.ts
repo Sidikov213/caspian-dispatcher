@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
+/** Статический экспорт для Caddy на `/`. Локально `next dev` тоже работает. */
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  output: "export",
+  images: { unoptimized: true },
   turbopack: {
     rules: {
       "*.css": {

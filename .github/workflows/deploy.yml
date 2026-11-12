@@ -1,6 +1,7 @@
-# Выкатка бэкенда на VPS (Timeweb, Ubuntu 24.04) и обслуживание. Запуск вручную или scripts/deploy.ps1.
-# Раннер GitHub ходит на VPS по SSH: с ноутбука тимлида сервер недоступен (сеть режет адрес).
-# Секреты репозитория: VPS_HOST, VPS_SSH_KEY, API_KEY, JWT_SECRET, BOT_TOKEN.
+# Выкатка бэкенда + сайта на VPS. Запуск вручную или scripts/deploy.ps1.
+# Раннер GitHub ходит на VPS по SSH: с ноутбука тимлида сервер недоступен.
+# Секреты: VPS_HOST, VPS_SSH_KEY, API_KEY, JWT_SECRET, BOT_TOKEN.
+# PUBLIC_URL: https://129-101-122-103.sslip.io — сайт на /, API /api, WS /ws, /tg/ зарезервирован.
 name: deploy
 
 on:
@@ -20,6 +21,9 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+env:
+  PUBLIC_URL: https://129-101-122-103.sslip.io
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -27,6 +31,7 @@ jobs:
     env:
       HOST: ${{ secrets.VPS_HOST }}
       APP: /opt/caspian/backend
+      WEB: /opt/caspian/website
     steps:
       - uses: actions/checkout@v4
 
@@ -41,15 +46,34 @@ jobs:
           echo "DOMAIN=${HOST//./-}.sslip.io" >> "$GITHUB_ENV"
           ssh -o BatchMode=yes root@"$HOST" 'echo "вход по ключу: $(hostname)"'
 
-      - name: Код на сервер (rsync, без .venv, .env и локальных данных)
+      - name: Сборка сайта (Next static export)
+        if: inputs.action == 'deploy'
+        env:
+          NEXT_PUBLIC_API_URL: ${{ env.PUBLIC_URL }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.API_KEY }}
+        working-directory: website
+        run: |
+          node -v
+          npm ci
+          npm run build
+          test -f out/index.html
+          echo "сайт собран: $(du -sh out | cut -f1)"
+
+      - name: Код backend на сервер (rsync)
         if: inputs.action == 'deploy'
         run: |
-          ssh root@"$HOST" "command -v rsync >/dev/null || (apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q rsync >/dev/null); mkdir -p $APP"
+          ssh root@"$HOST" "command -v rsync >/dev/null || (apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q rsync >/dev/null); mkdir -p $APP $WEB"
           rsync -az --delete \
             --exclude '.venv/' --exclude '.env' --exclude '__pycache__/' --exclude '.pytest_cache/' \
             --exclude 'data/accounts.json' --exclude 'data/users.json' --exclude 'data/weather_cache.json' \
             --exclude 'data/agent_keys*' --exclude '*.tmp' \
             backend/ root@"$HOST":"$APP"/
+
+      - name: Сайт на сервер (rsync out/ → /opt/caspian/website)
+        if: inputs.action == 'deploy'
+        run: |
+          rsync -az --delete website/out/ root@"$HOST":"$WEB"/
+          ssh root@"$HOST" "test -f $WEB/index.html && echo OK_SITE_FILES=\$(find $WEB -type f | wc -l)"
 
       - name: .env на сервере
         if: inputs.action == 'deploy'
@@ -58,8 +82,8 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          printf 'API_KEY=%s\nJWT_SECRET=%s\nBOT_TOKEN=%s\nWEATHER_MODE=live\nPREDICTOR=catboost\n' \
-            "$API_KEY" "$JWT_SECRET" "$BOT_TOKEN" \
+          printf 'API_KEY=%s\nJWT_SECRET=%s\nBOT_TOKEN=%s\nWEATHER_MODE=live\nPREDICTOR=catboost\nPUBLIC_URL=%s\n' \
+            "$API_KEY" "$JWT_SECRET" "$BOT_TOKEN" "$PUBLIC_URL" \
             | ssh root@"$HOST" "umask 077; cat > $APP/.env"
 
       - name: Настройка сервера и запуск (ufw, swap, venv, systemd, Caddy)
@@ -80,7 +104,7 @@ jobs:
         if: inputs.action != 'logs'
         run: ssh root@"$HOST" "$APP/.venv/bin/python $APP/deploy/server_check.py"
 
-      - name: Проверки снаружи (graph, вход, WebSocket, /docs)
+      - name: Проверки снаружи (главная, API, вход, WebSocket, /docs)
         if: inputs.action != 'logs'
         env:
           API_KEY: ${{ secrets.API_KEY }}
@@ -89,5 +113,6 @@ jobs:
             if curl -sf --max-time 10 "https://$DOMAIN/health" >/dev/null; then BASE="https://$DOMAIN"; else BASE="http://$HOST"; fi
           fi
           echo "адрес: $BASE"
+          echo "PUBLIC_URL: $PUBLIC_URL"
           python -m pip install -q httpx websockets
           python backend/deploy/external_check.py "$BASE"

@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Настройка VPS и выкатка бэкенда. Запускается workflow .github/workflows/deploy.yml от root после
-# rsync кода в /opt/caspian/backend и записи .env. Идемпотентно: повторный запуск ничего не ломает.
+# Настройка VPS и выкатка. Запускается workflow .github/workflows/deploy.yml от root после
+# rsync backend → /opt/caspian/backend, website/out → /opt/caspian/website и записи .env.
+# Идемпотентно: повторный запуск ничего не ломает.
 #   server_setup.sh <домен> <upgrade: 0|1>
 set -euo pipefail
 DOMAIN="$1"
 UPGRADE="${2:-0}"
 APP=/opt/caspian/backend
+WEB=/opt/caspian/website
 MARK=/opt/caspian/.bootstrapped
 export DEBIAN_FRONTEND=noninteractive
 
@@ -73,29 +75,96 @@ curl -sf http://127.0.0.1:8000/health && echo
 systemctl --no-pager --lines=0 status caspian-backend | sed -n '1,4p'
 done_
 
-step "Caddy: https://$DOMAIN → 127.0.0.1:8000"
-https_caddyfile() {
-  cat > /etc/caddy/Caddyfile <<CADDY
+step "Сайт: $WEB"
+if [ ! -f "$WEB/index.html" ]; then
+  echo "FAIL: нет $WEB/index.html — сначала соберите website и rsync out/"
+  exit 1
+fi
+echo "файлов: $(find "$WEB" -type f | wc -l), index: $(wc -c < "$WEB/index.html") байт"
+done_
+
+# Caddy: / → статика сайта; /api /ws /docs /health → uvicorn; /tg/ зарезервирован под мини-приложение.
+write_caddyfile() {
+  local scheme_host="$1"
+  if [ "$scheme_host" = "https" ]; then
+    cat > /etc/caddy/Caddyfile <<CADDY
 $DOMAIN {
 	encode gzip
-	reverse_proxy 127.0.0.1:8000
+
+	handle /api* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /ws {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /docs* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /redoc* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /openapi.json {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /health {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /tg/* {
+		respond "Telegram mini-app: скоро" 200
+	}
+
+	handle {
+		root * $WEB
+		try_files {path} /index.html
+		file_server
+	}
 }
 CADDY
-}
-http_caddyfile() {
-  cat > /etc/caddy/Caddyfile <<CADDY
+  else
+    cat > /etc/caddy/Caddyfile <<CADDY
 :80 {
 	encode gzip
-	reverse_proxy 127.0.0.1:8000
+
+	handle /api* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /ws {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /docs* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /redoc* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /openapi.json {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /health {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /tg/* {
+		respond "Telegram mini-app: скоро" 200
+	}
+
+	handle {
+		root * $WEB
+		try_files {path} /index.html
+		file_server
+	}
 }
 CADDY
+  fi
 }
-# Если раньше пришлось откатиться на HTTP, при каждой выкатке пробуем HTTPS снова.
-https_caddyfile
+
+step "Caddy: https://$DOMAIN → сайт + /api + /ws"
+write_caddyfile https
 systemctl enable caddy >/dev/null 2>&1
 systemctl reload caddy || systemctl restart caddy
 OK_HTTPS=0
-for i in $(seq 1 60); do   # до 5 минут на сертификат
+for i in $(seq 1 60); do
   if curl -sf --max-time 5 "https://$DOMAIN/health" >/dev/null; then OK_HTTPS=1; break; fi
   sleep 5
 done
@@ -104,7 +173,7 @@ if [ "$OK_HTTPS" = 1 ]; then
 else
   echo "HTTPS_FAILED: сертификат не выдан за 5 минут — оставляем HTTP на 80 порту"
   journalctl -u caddy -n 20 --no-pager | grep -iE "error|acme|certificate" | tail -8 || true
-  http_caddyfile
+  write_caddyfile http
   systemctl reload caddy || systemctl restart caddy
 fi
 done_

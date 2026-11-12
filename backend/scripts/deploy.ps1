@@ -18,9 +18,9 @@ Set-Location (Join-Path $PSScriptRoot "..\..")
 if ($Action -eq "deploy") {
     git fetch -q origin main
     $ahead = (git rev-list --count origin/main..HEAD).Trim()
-    $dirty = git status --porcelain -- backend
+    $dirty = git status --porcelain -- backend website .github/workflows/deploy.yml
     if ($ahead -ne "0") { Write-Warning "Локальных коммитов не в origin/main: $ahead. Выкатится только запушенное — сначала git push." }
-    if ($dirty) { Write-Warning "В backend/ есть незакоммиченные изменения — они не выкатятся." }
+    if ($dirty) { Write-Warning "Есть незакоммиченные изменения (backend/website/workflow) — они не выкатятся." }
 }
 
 $upgradeArg = if ($Upgrade) { "true" } else { "false" }
@@ -46,6 +46,6 @@ if ($Action -eq "logs") {
     $log | Select-Object -Last 240
 } else {
     $log |
-        Select-String -Pattern "^(OK  |FAIL|адрес:|HTTPS_)" | ForEach-Object { $_.Line }
+        Select-String -Pattern "^(OK  |FAIL|адрес:|PUBLIC_URL:|HTTPS_|OK_SITE)" | ForEach-Object { $_.Line }
 }
 exit $code

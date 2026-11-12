@@ -6,7 +6,7 @@ import type { WeatherSummary } from "@/lib/derive";
 import { formatDecimal, formatInt, formatRub, formatSignedPct } from "@/lib/format";
 import { ROLE_LABEL, can, clearSession, useSessionUser } from "@/lib/session";
 import { setSiteTheme, useSiteTheme } from "@/lib/theme";
-import type { ScenarioPreset, Stats } from "@/lib/types";
+import type { PlaybackSpeed, ScenarioPreset, Stats } from "@/lib/types";
 import { ChevronDownIcon, ClockIcon, CloseIcon, HazardIcon, LeafIcon, LogoWordmark, RouteIcon, StormIcon, WavesIcon } from "./icons";
 
 interface Props {
@@ -16,6 +16,39 @@ interface Props {
   presets: ScenarioPreset[];
   onScenario(preset: string): void;
   onReset(): void;
+  /** Ускоренный просмотр движения; null — не поддерживается (моки). */
+  playback?: PlaybackSpeed | null;
+  onPlayback?(speed: PlaybackSpeed): void;
+}
+
+const SPEEDS: { v: PlaybackSpeed; label: string }[] = [
+  { v: 0, label: "Пауза" },
+  { v: 60, label: "×60" },
+  { v: 600, label: "×600" },
+];
+
+/** «Движение: пауза / ×60 / ×600» — двигает только значки грузов на карте. */
+function PlaybackSwitch({ value, onChange }: { value: PlaybackSpeed; onChange(v: PlaybackSpeed): void }) {
+  return (
+    <div className="flex items-center gap-[8px]" role="group" aria-label="Движение грузов на карте">
+      <span className="text-[12px] font-bold text-muted">Движение</span>
+      <div className="flex h-[40px] items-center rounded-[8px] border border-line-strong bg-panel p-[3px]">
+        {SPEEDS.map((s) => (
+          <button
+            key={s.v}
+            type="button"
+            aria-pressed={value === s.v}
+            onClick={() => onChange(s.v)}
+            className={`tnum h-[32px] rounded-[6px] px-[10px] text-[13px] font-bold transition-colors ${
+              value === s.v ? "bg-action text-white" : "text-muted hover:bg-tile hover:text-text"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function Saved({ icon, value, label, good }: { icon: React.ReactNode; value: string; label: string; good?: boolean }) {
@@ -55,7 +88,7 @@ function ThemeToggle() {
   );
 }
 
-export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset }: Props) {
+export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset, playback, onPlayback }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const user = useSessionUser();
@@ -127,6 +160,7 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
 
       <div className="ml-auto flex items-center gap-[12px]">
         <ThemeToggle />
+        {canScenario && playback != null && onPlayback && <PlaybackSwitch value={playback} onChange={onPlayback} />}
         {(canScenario || canReset) && (
         <div ref={menuRef} className="relative">
           <button

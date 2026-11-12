@@ -13,6 +13,8 @@ import type {
   ModelInfo,
   Pass,
   PassVerify,
+  Playback,
+  PlaybackSpeed,
   Scenario,
   Sailing,
   ScenarioPreset,
@@ -72,6 +74,9 @@ export interface Api {
   /** Проверка пропуска: POST /passes/verify. */
   verifyPass(token: string): Promise<PassVerify>;
   resetDemo(): Promise<void>;
+  /** Ускоренный просмотр движения (только положение грузов). У моков нет. */
+  getPlayback?(): Promise<Playback>;
+  setPlayback?(speed: PlaybackSpeed): Promise<Playback>;
   register(body: { name: string; email: string; password: string; role: AuthRole }): Promise<AuthOut>;
   login(body: { email: string; password: string }): Promise<AuthOut>;
   me(token: string): Promise<AuthUser>;
@@ -132,6 +137,8 @@ const httpApi: Api = {
   resetDemo: async () => {
     await request("/demo/reset", { method: "POST" });
   },
+  getPlayback: () => request("/demo/playback"),
+  setPlayback: (speed) => request("/demo/playback", { method: "POST", body: JSON.stringify({ speed }) }),
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: (token) =>

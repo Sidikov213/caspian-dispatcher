@@ -43,6 +43,7 @@ dependencies:
   firebase_core: ^5.1.0
   firebase_messaging: ^17.0.1
   web_socket_channel: ^3.0.3
+  flutter_dotenv: ^6.0.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -76,6 +77,8 @@ flutter:
 
   assets:
     - assets/brand/caspian-dispatcher-app.svg
+    - .env
+    - .env.example
 
   fonts:
     - family: Inter

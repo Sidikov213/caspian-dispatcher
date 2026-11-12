@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Запуск с API из локального .env (не в assets/git).
+# Достаточно .env в корне проекта.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-exec flutter run --dart-define-from-file=.env "$@"
+exec flutter run "$@"

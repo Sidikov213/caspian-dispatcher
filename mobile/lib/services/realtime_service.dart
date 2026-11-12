@@ -10,12 +10,10 @@ typedef RealtimeConnectionHandler = void Function(bool connected);
 
 /// WebSocket контракта: `/ws?api_key=…`.
 class RealtimeService {
-  RealtimeService({RealtimeHandler? onEvent, RealtimeConnectionHandler? onConnection})
-    : _onEvent = onEvent,
-      _onConnection = onConnection;
+  RealtimeService({this.onEvent, this.onConnection});
 
-  final RealtimeHandler? _onEvent;
-  final RealtimeConnectionHandler? _onConnection;
+  final RealtimeHandler? onEvent;
+  final RealtimeConnectionHandler? onConnection;
 
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
@@ -62,7 +60,7 @@ class RealtimeService {
   void _setConnected(bool value) {
     if (_connected == value) return;
     _connected = value;
-    _onConnection?.call(value);
+    onConnection?.call(value);
   }
 
   void _onMessage(dynamic raw) {
@@ -71,7 +69,7 @@ class RealtimeService {
       if (decoded is! Map) return;
       final type = '${decoded['type'] ?? ''}';
       if (type.isEmpty) return;
-      _onEvent?.call(type, decoded['payload']);
+      onEvent?.call(type, decoded['payload']);
     } catch (_) {
       // Игнорируем битые кадры.
     }

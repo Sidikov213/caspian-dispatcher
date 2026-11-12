@@ -47,8 +47,7 @@ class ApiClient {
   Map<String, String> get _headers {
     if (apiKey.trim().isEmpty) {
       throw ApiException(
-        'Не задан API_KEY. Запустите с '
-        '--dart-define-from-file=.env или --dart-define=API_KEY=…',
+        'Не задан API_KEY. Пропишите его в файле .env в корне проекта.',
       );
     }
     return {'X-API-Key': apiKey, 'Accept': 'application/json'};

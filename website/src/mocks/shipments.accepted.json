@@ -12,8 +12,18 @@
     "rerouted": true,
     "display_status": "rerouted",
     "position": {
-      "lat": 53.4,
-      "lon": 40.225
+      "lat": 52.9732,
+      "lon": 40.4583,
+      "edge_id": "e-moscow-astrakhan",
+      "mode": "rail",
+      "progress": 0.25,
+      "heading_deg": 165.3,
+      "from_node": "moscow",
+      "to_node": "astrakhan",
+      "eta_next_node": "2026-11-13T17:00:00Z",
+      "waiting": false,
+      "waiting_reason": null,
+      "waiting_label": null
     },
     "current_leg": 0,
     "route": {
@@ -112,7 +122,7 @@
     "planned_eta": "2026-11-21T07:00:00Z",
     "eta": "2026-11-21T13:00:00Z",
     "risk": {
-      "miss_probability": 0.04,
+      "miss_probability": 0.06,
       "level": "low",
       "departure_shift_h": 0.0,
       "arrival_delay_h": 0.0,
@@ -124,18 +134,20 @@
         },
         {
           "name": "port_congestion",
-          "label": "Загрузка порта 55%",
-          "impact_hours": 0.0
+          "label": "Загрузка порта 64%",
+          "impact_hours": 1.0
         },
         {
           "name": "customs_queue",
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-01-r1",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   },
   {
     "id": "sh-02",
@@ -150,8 +162,18 @@
     "rerouted": true,
     "display_status": "rerouted",
     "position": {
-      "lat": 52.019,
-      "lon": 49.7862
+      "lat": 52.2145,
+      "lon": 48.052,
+      "edge_id": "e-samara-astrakhan",
+      "mode": "rail",
+      "progress": 0.1724,
+      "heading_deg": 242.2,
+      "from_node": "samara",
+      "to_node": "astrakhan",
+      "eta_next_node": "2026-11-13T11:00:00Z",
+      "waiting": false,
+      "waiting_reason": null,
+      "waiting_label": null
     },
     "current_leg": 0,
     "route": {
@@ -250,7 +272,7 @@
     "planned_eta": "2026-11-21T07:00:00Z",
     "eta": "2026-11-21T13:00:00Z",
     "risk": {
-      "miss_probability": 0.04,
+      "miss_probability": 0.06,
       "level": "low",
       "departure_shift_h": 0.0,
       "arrival_delay_h": 0.0,
@@ -262,18 +284,20 @@
         },
         {
           "name": "port_congestion",
-          "label": "Загрузка порта 55%",
-          "impact_hours": 0.0
+          "label": "Загрузка порта 64%",
+          "impact_hours": 1.0
         },
         {
           "name": "customs_queue",
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-02-r1",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   },
   {
     "id": "sh-03",
@@ -288,8 +312,18 @@
     "rerouted": true,
     "display_status": "rerouted",
     "position": {
-      "lat": 50.8825,
-      "lon": 46.2812
+      "lat": 50.7647,
+      "lon": 45.6975,
+      "edge_id": "e-saratov-astrakhan",
+      "mode": "rail",
+      "progress": 0.125,
+      "heading_deg": 195.6,
+      "from_node": "saratov",
+      "to_node": "astrakhan",
+      "eta_next_node": "2026-11-13T01:00:00Z",
+      "waiting": false,
+      "waiting_reason": null,
+      "waiting_label": null
     },
     "current_leg": 0,
     "route": {
@@ -381,14 +415,14 @@
         }
       ],
       "total_hours": 220.0,
-      "total_cost_rub": 206000.0,
-      "total_co2_kg": 3890.0,
+      "total_cost_rub": 212424.0,
+      "total_co2_kg": 3948.4,
       "branch": "transcaspian"
     },
     "planned_eta": "2026-11-21T07:00:00Z",
     "eta": "2026-11-21T13:00:00Z",
     "risk": {
-      "miss_probability": 0.04,
+      "miss_probability": 0.06,
       "level": "low",
       "departure_shift_h": 0.0,
       "arrival_delay_h": 0.0,
@@ -400,18 +434,20 @@
         },
         {
           "name": "port_congestion",
-          "label": "Загрузка порта 55%",
-          "impact_hours": 0.0
+          "label": "Загрузка порта 64%",
+          "impact_hours": 1.0
         },
         {
           "name": "customs_queue",
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-03-r1",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   },
   {
     "id": "sh-04",
@@ -426,8 +462,18 @@
     "rerouted": false,
     "display_status": "in_transit",
     "position": {
-      "lat": 39.038,
-      "lon": 49.086
+      "lat": 39.1065,
+      "lon": 48.7325,
+      "edge_id": "e-baku-astara",
+      "mode": "rail",
+      "progress": 0.6,
+      "heading_deg": 174.1,
+      "from_node": "baku",
+      "to_node": "astara",
+      "eta_next_node": "2026-11-12T15:00:00Z",
+      "waiting": false,
+      "waiting_reason": null,
+      "waiting_label": null
     },
     "current_leg": 0,
     "route": {
@@ -495,8 +541,8 @@
         }
       ],
       "total_hours": 145.0,
-      "total_cost_rub": 204350.0,
-      "total_co2_kg": 3928.8,
+      "total_cost_rub": 197255.0,
+      "total_co2_kg": 3864.2,
       "branch": "west"
     },
     "planned_eta": "2026-11-18T06:00:00Z",
@@ -517,10 +563,12 @@
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-04",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   },
   {
     "id": "sh-05",
@@ -534,10 +582,7 @@
     "risk_level": "low",
     "rerouted": false,
     "display_status": "planned",
-    "position": {
-      "lat": 46.35,
-      "lon": 48.04
-    },
+    "position": null,
     "current_leg": null,
     "route": {
       "id": "r-sh-05-plan",
@@ -583,9 +628,11 @@
           "label": "Очередь на таможне",
           "impact_hours": 1.0
         }
-      ]
+      ],
+      "probability_drivers": null
     },
     "pass_id": "pass-05",
-    "pass_state": "active"
+    "pass_state": "active",
+    "manual": false
   }
 ]

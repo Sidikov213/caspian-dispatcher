@@ -36,3 +36,30 @@
 .rm .leaflet-control-attribution { font-size: 11px; }
 .rm-dark .leaflet-control-attribution { background: rgba(11, 18, 32, 0.8); color: #8a97ad; }
 .rm-dark .leaflet-control-attribution a { color: #8fb8ff; }
+
+/* Живые грузы: значок по виду транспорта (вид сверху), обводка — цвет статуса, повёрнут по курсу */
+.rm-dark { --rm-fill: #131c2e; }
+.rm-light { --rm-fill: #ffffff; }
+.rm-live { position: relative; width: 28px; height: 28px; cursor: pointer; transition: opacity 0.2s; }
+.rm-live-rot { display: block; transform-origin: 50% 50%; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
+.rm-live-rot * { fill: var(--rm-fill); stroke: var(--c); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.rm-live-no {
+  position: absolute; top: -6px; right: -8px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px;
+  background: var(--c); color: #fff; font: 800 10px/15px var(--font-sans); text-align: center;
+  box-shadow: 0 0 0 1.5px var(--rm-fill);
+}
+.rm-live.dim { opacity: 0.4; }
+.rm-live.picked .rm-live-rot { filter: drop-shadow(0 0 4px var(--color-cyan)) drop-shadow(0 0 2px var(--color-cyan)); }
+.rm-live.wait .rm-live-rot * { stroke-dasharray: 3 2; }
+/* под риском — мягкая пульсация кольца под значком */
+.rm-live.pulse::before, .rm-cluster.pulse::before {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--c);
+  animation: rm-pulse 2.2s ease-out infinite; pointer-events: none;
+}
+@keyframes rm-pulse { 0% { transform: scale(0.7); opacity: 0.7; } 80%, 100% { transform: scale(1.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .rm-live.pulse::before, .rm-cluster.pulse::before { animation: none; opacity: 0.5; } }
+.rm-cluster {
+  position: relative; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--rm-fill); color: var(--c); border: 2.5px solid var(--c); font: 800 14px/1 var(--font-sans); cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}

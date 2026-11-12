@@ -28,6 +28,7 @@ from .predictor import PredictContext, PredictorResult
 from . import hazards as HZ
 from .card import build_card
 from .hazards import note_of
+from .livepos import live_position
 from .scenarios import make_scenario, public
 from .schedule import Ctx, build_legs, make_route, route_end
 from .weather import HORIZON_H
@@ -112,19 +113,11 @@ def risk_of(res: PredictorResult, departure=None, arrival_delay_h: float = 0) ->
     return risk
 
 
-def position(st, route: dict, stage: str, origin: str) -> tuple[dict, int | None]:
-    if stage == "planned":
-        n = st.graph.nodes[origin]
-        return {"lat": n["lat"], "lon": n["lon"]}, None
+def current_leg_of(route: dict) -> int | None:
     for leg in route["legs"]:
         if leg["status"] == "active":
-            s, e = parse(leg["planned_start"]), parse(leg["planned_end"])
-            k = hours(s, st.sim_now) / hours(s, e)
-            a, b = st.graph.nodes[leg["from"]], st.graph.nodes[leg["to"]]
-            return {"lat": round(a["lat"] + (b["lat"] - a["lat"]) * k, 4),
-                    "lon": round(a["lon"] + (b["lon"] - a["lon"]) * k, 4)}, leg["index"]
-    n = st.graph.nodes[route["legs"][-1]["to"]]
-    return {"lat": n["lat"], "lon": n["lon"]}, None
+            return leg["index"]
+    return None
 
 
 def set_route(st, sh: dict, route: dict, risk: dict, rerouted: bool | None = None) -> None:
@@ -134,7 +127,8 @@ def set_route(st, sh: dict, route: dict, risk: dict, rerouted: bool | None = Non
     if rerouted is not None:
         sh["rerouted"] = rerouted
     sh["eta"] = iso(route_end(route) + H(route["legs"][-1]["predicted_delay_h"]))
-    sh["position"], sh["current_leg"] = position(st, route, sh["stage"], sh["origin"])
+    sh["current_leg"] = current_leg_of(route) if sh["stage"] != "planned" else None
+    sh["position"] = live_position(st, sh)
     sh["display_status"] = M.display_status_of(sh["stage"], sh["risk_level"], sh["rerouted"])
 
 

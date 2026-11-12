@@ -77,9 +77,23 @@ class Edge(Model):
                           "Только рисование: море по акватории, суша вдоль трасс")
 
 
+WaitingReason = Literal["blocked", "sailing", "border", "transfer"]
+
+
 class Position(Model):
+    """Где груз на карте. Считает сервер от sim_now по расписанию этапов; точка — на Edge.path."""
     lat: float
     lon: float
+    edge_id: str = Field(description="Ребро текущего этапа (или следующего, если груз ждёт в узле)")
+    mode: Mode = Field(description="Вид транспорта этапа: rail | road | sea")
+    progress: float = Field(ge=0, le=1, description="Доля пройденного пути ребра; в ожидании — 0")
+    heading_deg: float = Field(ge=0, lt=360, description="Курс по линии ребра, градусы от севера по часовой")
+    from_node: str
+    to_node: str
+    eta_next_node: datetime = Field(description="Прибытие в to_node: planned_end этапа + predicted_delay_h")
+    waiting: bool = Field(False, description="Стоит в узле: ждёт рейс, граница, перегрузка, участок закрыт")
+    waiting_reason: WaitingReason | None = None
+    waiting_label: str | None = Field(None, description="«Ждёт рейс», «Граница и таможня», «Перегрузка», «Участок закрыт»")
 
 
 class Leg(Model):
@@ -139,7 +153,7 @@ class Shipment(Model):
     risk_level: RiskLevel
     rerouted: bool
     display_status: DisplayStatus = Field(description="Считает бэкенд, клиенты сами не выводят")
-    position: Position
+    position: Position | None = Field(None, description="null — ещё не выехал (planned) или доставлен")
     current_leg: int | None = None
     route: Route
     planned_eta: datetime

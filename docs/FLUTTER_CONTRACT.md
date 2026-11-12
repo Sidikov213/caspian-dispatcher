@@ -107,7 +107,9 @@ Telegram Mini App и `/tg/`, `POST /api/tg/auth`, второй способ ав
 
 ### Модели (имена полей точные)
 
-**Shipment**: `id`, `title`, `cargo_type`, `weight_t`, `owner_tg_id?`, `origin`, `destination`, `stage: planned|in_transit|delivered`, `risk_level: low|medium|high`, `rerouted: bool`, `display_status: planned|in_transit|at_risk|rerouted|delivered`, `position: {lat, lon}`, `current_leg: int|null`, `route: Route`, `planned_eta`, `eta`, `risk: Risk`, `pass_id: string|null`, `pass_state: none|active|reissue_pending`.
+**Shipment**: `id`, `title`, `cargo_type`, `weight_t`, `owner_tg_id?`, `origin`, `destination`, `stage: planned|in_transit|delivered`, `risk_level: low|medium|high`, `rerouted: bool`, `display_status: planned|in_transit|at_risk|rerouted|delivered`, `position: Position|null`, `current_leg: int|null`, `route: Route`, `planned_eta`, `eta`, `risk: Risk`, `pass_id: string|null`, `pass_state: none|active|reissue_pending`.
+
+**Position** (новое, необязательно для приложения): `lat`, `lon`, `edge_id`, `mode: rail|road|sea`, `progress: 0..1`, `heading_deg`, `from_node`, `to_node`, `eta_next_node`, `waiting: bool`, `waiting_reason?: sailing|border|transfer|blocked`, `waiting_label?` («Ждёт рейс», «Граница и таможня», «Перегрузка», «Участок закрыт»). Считает сервер от sim_now; у запланированного и доставленного груза `position: null` — раньше у запланированного была точка узла отправления, модель должна принимать null.
 
 **Route**: `id`, `legs`, `total_hours`, `total_cost_rub`, `total_co2_kg`, `branch: west|transcaspian|east`.
 

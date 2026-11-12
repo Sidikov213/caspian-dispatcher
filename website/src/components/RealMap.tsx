@@ -4,12 +4,14 @@ import "leaflet/dist/leaflet.css";
 import "./RealMap.css";
 
 import type * as LT from "leaflet";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pickFocus, pointWave } from "@/lib/derive";
 import { formatDecimal, shipmentIndex, shortNodeName } from "@/lib/format";
 import { useSiteTheme, type SiteTheme } from "@/lib/theme";
 import type { Alert, DisplayStatus, Edge, GraphNode, Leg, Mode, Route, Shipment, Weather } from "@/lib/types";
+import { edgeLine, routeKey, routeTrack, trackPoint, trackS, type Track } from "@/lib/map/live";
 import { CorridorMap } from "./CorridorMap";
+import { LiveCard, LiveList } from "./LiveCard";
 import { MinusIcon, PlusIcon, RailIcon, RoadIcon, RouteIcon, SeaIcon } from "./icons";
 
 type LatLng = [number, number];
@@ -87,19 +89,54 @@ const STATUS_COLOR: Record<DisplayStatus, string> = {
 };
 const DASH: Record<Mode, string | undefined> = { rail: undefined, sea: "12 10", road: "1 10" };
 
-function edgeLine(edge: Edge | undefined, nodes: Map<string, GraphNode>, from?: string): LatLng[] | null {
-  if (!edge) return null;
-  const a = nodes.get(edge.from);
-  const b = nodes.get(edge.to);
-  if (!a || !b) return null;
-  const pts: LatLng[] = [[a.lat, a.lon], ...(edge.path ?? []), [b.lat, b.lon]];
-  return from && from === edge.to ? pts.reverse() : pts;
-}
-
 function legLines(route: Route, edges: Map<string, Edge>, nodes: Map<string, GraphNode>) {
   return route.legs
     .map((leg: Leg) => ({ leg, pts: edgeLine(edges.get(leg.edge_id), nodes, leg.from) }))
     .filter((x): x is { leg: Leg; pts: LatLng[] } => !!x.pts);
+}
+
+// ---------- живые грузы: значки по виду транспорта, вид сверху, нос на север — поворот по heading_deg ----------
+const GLYPH: Record<Mode, string> = {
+  rail: '<path d="M10 13V6.2Q10 3 14 3t4 3.2V13Z"/><rect x="10" y="15" width="8" height="10" rx="1.6"/><path d="M14 13v2M11.8 6.5h4.4"/>',
+  road: '<rect x="9.5" y="2.8" width="9" height="6.4" rx="2.2"/><rect x="8.5" y="10.6" width="11" height="14.6" rx="1.6"/><path d="M11.5 5.4h5"/>',
+  sea: '<path d="M14 2.6c4.3 3.4 5.4 7.2 5.4 11.2v9.6c0 1.2-.8 2-2 2h-6.8c-1.2 0-2-.8-2-2v-9.6c0-4 1.1-7.8 5.4-11.2Z"/><rect x="11" y="16.6" width="6" height="5" rx="1"/>',
+};
+const LIVE_PX = 28;
+const ANIM_MS = 1500;
+/** Значки ближе этого (px на текущем масштабе) собираются в один со счётчиком. */
+const CLUSTER_PX = 22;
+const STATUS_RANK: Record<DisplayStatus, number> = { at_risk: 3, rerouted: 2, in_transit: 1, planned: 0, delivered: 0 };
+
+function liveHtml(s: Shipment, dim: boolean, picked: boolean): string {
+  const p = s.position!;
+  const cls = ["rm-live", s.display_status === "at_risk" ? "pulse" : "", dim ? "dim" : "", picked ? "picked" : "", p.waiting ? "wait" : ""]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    `<div class="${cls}" style="--c:${STATUS_COLOR[s.display_status]}">` +
+    `<svg class="rm-live-rot" viewBox="0 0 28 28" width="${LIVE_PX}" height="${LIVE_PX}" style="transform:rotate(${p.heading_deg}deg)">${GLYPH[p.mode]}</svg>` +
+    `<span class="rm-live-no">${shipmentIndex(s.id)}</span></div>`
+  );
+}
+
+function clusterHtml(list: Shipment[]): string {
+  const top = [...list].sort((a, b) => STATUS_RANK[b.display_status] - STATUS_RANK[a.display_status])[0];
+  return `<div class="rm-cluster${top.display_status === "at_risk" ? " pulse" : ""}" style="--c:${STATUS_COLOR[top.display_status]}">${list.length}</div>`;
+}
+
+const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
+/** Состояние одного значка между обновлениями с сервера. */
+interface Live {
+  marker: LT.Marker;
+  track: Track;
+  key: string;
+  /** Показанная точка — расстояние вдоль маршрута; null — ребра нет в маршруте, стоим в точке сервера. */
+  s: number | null;
+  from: number;
+  to: number;
+  t0: number;
+  html: string;
 }
 
 export function RealMap(props: Props) {
@@ -110,6 +147,15 @@ export function RealMap(props: Props) {
   const map = useRef<LT.Map | null>(null);
   const tiles = useRef<LT.TileLayer | null>(null);
   const layer = useRef<LT.LayerGroup | null>(null);
+  const liveLayer = useRef<LT.LayerGroup | null>(null);
+  const lives = useRef<Map<string, Live>>(new Map());
+  const clusters = useRef<LT.Marker[]>([]);
+  const raf = useRef<number | null>(null);
+  /** Груз, выбранный кликом по значку: карточка и подсветка маршрута. */
+  const [picked, setPicked] = useState<string | null>(null);
+  /** Несколько грузов в одной точке: список по клику на счётчик. */
+  const [group, setGroup] = useState<string[] | null>(null);
+  const [zoomSeq, setZoomSeq] = useState(0);
   const loaded = useRef(false);
   const [stage, setStage] = useState<Stage>("primary");
   const [ready, setReady] = useState(false);
@@ -132,6 +178,7 @@ export function RealMap(props: Props) {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let resize: ResizeObserver | undefined;
+    const liveMap = lives.current;
     (async () => {
       const lib = (await import("leaflet")).default;
       if (cancelled || !host.current) return;
@@ -140,7 +187,15 @@ export function RealMap(props: Props) {
       m.attributionControl.setPrefix(false);
       // без вида Leaflet откладывает добавление слоёв (и запрос тайлов); точный вид ставит эффект ниже
       m.setView([0, 0], 3);
-      map.current = m;      layer.current = lib.layerGroup().addTo(m);
+      map.current = m;
+      layer.current = lib.layerGroup().addTo(m);
+      liveLayer.current = lib.layerGroup().addTo(m);
+      // клик по пустому месту карты снимает выделение (значки и узлы клик дальше не пропускают)
+      m.on("click", () => {
+        setPicked(null);
+        setGroup(null);
+      });
+      m.on("zoomend", () => setZoomSeq((n) => n + 1));
 
       const add = (url: string) => {
         tiles.current?.remove();
@@ -183,6 +238,8 @@ export function RealMap(props: Props) {
       cancelled = true;
       clearTimeout(timer);
       resize?.disconnect();
+      if (raf.current) cancelAnimationFrame(raf.current);
+      liveMap.clear();
       map.current?.remove();
       map.current = null;
     };
@@ -217,10 +274,11 @@ export function RealMap(props: Props) {
       lib.polygon(zone, { color: zc, weight: 2, dashArray: "6 6", fillColor: zc, fillOpacity: props.zoneHazard === "ice" ? 0.2 : 0.14, interactive: false }).addTo(g);
     }
 
-    // 2. вся сеть коридора: тонко и приглушённо, стиль по виду транспорта
+    // 2. вся сеть коридора: тонко и приглушённо, стиль по виду транспорта; при выбранном значке — ещё тусклее
+    const pickedShip = picked ? (shipments.find((x) => x.id === picked) ?? null) : null;
     for (const e of edges.values()) {
       const pts = edgeLine(e, nodes);
-      if (pts) lib.polyline(pts, { color: net, weight: 3, opacity: 0.75, dashArray: DASH[e.mode], lineCap: "round", interactive: false }).addTo(g);
+      if (pts) lib.polyline(pts, { color: net, weight: 3, opacity: pickedShip ? 0.35 : 0.75, dashArray: DASH[e.mode], lineCap: "round", interactive: false }).addTo(g);
     }
 
     // 3. маршруты грузов: цвет — статус груза; выбранный толще
@@ -229,11 +287,17 @@ export function RealMap(props: Props) {
         lib.polyline(pts, { color, weight, opacity, dashArray: dash ?? DASH[leg.mode], lineCap: "round", interactive: false }).addTo(g);
       }
     };
-    for (const s of shipments) {
+    if (pickedShip) {
+      // клик по значку: весь маршрут груза бирюзой, остальные тускнеют
+      for (const s of shipments) if (s.id !== pickedShip.id) drawRoute(s.route, STATUS_COLOR[s.display_status], 3, 0.18);
+      drawRoute(pickedShip.route, theme === "dark" ? "#0B1220" : "#FFFFFF", 11, 0.9, "");
+      drawRoute(pickedShip.route, "var(--color-cyan)", 7, 1);
+    }
+    for (const s of pickedShip ? [] : shipments) {
       if (s.id === focus?.id) continue;
       drawRoute(s.route, STATUS_COLOR[s.display_status], 4, 0.55);
     }
-    if (focus) {
+    if (focus && !pickedShip) {
       if (focus.rerouted) {   // прежний маршрут — из принятого алерта, серым пунктиром
         const old = (alerts ?? []).filter((a) => a.status === "accepted")
           .flatMap((a) => a.items).find((i) => i.shipment_id === focus.id)?.from_route;
@@ -247,7 +311,7 @@ export function RealMap(props: Props) {
     for (const n of nodes.values()) {
       const dot = lib.circleMarker([n.lat, n.lon], {
         radius: n.type === "border" ? 4 : 6, color: theme === "dark" ? "#E6EDF7" : "var(--color-text)", weight: 2,
-        fillColor: theme === "dark" ? "#0B1220" : "var(--color-panel)", fillOpacity: 1,
+        fillColor: theme === "dark" ? "#0B1220" : "var(--color-panel)", fillOpacity: 1, bubblingMouseEvents: false,
       }).addTo(g);
       if (n.type !== "border") {
         dot.bindTooltip(shortNodeName(n.name), { permanent: true, direction: "auto", className: "rm-node", offset: [8, 0], interactive: true });
@@ -269,22 +333,128 @@ export function RealMap(props: Props) {
         .addTo(g);
     }
 
-    // 6. грузы — маркеры с номером в цвете статуса; клик открывает двойник
-    for (const s of shipments) {
-      if (!s.position) continue;
-      const isFocus = s.id === focus?.id && !!focusId;
-      const size = isFocus ? 36 : 30;
-      const icon = lib.divIcon({
-        className: "",
-        html: `<div class="rm-ship${isFocus ? " focus" : ""}" style="background:${STATUS_COLOR[s.display_status]}">${shipmentIndex(s.id)}</div>`,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-      });
-      lib.marker([s.position.lat, s.position.lon], { icon, zIndexOffset: isFocus ? 2000 : 1000, title: s.title, keyboard: true })
-        .on("click", () => onSelectRef.current(s.id))
-        .addTo(g);
+    // 6. грузы — отдельный слой живых значков (ниже): он не пересоздаётся, значки едут плавно
+  }, [ready, theme, nodes, edges, shipments, weather, focus, focusId, preview, calmWaves, checkpointNode, zone, alerts, props.zoneHazard, picked]);
+
+  // ---------- живые грузы: значок едет к точке сервера вдоль линии маршрута ----------
+  const tick = useCallback(function step() {
+    raf.current = null;
+    const now = performance.now();
+    let more = false;
+    for (const lv of lives.current.values()) {
+      if (lv.s === null || lv.s === lv.to) continue;
+      const k = Math.min((now - lv.t0) / ANIM_MS, 1);
+      lv.s = k >= 1 ? lv.to : lv.from + (lv.to - lv.from) * ease(k);
+      const { pt, heading } = trackPoint(lv.track, lv.s);
+      lv.marker.setLatLng(pt);
+      const rot = lv.marker.getElement()?.querySelector<SVGElement>(".rm-live-rot");
+      if (rot && k < 1) rot.style.transform = `rotate(${heading}deg)`;
+      if (k < 1) more = true;
     }
-  }, [ready, theme, nodes, edges, shipments, weather, focus, focusId, preview, calmWaves, checkpointNode, zone, alerts, props.zoneHazard]);
+    if (more) raf.current = requestAnimationFrame(step);
+  }, []);
+
+  useEffect(() => {
+    const lib = L.current;
+    const g = liveLayer.current;
+    const m = map.current;
+    if (!ready || !lib || !g || !m) return;
+    const icon = (html: string) => lib.divIcon({ className: "", html, iconSize: [LIVE_PX, LIVE_PX], iconAnchor: [LIVE_PX / 2, LIVE_PX / 2] });
+    const seen = new Set<string>();
+    const moving = shipments.filter((x) => x.position);
+    for (const s of moving) {
+      const pos = s.position!;
+      seen.add(s.id);
+      const html = liveHtml(s, !!picked && picked !== s.id, picked === s.id || (!picked && focusId === s.id));
+      const key = routeKey(s);
+      let lv = lives.current.get(s.id);
+      if (!lv) {
+        const track = routeTrack(s.route, edges, nodes);
+        const at = trackS(track, pos);
+        const marker = lib.marker([pos.lat, pos.lon], { icon: icon(html), zIndexOffset: 1000, title: s.title, keyboard: true, bubblingMouseEvents: false });
+        marker.on("click", () => {
+          setGroup(null);
+          setPicked(s.id);
+        });
+        marker.addTo(g);
+        lives.current.set(s.id, { marker, track, key, s: at, from: at ?? 0, to: at ?? 0, t0: 0, html });
+        continue;
+      }
+      if (lv.html !== html) {
+        lv.marker.setIcon(icon(html));
+        lv.html = html;
+      }
+      lv.marker.setZIndexOffset(picked === s.id ? 3000 : 1000);
+      // маршрут сменился (перестроение): показанную точку переносим на новую линию по ребру и доле пути
+      let cur = lv.s;
+      if (lv.key !== key) {
+        const track = routeTrack(s.route, edges, nodes);
+        if (cur !== null) {
+          const c = cur;
+          const old = lv.track.legs.find((l) => c >= l.start && c <= l.start + l.len);
+          const same = old ? track.legs.find((l) => l.edge_id === old.edge_id) : undefined;
+          cur = old && same ? same.start + (old.len ? ((c - old.start) / old.len) * same.len : 0) : null;
+        }
+        lv = Object.assign(lv, { track, key });
+      }
+      const target = trackS(lv.track, pos);
+      if (target === null || cur === null) {
+        lv.s = target;
+        lv.from = lv.to = target ?? 0;
+        lv.marker.setLatLng([pos.lat, pos.lon]);
+      } else if (Math.abs(target - cur) > 1e-6) {
+        lv.s = cur;
+        lv.from = cur;
+        lv.to = target;
+        lv.t0 = performance.now();
+      } else {
+        lv.s = lv.from = lv.to = target;
+        lv.marker.setLatLng([pos.lat, pos.lon]);
+      }
+      const rot = lv.marker.getElement()?.querySelector<SVGElement>(".rm-live-rot");
+      if (rot && lv.s === lv.to) rot.style.transform = `rotate(${pos.heading_deg}deg)`;
+    }
+    for (const [id, lv] of lives.current) {
+      if (seen.has(id)) continue;
+      lv.marker.remove();
+      lives.current.delete(id);
+    }
+    if (!raf.current) raf.current = requestAnimationFrame(tick);
+
+    // несколько грузов в одной точке — один значок со счётчиком (по точкам сервера, на текущем масштабе)
+    for (const c of clusters.current) c.remove();
+    clusters.current = [];
+    const pts = moving.map((x) => ({ s: x, p: m.latLngToLayerPoint([x.position!.lat, x.position!.lon]) }));
+    const used = new Set<string>();
+    for (const a of pts) {
+      if (used.has(a.s.id)) continue;
+      const near = pts.filter((b) => !used.has(b.s.id) && a.p.distanceTo(b.p) < CLUSTER_PX);
+      if (near.length < 2) continue;
+      near.forEach((b) => used.add(b.s.id));
+      const list = near.map((b) => b.s);
+      const c = lib.marker([a.s.position!.lat, a.s.position!.lon], {
+        icon: lib.divIcon({ className: "", html: clusterHtml(list), iconSize: [32, 32], iconAnchor: [16, 16] }),
+        zIndexOffset: 2500,
+        title: `Грузов в точке: ${list.length}`,
+        keyboard: true,
+        bubblingMouseEvents: false,
+      });
+      c.on("click", () => {
+        setPicked(null);
+        setGroup(list.map((x) => x.id));
+      });
+      c.addTo(g);
+      clusters.current.push(c);
+    }
+    for (const [id, lv] of lives.current) lv.marker.setOpacity(used.has(id) && picked !== id ? 0 : 1);
+  }, [ready, shipments, edges, nodes, picked, focusId, zoomSeq, tick]);
+
+  // выбранный груз исчез (сброс демо, доставлен) — снять выделение
+  const pickedShipment = picked ? (shipments.find((x) => x.id === picked && x.position) ?? null) : null;
+  useEffect(() => {
+    if (picked && !pickedShipment) setPicked(null);
+  }, [picked, pickedShipment]);
+  const groupShipments = group ? shipments.filter((x) => group.includes(x.id) && x.position) : [];
 
   if (stage === "svg") {
     // подложка не пришла ни с CARTO, ни с OSM — прежняя схема, демо от тайлов не зависит
@@ -312,6 +482,28 @@ export function RealMap(props: Props) {
         <RouteIcon size={16} />
         {wide ? "Каспий" : "Весь коридор"}
       </button>
+
+      {pickedShipment && (
+        <LiveCard
+          shipment={pickedShipment}
+          nodes={nodes}
+          onOpen={() => {
+            setPicked(null);
+            onSelect(pickedShipment.id);
+          }}
+          onClose={() => setPicked(null)}
+        />
+      )}
+      {!pickedShipment && groupShipments.length > 1 && (
+        <LiveList
+          shipments={groupShipments}
+          onPick={(id) => {
+            setGroup(null);
+            setPicked(id);
+          }}
+          onClose={() => setGroup(null)}
+        />
+      )}
 
       <div className="absolute bottom-[21px] left-5 z-[500] flex h-[42px] items-center gap-[16px] rounded-[10px] border border-line-strong bg-field px-[14px] text-[13px] font-bold text-text">
         <span className="flex items-center gap-[6px]"><RailIcon size={14} />Ж/д <i className="inline-block h-[3px] w-[22px] rounded bg-current" /></span>

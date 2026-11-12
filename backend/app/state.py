@@ -143,6 +143,7 @@ class State:
         self.alert_threat: dict[str, dict] = {}            # алерт → угроза, по которой он создан
         self.threat_alerts: dict[tuple, str | None] = {}  # угроза (вид, порт, рейс) → алерт (None — грузов нет)
         self.accept_results: dict[str, dict] = {}
+        self.alert_alloc: dict[str, dict | None] = {}     # алерт → кто получил место на рейсе (negotiation.allocate)
         self.decisions: list[dict] = []
         self.scenarios: dict[str, dict] = {}
         self.epoch = getattr(self, "epoch", 0) + 1   # номер прогона демо — для кнопок в Telegram
@@ -218,6 +219,8 @@ class State:
                 if (not from_ or s["from"] == from_) and (not to or s["to"] == to)]
 
     def alerts_list(self, status: str | None = None):
+        for a in self.alerts.values():   # срок решения мог пройти — вариант помечается недоступным
+            D.N.refresh_availability(self, a)
         return [copy.deepcopy(a) for a in self.alerts.values() if not status or a["status"] == status]
 
     def stats(self):

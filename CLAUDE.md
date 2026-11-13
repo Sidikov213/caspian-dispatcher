@@ -31,7 +31,7 @@
 - Telegram-бот — диспетчер: алерты с кнопками, вопросы свободным текстом.
 - Telegram Mini App (`backend/app/miniapp/`, `/tg/`) — пульт логиста внутри Telegram: Обзор, Грузы с двойником и новым грузом, Решения с принятием.
 
-**Продакшен:** `https://caspian-dispatcher.ru` (запасной адрес `https://129-101-122-103.sslip.io` работает так же) — сайт на `/`, API на `/api`, WebSocket на `/ws`, мини-приложение на `/tg/`. Один VPS, Caddy с HTTPS, выкатка через GitHub Actions (`backend/scripts/deploy.ps1`). Telegram-бот работает только там.
+**Продакшен:** демо-стенд выключен после хакатона. Пока работал — сайт на `/`, API на `/api`, WebSocket на `/ws`, мини-приложение на `/tg/`. Один VPS, Caddy с HTTPS, выкатка через GitHub Actions (`backend/scripts/deploy.ps1`). Telegram-бот работает только там.
 
 **Бонус:** фото инвойса на фарси → поля декларации на русском.
 
@@ -186,7 +186,7 @@ Block     {index, ts, event: issued|reissued|verified|negotiation, shipment_id,
 
 ## 5. Контракт API
 
-База: `/api` (продакшен `https://caspian-dispatcher.ru/api`). JSON, UTF-8, время в ISO 8601 UTC. Авторизация на всех `/api/*`: заголовок `X-API-Key` (сайт, приложение, бот) **или** `Authorization: Bearer <сессия мини-приложения>` из `POST /api/tg/auth`. Токен входа сайта (`/api/auth/*`) доступа к API не даёт, но если пришёл вместе с `X-API-Key`, сервер проверяет права роли (см. «Аккаунты»). Ошибки: `{"error": {"code": "...", "message": "...", "fields"?: [string]}}`; `fields` — поля запроса с ошибкой, где это известно. Неверное тело запроса — 422.
+База: `/api`. JSON, UTF-8, время в ISO 8601 UTC. Авторизация на всех `/api/*`: заголовок `X-API-Key` (сайт, приложение, бот) **или** `Authorization: Bearer <сессия мини-приложения>` из `POST /api/tg/auth`. Токен входа сайта (`/api/auth/*`) доступа к API не даёт, но если пришёл вместе с `X-API-Key`, сервер проверяет права роли (см. «Аккаунты»). Ошибки: `{"error": {"code": "...", "message": "...", "fields"?: [string]}}`; `fields` — поля запроса с ошибкой, где это известно. Неверное тело запроса — 422.
 
 | Метод | Путь | Запрос | Ответ |
 |---|---|---|---|
@@ -228,7 +228,7 @@ Block     {index, ts, event: issued|reissued|verified|negotiation, shipment_id,
 | POST | `/demo/playback` | `{speed: 0 \| 60 \| 600}` | то же; право `run_scenario`; 0 — пауза (смещение сохраняется), `demo/reset` обнуляет смещение и ставит 0; сценарий и accept смещение не трогают. Событие WS `playback.updated` с тем же телом. Меняет только `Shipment.position` |
 | POST | `/demo/fail_next_pass` (только демо) | — | `{ok: true}`; следующий выпуск пропуска сорвётся → груз получает `pass_state: reissue_pending`, старый пропуск активен, повтор через `/shipments/{id}/pass/retry` |
 
-Аккаунты: `X-API-Key` по-прежнему обязателен на всех `/api/*`, включая `/auth/*`; Bearer-токен (JWT HS256 на 7 дней, ключ из `JWT_SECRET`) нужен для `/auth/me` (имя, роль, права); `user` в ответах входа и `/auth/me` — `{id, name, email, role, permissions}`, права логиста `["run_scenario", "reset_demo", "decide_alert"]`, экспедитора `[]`. Если запрос пришёл с этим Bearer, сервер проверяет права: `accept`, `reject`, `reroute` — `decide_alert`; `POST /scenarios` — `run_scenario`; все `/demo/*` — `reset_demo`; нет права — 403 `forbidden_role`, неверный токен — 401 `invalid_token`. Запросы только с `X-API-Key` работают как раньше. Сессия мини-приложения и кнопки бота — права логиста; имя пользователя Telegram попадает в `accepted_by`. Пароль хранится только как хэш scrypt с солью в `data/accounts.json` (не в git), аккаунты переживают `demo/reset` и перезапуск. Демо-аккаунты создаются при первом старте: `logist@demo.ru` и `expeditor@demo.ru`, пароль `demo123`.
+Аккаунты: `X-API-Key` по-прежнему обязателен на всех `/api/*`, включая `/auth/*`; Bearer-токен (JWT HS256 на 7 дней, ключ из `JWT_SECRET`) нужен для `/auth/me` (имя, роль, права); `user` в ответах входа и `/auth/me` — `{id, name, email, role, permissions}`, права логиста `["run_scenario", "reset_demo", "decide_alert"]`, экспедитора `[]`. Если запрос пришёл с этим Bearer, сервер проверяет права: `accept`, `reject`, `reroute` — `decide_alert`; `POST /scenarios` — `run_scenario`; все `/demo/*` — `reset_demo`; нет права — 403 `forbidden_role`, неверный токен — 401 `invalid_token`. Запросы только с `X-API-Key` работают как раньше. Сессия мини-приложения и кнопки бота — права логиста; имя пользователя Telegram попадает в `accepted_by`. Пароль хранится только как хэш scrypt с солью в `data/accounts.json` (не в git), аккаунты переживают `demo/reset` и перезапуск. Демо-аккаунты логиста и экспедитора создаются при первом старте; пароли задаются при первом запуске.
 
 | POST | `/tg/auth` (без `X-API-Key`) | `{init_data}` — `Telegram.WebApp.initData` | `{token, expires_at, user: {id, name, username}, company}`; подпись initData по токену бота, срок 24 ч; 401 `invalid_init_data` / `init_data_expired`, 503 — на сервере нет токена бота. Сессия на 24 ч |
 

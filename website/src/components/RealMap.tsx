@@ -59,6 +59,8 @@ const ATTR_CARTO = `${ATTR_OSM} &copy; <a href="https://carto.com/attributions">
 const attributionFor = (url: string) => (url.includes("cartocdn") ? ATTR_CARTO : ATTR_OSM);
 /** Подложка не загрузилась — только если за это время не пришёл ни один тайл. */
 const TILE_TIMEOUT_MS = 5000;
+/** Новая зона угрозы проявляется за это время (класс rm-zone-in в globals.css). */
+const ZONE_IN_MS = 800;
 type Stage = "primary" | "fallback" | "svg";
 
 // ---------- вид: рамка из данных графа, не координаты в коде ----------
@@ -165,6 +167,7 @@ export function RealMap(props: Props) {
   const [group, setGroup] = useState<string[] | null>(null);
   const [zoomSeq, setZoomSeq] = useState(0);
   const loaded = useRef(false);
+  const zoneSeen = useRef<{ key: string; at: number } | null>(null);
   const [stage, setStage] = useState<Stage>("primary");
   const [ready, setReady] = useState(false);
   const [wide, setWide] = useState(false);
@@ -279,10 +282,18 @@ export function RealMap(props: Props) {
     g.clearLayers();
     const net = theme === "dark" ? "#5B6B86" : "#94A3B8";
 
-    // 1. зона угрозы — из Scenario.zone
+    // 1. зона угрозы — из Scenario.zone. Новая зона проявляется за ZONE_IN_MS; слой перерисовывается при
+    // каждом обновлении данных, поэтому анимация продолжается с того же места (отрицательная задержка).
+    if (!zone || zone.length < 3) zoneSeen.current = null;
     if (zone && zone.length >= 3) {
+      const zoneKey = zone.map((p) => p.join(",")).join(";");
+      const nowMs = performance.now();
+      if (zoneSeen.current?.key !== zoneKey) zoneSeen.current = { key: zoneKey, at: nowMs };
+      const age = nowMs - zoneSeen.current.at;
+      const fresh = age < ZONE_IN_MS;
       const zc = props.zoneHazard === "ice" ? "var(--color-transit)" : props.zoneHazard === "congestion" || props.zoneHazard === "customs" ? "var(--color-warn)" : "var(--color-risk)";
-      lib.polygon(zone, { color: zc, weight: 2, dashArray: "6 6", fillColor: zc, fillOpacity: props.zoneHazard === "ice" ? 0.2 : 0.14, interactive: false }).addTo(g);
+      const poly = lib.polygon(zone, { color: zc, weight: 2, dashArray: "6 6", fillColor: zc, fillOpacity: props.zoneHazard === "ice" ? 0.2 : 0.14, interactive: false, ...(fresh ? { className: "rm-zone-in" } : {}) }).addTo(g);
+      if (fresh) (poly.getElement() as SVGElement | undefined)?.style.setProperty("animation-delay", `-${Math.round(age)}ms`);
     }
 
     // 2. вся сеть коридора: тонко и приглушённо, стиль по виду транспорта; при выбранном значке — ещё тусклее

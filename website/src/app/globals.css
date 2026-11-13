@@ -120,7 +120,7 @@ body {
 @keyframes negotiation-step-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -133,6 +133,69 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .negotiation-step {
     animation: none;
+  }
+}
+
+/* ---------- Анимации показа. Только переходы: в конце экран такой же, как без них. При «уменьшить
+   движение» (prefers-reduced-motion) их нет. ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* счётчик расчётной экономии добежал до нового значения — один раз мягко подсвечивается зелёным */
+  @keyframes saved-flash {
+    0% {
+      background: transparent;
+      box-shadow: 0 0 0 0 transparent;
+    }
+    25% {
+      background: var(--color-ok-soft);
+      box-shadow: 0 0 0 7px var(--color-ok-soft);
+    }
+    100% {
+      background: transparent;
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+  .saved-flash {
+    border-radius: 8px;
+    animation: saved-flash 1.3s ease-out 1;
+  }
+
+  /* груз стал «Под риском» — строка списка один раз мягко подсвечивается красным */
+  @keyframes risk-flash {
+    0% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+    25% {
+      box-shadow:
+        0 0 0 3px var(--color-risk-line),
+        inset 0 0 0 100px var(--color-risk-soft);
+    }
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+  .risk-flash {
+    animation: risk-flash 1.4s ease-out 1;
+  }
+
+  /* зона угрозы на карте проявляется, а не возникает мгновенно */
+  @keyframes rm-zone-in {
+    from {
+      opacity: 0;
+    }
+  }
+  .rm-zone-in {
+    animation: rm-zone-in 0.8s ease-out both;
+  }
+
+  /* итог согласования: галочка появляется с лёгким увеличением */
+  @keyframes negotiation-done-in {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+  }
+  .negotiation-done {
+    animation: negotiation-done-in 0.35s ease-out both;
   }
 }
 

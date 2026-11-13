@@ -135,3 +135,183 @@ body {
     animation: none;
   }
 }
+
+/* ---------- Телефон (ширина до 767 px): минимальная адаптация. Всё ниже — только внутри медиа-запроса,
+   широкий экран не меняется. Разметка не тронута: блоки находятся по своим классам и ролям. ---------- */
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /* каркас: без минимальной ширины, страница прокручивается по вертикали */
+  html .min-w-\[1280px\] {
+    min-width: 0;
+    min-height: 100%;
+    height: auto;
+  }
+
+  /* шапка: в несколько строк, ширина блоков по содержимому, текст не обрезается */
+  html header.h-20 {
+    height: auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 26px 12px 10px;
+  }
+  html header.h-20 > div {
+    width: auto;
+    margin-left: 0;
+    padding-top: 0;
+    align-self: center;
+  }
+  html header.h-20 > .w-px {
+    display: none;
+  }
+  html header.h-20 > .ml-auto {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  html header.h-20 > .ml-auto > div {
+    border-left: 0;
+    padding-left: 0;
+  }
+  html header.h-20 [role="menu"] {
+    right: auto;
+    left: 0;
+    width: min(280px, calc(100vw - 24px));
+  }
+  html header.h-20 [role="menu"] button {
+    min-height: 44px;
+    height: auto;
+    white-space: normal;
+  }
+
+  /* колонки — в одну: разделы строкой, карта (около 55% экрана), под ней список грузов */
+  html .min-w-\[1280px\] > div.relative.flex {
+    flex: none;
+    flex-direction: column;
+  }
+  html nav[aria-label="Разделы"] {
+    order: 0;
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+    padding: 8px 12px;
+  }
+  html nav[aria-label="Разделы"] > * {
+    flex: none;
+    width: auto;
+  }
+  html .min-w-\[1280px\] > div.relative.flex > .relative.flex.min-w-0.flex-1 {
+    order: 1;
+    flex: none;
+    width: 100%;
+    height: 55vh;
+    min-height: 320px;
+  }
+  html .min-w-\[1280px\] > div.relative.flex > aside.w-\[320px\] {
+    order: 2;
+    width: 100%;
+  }
+
+  /* разделы с таблицами и журнал: горизонтальная прокрутка внутри блока, а не страницы */
+  html .min-w-\[1280px\] > div.relative.flex > .scroll-thin.flex-1 {
+    flex: none;
+    width: 100%;
+    overflow-x: auto;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  html .min-w-\[1280px\] > div.relative.flex > .scroll-thin.flex-1 table,
+  html .min-w-\[1280px\] > div.relative.flex > .scroll-thin.flex-1 [class*="grid-cols-["] {
+    min-width: 600px;
+  }
+
+  /* карточка алерта: на всю ширину снизу, прокрутка внутри, кнопки закреплены (sticky уже в разметке) */
+  html [role="dialog"][aria-label="Прогноз шторма"] {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 1100;
+    width: 100%;
+    max-height: 86vh;
+    border-radius: 14px 14px 0 0;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  /* в узкой карточке текст переносится, а не обрезается */
+  html [role="dialog"][aria-label="Прогноз шторма"] .truncate {
+    overflow: visible;
+    white-space: normal;
+  }
+  html [role="dialog"][aria-label="Прогноз шторма"] .h-\[111px\] {
+    height: auto;
+    padding-bottom: 10px;
+  }
+  html [role="dialog"][aria-label="Прогноз шторма"] h2 {
+    font-size: 20px;
+    line-height: 26px;
+  }
+  html [role="dialog"][aria-label="Прогноз шторма"] .sticky.bottom-0 {
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  html [role="dialog"][aria-label="Прогноз шторма"] .sticky.bottom-0 button {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 48px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  /* карточка груза на карте, карточка узла, уведомление: на всю ширину, прокрутка внутри */
+  html [role="dialog"][aria-label^="Груз"] {
+    position: fixed;
+    inset: auto 0 0 0 !important;
+    z-index: 1100;
+    width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: 14px 14px 0 0;
+  }
+  html [role="dialog"][aria-label^="Груз"] button,
+  html aside.absolute.inset-y-0.right-0 button {
+    min-height: 48px;
+  }
+  html [data-map-ui].w-\[360px\],
+  html [data-map-ui].w-\[380px\] {
+    left: 8px !important;
+    right: 8px !important;
+    width: auto;
+  }
+
+  /* панели двойника и вариантов: на весь экран, прокручиваются внутри */
+  html aside.absolute.inset-y-0.right-0 {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    width: 100%;
+  }
+
+  /* экран входа: помещается без прокрутки */
+  html .min-h-\[720px\] {
+    min-height: 0;
+  }
+  html .min-h-\[720px\] > main {
+    justify-content: flex-start;
+    padding: 14px 16px;
+  }
+  html .min-h-\[720px\] > main .mb-6 {
+    margin-bottom: 12px;
+  }
+  html .min-h-\[720px\] > main form {
+    margin-top: 14px;
+  }
+}

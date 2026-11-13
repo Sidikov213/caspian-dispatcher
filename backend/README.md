@@ -124,37 +124,20 @@ FastAPI, один процесс. Контракт — раздел 5 `CLAUDE.md
 
 ## Продакшен-сервер
 
-Постоянный адрес для команды, сайта, приложения и бота:
+**Демо-стенд выключен после хакатона.** Пока он работал, это был один VPS: uvicorn за Caddy с HTTPS, сервис systemd, наружу только 22, 80 и 443. Caddy отдавал `/` → сайт, `/api` и `/ws` → backend, `/tg/` → мини-приложение. Telegram-бот работал только там: один токен — одно место, в локальном `.env` `BOT_TOKEN` пустой.
 
-- **Сайт (логист):** `https://129-101-122-103.sslip.io/`
-- **API:** `https://129-101-122-103.sslip.io/api`, заголовок `X-API-Key: <ключ из чата>` (это не `caspian-dev-key`).
-- **WebSocket:** `wss://129-101-122-103.sslip.io/ws?api_key=<ключ>`.
-- **Swagger:** https://129-101-122-103.sslip.io/docs
-- **Telegram mini-app (позже):** `https://129-101-122-103.sslip.io/tg/`
+### Выкатка
 
-Сервер: VPS Timeweb (Амстердам), Ubuntu 24.04, 1 ГБ памяти + 2 ГБ подкачки. HTTPS — Caddy с сертификатом Let's Encrypt на домен `sslip.io` (он сам указывает на IP, покупать домен не нужно). Наружу открыты только 22, 80, 443 (ufw); uvicorn слушает `127.0.0.1:8000`, один процесс, сервис systemd `caspian-backend` с автозапуском и перезапуском при падении. Код бэкенда — `/opt/caspian/backend`, статика сайта — `/opt/caspian/website`, `.env` собирается из секретов репозитория при выкатке. Caddy: `/` → сайт, `/api` и `/ws` → backend.
-
-**Telegram-бот работает только здесь.** Один токен — одно место: в локальном `.env` `BOT_TOKEN` пустой. Привязки пользователей (`data/users.json`) на сервер не переносились — после переезда каждый один раз жмёт `/start`. Аккаунты сайта (`data/accounts.json`) на сервере свои; демо-аккаунты `logist@demo.ru` / `expeditor@demo.ru` созданы при первом старте.
-
-### Выкатка и обслуживание — одной командой
-
-Выкатка идёт через GitHub Actions (`.github/workflows/deploy.yml`): раннер GitHub заходит на сервер по SSH, собирает `website/` (Next static export с `NEXT_PUBLIC_API_URL=https://129-101-122-103.sslip.io`), копирует `backend/` и `website/out/` через rsync, пишет `.env`, ставит зависимости, настраивает Caddy, перезапускает сервис и прогоняет проверки (в т.ч. главная страница снаружи). Выкатывается то, что запушено в `main`.
+Выкатка идёт через GitHub Actions (`.github/workflows/deploy.yml`): раннер заходит на сервер по SSH, собирает `website/` (Next static export с `NEXT_PUBLIC_API_URL` = адрес стенда), копирует `backend/` и `website/out/` через rsync, пишет `.env` из секретов репозитория, ставит зависимости, настраивает Caddy, перезапускает сервис и прогоняет проверки. Выкатывается то, что запушено в `main`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1            # выкатить main
-powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 logs       # журнал: journalctl -u caspian-backend -n 200
-powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 restart    # systemctl restart caspian-backend
+powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 logs       # журнал сервиса
+powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 restart    # перезапуск
 powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 check      # только проверки
-powershell -ExecutionPolicy Bypass -File backend\scripts\deploy.ps1 deploy -Upgrade   # с apt upgrade
 ```
 
-Нужен `gh` с доступом к репозиторию. То же самое — кнопкой **Run workflow** на вкладке Actions → `deploy`. Скрипт печатает итог проверок: с сервера — Telegram `getMe`, волна из Open-Meteo, `/api/model` (CatBoost), `/api/demo/check`; снаружи — `/api/graph` с ключом, вход `logist@demo.ru`, WebSocket `/ws`, `/docs`.
-
-Если есть прямой SSH-доступ (ключ `~/.ssh/caspian_vps`): `ssh -i ~/.ssh/caspian_vps root@129.101.122.103`, дальше `journalctl -u caspian-backend -f`, `systemctl restart caspian-backend`, `journalctl -u caddy -n 50`. С ноутбука тимлида сервер напрямую недоступен (сеть режет адрес), поэтому всё — через Actions.
-
-**Секреты репозитория** (Settings → Secrets → Actions): `VPS_HOST`, `VPS_SSH_KEY` (приватный ключ деплоя), `API_KEY`, `JWT_SECRET`, `BOT_TOKEN`. Сменить ключ API: `gh secret set API_KEY`, затем выкатка — и раздать новый ключ команде.
-
-**HTTPS.** Если Let's Encrypt не выдаст сертификат за 5 минут, `server_setup.sh` оставит HTTP на 80 порту (`http://129.101.122.103/api`) и напишет `HTTPS_FAILED` в логе; при следующей выкатке HTTPS пробуется снова.
+Нужен `gh` с доступом к репозиторию. **Секреты репозитория** (Settings → Secrets → Actions): `VPS_HOST`, `VPS_SSH_KEY`, `API_KEY`, `JWT_SECRET`, `BOT_TOKEN`, `FIREBASE_ADMIN_JSON`. Адрес и ключи в документах не публикуются.
 
 ## Общий сервер
 
@@ -191,7 +174,7 @@ ssh -p 443 -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -R0:127
 - **Бот:** при заданном `PUBLIC_URL` кнопка меню чата «Пульт» открывает `/tg/`, в алерте кнопка «📱 Открыть пульт» открывает вкладку «Решения» (`/tg/?tab=decisions`). В приветствии и в шапке пульта — «Демо-кабинет компании „Каспий Логистик“» (`DEMO_COMPANY`).
 - **Груз, созданный вручную** (`manual: true`), виден всем, бронирует место на пароме сразу, участвует в наблюдателе и сценариях и исчезает при `demo/reset`. Маршрут — допустимый путь с самым ранним прибытием по расписанию. Груз, созданный сейчас в Москве, на паром А (+44 ч) не успевает и идёт по суше; паромом идут, например, Астрахань → Энзели или Самара → Энзели.
 
-Настройки `.env`: `PUBLIC_URL` (например `https://129-101-122-103.sslip.io`), `DEMO_COMPANY` (по умолчанию «Каспий Логистик»).
+Настройки `.env`: `PUBLIC_URL` (адрес стенда, например `https://example.org`), `DEMO_COMPANY` (по умолчанию «Каспий Логистик»).
 
 Проверить локально без Telegram: подписать initData тестовым токеном (`app.tgauth.sign_init_data`) и открыть `http://localhost:8000/tg/?tab=decisions#tgWebAppData=<initData, urlencoded>&tgWebAppVersion=8.0` при `BOT_TOKEN=<тот же токен>`.
 
@@ -207,12 +190,12 @@ ssh -p 443 -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -R0:127
 
 Ошибки в общем формате: `409 email_taken` (email уже есть, регистр не важен), `401 invalid_credentials` (неверный email или пароль), `422 weak_password` (пароль короче 6 символов), `422 invalid_email`, `422 validation_error` (например, роль не из списка), `401 invalid_token` на `/auth/me` (нет токена, чужой, истёк).
 
-- **Демо-аккаунты** создаются при первом старте, если их нет: `logist@demo.ru` и `expeditor@demo.ru`, пароль `demo123`. Для быстрого входа на защите.
+- **Демо-аккаунты** логиста и экспедитора создаются при первом старте, если их нет; пароли задаются при первом запуске. Для быстрого входа на защите.
 - **Хранение:** `data/accounts.json` (не в git), отдельно от состояния демо: переживает `POST /api/demo/reset` и перезапуск сервера. Пароль хранится только как хэш scrypt с солью.
 - **Токен:** JWT HS256 на 7 дней, подписан ключом, выведенным из `JWT_SECRET` (отдельно от ключа QR-пропусков). Клиент хранит его и шлёт только на `/auth/me`. Подтверждения почты, восстановления и смены пароля нет.
 
 ```bash
-curl -X POST -H "X-API-Key: <ключ>" -H "Content-Type: application/json" -d '{"email":"logist@demo.ru","password":"demo123"}' http://localhost:8000/api/auth/login
+curl -X POST -H "X-API-Key: <ключ>" -H "Content-Type: application/json" -d '{"email":"<email>","password":"<пароль>"}' http://localhost:8000/api/auth/login
 ```
 ```bash
 curl -H "X-API-Key: <ключ>" -H "Authorization: Bearer <token>" http://localhost:8000/api/auth/me

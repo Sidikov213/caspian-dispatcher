@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cargoIcon } from "@/lib/derive";
 import { formatDateTime, formatPercent, shipmentNumber, shortNodeName } from "@/lib/format";
 import type { GraphNode, Shipment } from "@/lib/types";
@@ -19,6 +19,10 @@ function nodeName(nodes: Map<string, GraphNode>, id: string) {
   return n ? shortNodeName(n.name) : id;
 }
 
+/** Грузы, у которых подсветка «стал под риском» уже отыграла: при возврате на пульт она не повторяется. */
+const riskFlashed = new Set<string>();
+const RISK_FLASH_MS = 1400;
+
 function ShipmentCard({
   s,
   nodes,
@@ -32,6 +36,17 @@ function ShipmentCard({
 }) {
   const atRisk = s.display_status === "at_risk";
   const rerouted = s.display_status === "rerouted";
+  // Груз стал «Под риском» — строка один раз мягко подсвечивается (класс risk-flash); повторно — только
+  // после того, как риск сняли и он появился снова.
+  const flash = atRisk && !riskFlashed.has(s.id);
+  useEffect(() => {
+    if (!atRisk) {
+      riskFlashed.delete(s.id);
+      return;
+    }
+    const t = window.setTimeout(() => riskFlashed.add(s.id), RISK_FLASH_MS);
+    return () => window.clearTimeout(t);
+  }, [atRisk, s.id]);
   const border = selected ? "var(--color-transit)" : atRisk ? "var(--color-risk-line)" : rerouted ? "var(--color-ok-line)" : "var(--color-line)";
   const tile = atRisk ? "var(--color-risk-soft)" : rerouted ? "var(--color-ok-soft)" : "var(--color-info-soft)";
   const iconColor = atRisk ? "var(--color-risk)" : rerouted ? "var(--color-rerouted)" : "var(--color-transit)";
@@ -42,7 +57,7 @@ function ShipmentCard({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className="block h-[90px] w-full shrink-0 rounded-[12px] border pt-[10px] pr-[13px] pl-[11px] text-left transition-colors hover:brightness-110"
+      className={`block h-[90px] w-full shrink-0 rounded-[12px] border pt-[10px] pr-[13px] pl-[11px] text-left transition-colors hover:brightness-110${flash ? " risk-flash" : ""}`}
       style={{ borderColor: border, background: selected ? "var(--color-info-soft)" : "var(--color-panel)" }}
     >
       <div className="flex gap-[8px]">

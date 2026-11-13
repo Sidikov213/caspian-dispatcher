@@ -6,6 +6,7 @@ import type { WeatherSummary } from "@/lib/derive";
 import { formatDecimal, formatInt, formatRub, formatSignedPct } from "@/lib/format";
 import { ROLE_LABEL, can, clearSession, useSessionUser } from "@/lib/session";
 import { setSiteTheme, useSiteTheme } from "@/lib/theme";
+import { useCountUp } from "@/lib/useCountUp";
 import { DemoBadge } from "./DemoBadge";
 import type { PlaybackSpeed, ScenarioPreset, Stats } from "@/lib/types";
 import { ChevronDownIcon, ClockIcon, CloseIcon, HazardIcon, LeafIcon, LogoWordmark, RouteIcon, StormIcon, WavesIcon } from "./icons";
@@ -52,9 +53,15 @@ function PlaybackSwitch({ value, onChange }: { value: PlaybackSpeed; onChange(v:
   );
 }
 
-function Saved({ icon, value, label, good }: { icon: React.ReactNode; value: string; label: string; good?: boolean }) {
+function Saved({ icon, value, label, good, flash = 0 }: { icon: React.ReactNode; value: string; label: string; good?: boolean; flash?: number }) {
+  // flash растёт на 1, когда счётчик добежал до нового значения: подсветка включается один раз и после
+  // окончания класс снимается — разметка возвращается ровно к прежней.
+  const [played, setPlayed] = useState(0);
   return (
-    <div className="flex items-start gap-[9px]">
+    <div
+      className={`flex items-start gap-[9px]${flash > played ? " saved-flash" : ""}`}
+      onAnimationEnd={() => setPlayed(flash)}
+    >
       <span className={`mt-[2px] ${good ? "text-ok" : "text-muted"}`}>{icon}</span>
       <div>
         <div className={`tnum text-[18px] leading-[22px] font-bold ${good ? "text-ok" : ""}`}>{value}</div>
@@ -118,6 +125,10 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
   }, [open]);
 
   const hours = stats?.saved_hours ?? 0;
+  // Счётчики добегают до нового значения за 1 с (только показ; числа — с сервера, в конце ровно они).
+  const hoursUp = useCountUp(hours);
+  const rubUp = useCountUp(stats?.saved_rub ?? 0);
+  const co2Up = useCountUp(co2Pct);
 
   return (
     <header className="relative z-30 flex h-20 shrink-0 items-center border-b border-line bg-panel pr-[21px] pl-5">
@@ -136,13 +147,13 @@ export function AppHeader({ stats, co2Pct, weather, presets, onScenario, onReset
         Расчётная экономия
       </div>
       <div className="w-[125px]">
-        <Saved icon={<ClockIcon size={15} />} value={formatInt(hours)} label="груз-часов" good={hours > 0} />
+        <Saved icon={<ClockIcon size={15} />} value={formatInt(hoursUp.value)} label="груз-часов" good={hours > 0} flash={hoursUp.flash} />
       </div>
       <div className="w-[159px]">
-        <Saved icon={<RouteIcon size={15} />} value={formatRub(stats?.saved_rub ?? 0)} label="Расходы" good={(stats?.saved_rub ?? 0) > 0} />
+        <Saved icon={<RouteIcon size={15} />} value={formatRub(rubUp.value)} label="Расходы" good={(stats?.saved_rub ?? 0) > 0} flash={rubUp.flash} />
       </div>
       <div className="w-[141px]">
-        <Saved icon={<LeafIcon size={15} />} value={formatSignedPct(co2Pct)} label="CO₂" good={co2Pct < -0.05} />
+        <Saved icon={<LeafIcon size={15} />} value={formatSignedPct(co2Up.value)} label="CO₂" good={co2Pct < -0.05} flash={co2Up.flash} />
       </div>
 
       <div className="h-[38px] w-px bg-line" />

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatDateTime } from "@/lib/format";
 import type { AlertOption, NegotiationStep } from "@/lib/types";
+import { CheckIcon } from "./icons";
 
 /** Шаги согласования появляются по одному с этим интервалом. */
 const STEP_MS = 700;
@@ -66,9 +67,14 @@ export function NegotiationBlock({ steps }: { steps: NegotiationStep[] }) {
         <div className="caps text-[10.5px] font-bold text-muted">Согласование</div>
         <div
           aria-live="polite"
-          className="tnum text-[12px] font-bold"
+          className="tnum flex items-center gap-[5px] text-[12px] font-bold"
           style={{ color: !done ? "var(--color-muted)" : ok ? "var(--color-ok)" : "var(--color-risk-text)" }}
         >
+          {done && ok && (
+            <span aria-hidden className="negotiation-done flex">
+              <CheckIcon size={13} strokeWidth={2.6} />
+            </span>
+          )}
           {!done
             ? `Шаг ${shown} из ${total}…`
             : ok

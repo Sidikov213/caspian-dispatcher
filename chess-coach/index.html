@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chess Coach</title>
+  </head>
+  <body>
+    <header>
+      <h1>Chess Coach</h1>
+      <nav>
+        <button id="tab-play" class="tab active">Игра с ботом</button>
+        <button id="tab-review" class="tab">Разбор партии</button>
+      </nav>
+      <span id="engine-status">Stockfish загружается…</span>
+    </header>
+
+    <main id="view-play" class="view">
+      <div class="board-col">
+        <div class="evalbar"><div id="play-bar" class="evalbar-white"></div></div>
+        <div id="play-board" class="board"></div>
+      </div>
+      <aside class="panel">
+        <div class="row">
+          <label>Играю за
+            <select id="play-side"><option value="white">белых</option><option value="black">чёрных</option></select>
+          </label>
+          <label>Сила бота
+            <select id="play-level"></select>
+          </label>
+          <button id="play-new" class="primary">Новая партия</button>
+        </div>
+        <div class="row">
+          <button id="play-hint">Подсказка</button>
+          <button id="play-threat">Что грозит?</button>
+          <button id="play-undo">Ход назад</button>
+          <label class="check"><input id="play-coach" type="checkbox" checked /> Тренер</label>
+        </div>
+        <div id="play-status" class="status"></div>
+        <div id="play-eval" class="evaltext"></div>
+        <div id="play-feedback" class="note"></div>
+        <div id="play-hint-text" class="note"></div>
+        <div id="play-moves" class="moves"></div>
+        <button id="play-review">Разобрать эту партию</button>
+      </aside>
+    </main>
+
+    <main id="view-review" class="view hidden">
+      <div class="board-col">
+        <div class="evalbar"><div id="review-bar" class="evalbar-white"></div></div>
+        <div id="review-board" class="board"></div>
+      </div>
+      <aside class="panel">
+        <div id="review-input">
+          <textarea id="review-pgn" placeholder="Вставьте партию в формате PGN (на Lichess и Chess.com: «Поделиться» → PGN)"></textarea>
+          <div class="row">
+            <button id="review-run" class="primary">Разобрать</button>
+            <label class="file">Открыть файл .pgn<input id="review-file" type="file" accept=".pgn,.txt" /></label>
+          </div>
+          <div id="review-error" class="error"></div>
+        </div>
+        <div id="review-progress" class="hidden"><div class="progress"><div id="review-progress-bar"></div></div><span id="review-progress-text"></span></div>
+        <div id="review-result" class="hidden">
+          <div id="review-summary" class="summary"></div>
+          <svg id="review-graph" class="graph" viewBox="0 0 400 80" preserveAspectRatio="none"></svg>
+          <div class="row">
+            <button id="review-prev">← Назад</button>
+            <button id="review-next">Вперёд →</button>
+            <button id="review-flip">Перевернуть</button>
+            <button id="review-other">Другая партия</button>
+          </div>
+          <div id="review-note" class="note"></div>
+          <div class="row" id="train-start">
+            <button id="train-white">Тренировать ошибки белых</button>
+            <button id="train-black">Тренировать ошибки чёрных</button>
+          </div>
+          <div class="row hidden" id="train-controls">
+            <button id="train-show">Показать ответ</button>
+            <button id="train-next" class="primary">Дальше</button>
+            <button id="train-stop">Закончить</button>
+          </div>
+          <div id="review-moves" class="moves"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>Движок Stockfish и доска chessground (Lichess), лицензия GPL-3.0. Подсказки работают только в партиях с ботом и в разборе сыгранных партий.</footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

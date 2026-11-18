@@ -19,6 +19,10 @@ npm run dev     # режим разработки в браузере
 npm run dist    # установщик/портативный файл в release/ (собирать на своей ОС)
 ```
 
+### Ярлык на рабочем столе (Windows)
+
+Дважды щёлкните `install-windows.bat`: он поставит зависимости, соберёт приложение и создаст ярлык «Chess Coach» на рабочем столе. Папку проекта после этого не переносите — ярлык ссылается на неё.
+
 ## Из чего сделано
 
 - доска — [chessground](https://github.com/lichess-org/chessground), правила и PGN — [chessops](https://github.com/niklasf/chessops) (обе библиотеки Lichess);
